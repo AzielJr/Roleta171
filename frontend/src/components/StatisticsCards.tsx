@@ -4,9 +4,12 @@ import { useStatistics } from '../hooks/useStatistics';
 
 interface StatisticsCardsProps {
   statistics: Statistics;
+  patternDetectedCount?: number;
+  winCount?: number;
+  lossCount?: number;
 }
 
-export function StatisticsCards({ statistics }: StatisticsCardsProps) {
+export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0 }: StatisticsCardsProps) {
   const {
     totalNumbers,
     colorPercentages,
@@ -27,7 +30,7 @@ export function StatisticsCards({ statistics }: StatisticsCardsProps) {
         {data.map((item, index) => (
           <div key={item.label} className="flex items-center justify-between">
             <div className="flex items-center gap-1">
-              <div className={`w-2 h-2 rounded-full ${colors[index]}`}></div>
+              <div className={`w-3 h-3 rounded-full ${colors[index]}`}></div>
               <span className="text-xs text-gray-600 truncate">{item.label}</span>
             </div>
             <div className="text-right">
@@ -42,16 +45,8 @@ export function StatisticsCards({ statistics }: StatisticsCardsProps) {
 
   return (
     <div className="space-y-3">
-      {/* Header com total */}
-      <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-        <div className="text-center">
-          <div className="text-2xl font-bold text-blue-600">{totalNumbers}</div>
-          <div className="text-xs text-blue-800">Total de Números</div>
-        </div>
-      </div>
-
-      {/* Grid compacto de estatísticas */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+      {/* Grid com todos os 6 cards em uma linha */}
+      <div className="grid grid-cols-6 gap-2">
         <StatCard
           title="Cores"
           data={[
@@ -98,6 +93,16 @@ export function StatisticsCards({ statistics }: StatisticsCardsProps) {
             { label: '3ª Coluna', value: statistics.columns.third, percentage: columnsPercentages.third }
           ]}
           colors={['bg-emerald-500', 'bg-teal-500', 'bg-lime-500']}
+        />
+
+        <StatCard
+          title="📊 Sistema I7I"
+          data={[
+            { label: 'Entradas', value: patternDetectedCount, percentage: totalNumbers > 0 ? Math.round((patternDetectedCount / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: winCount, percentage: patternDetectedCount > 0 ? Math.round((winCount / patternDetectedCount) * 100) : 0 },
+            { label: 'LOSS', value: lossCount, percentage: patternDetectedCount > 0 ? Math.round((lossCount / patternDetectedCount) * 100) : 0 }
+          ]}
+          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500']}
         />
       </div>
     </div>

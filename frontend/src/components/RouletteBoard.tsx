@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '../utils/cn';
+import { StatisticsCards } from './StatisticsCards';
+import { useStatistics } from '../hooks/useStatistics';
+import { calculateStatistics } from '../utils/statisticsCalculator';
+import { getNumberColor as getNumberColorUtil } from '../utils/rouletteConfig';
 
 interface SelectedNumbers {
   numbers: number[];
@@ -33,6 +37,19 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   
   // Estado para armazenar os últimos 50 números sorteados
   const [lastNumbers, setLastNumbers] = useState<number[]>([]);
+  
+  // Converter lastNumbers para Statistics e usar useStatistics
+  const statisticsData = React.useMemo(() => {
+    const rouletteEntries = lastNumbers.map(number => ({
+      number,
+      color: getNumberColorUtil(number) as 'green' | 'red' | 'black',
+      createdAt: new Date()
+    }));
+    return calculateStatistics(rouletteEntries);
+  }, [lastNumbers]);
+  
+  // Hook para calcular estatísticas
+  const statistics = useStatistics(statisticsData);
   
   // Estado para controlar a simulação automática
   const [isSimulating, setIsSimulating] = useState(false);
@@ -902,7 +919,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
       <div className="max-w-7xl mx-auto mb-auto p-6 bg-green-700 rounded-xl shadow-2xl" style={{marginTop: '-20px'}}>
       {/* Título e botões na mesma linha */}
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center" style={{marginTop: '-10px', marginBottom: '9px'}}>
         <h1 className="text-2xl font-bold text-white" style={{marginTop: '-15px'}}>Roleta Europeia</h1>
         <div className="flex gap-2">
           <button
@@ -1184,138 +1201,25 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             </div>
           </div>
 
-          {/* Painel de Estatísticas - Direita - Layout em 6 Colunas */}
-          <div className="flex-1 bg-gray-800 rounded-lg p-3 h-fit">
-            <h3 className="text-white font-bold -mt-1.5 mb-3 text-center text-sm">📊 Estatísticas dos Sorteios</h3>
+          {/* Painel de Estatísticas - Direita */}
+          <div className="flex-1 bg-gray-800 rounded-lg p-3 h-fit" style={{marginTop: '-21px'}}>
+            {/* Cabeçalho com título à esquerda e total à direita */}
+            <div className="flex justify-between items-center -mt-1.5" style={{marginBottom: '3px'}}>
+              <h3 className="text-white font-bold text-sm">📊 Estatísticas dos Sorteios</h3>
+              <div className="text-white text-sm">
+                <span className="text-gray-300">Total de Números Chamados: </span>
+                <span className="font-bold text-blue-400">{lastNumbers.length}</span>
+              </div>
+            </div>
             
-            {/* Layout em 6 colunas */}
-            <div className="grid grid-cols-6 gap-3">
-              {/* Coluna 1 - Números */}
-              <div className="bg-gray-700 rounded p-2">
-                <h4 className="text-white font-semibold mb-2 text-xs">🎯 Números</h4>
-                <div className="grid grid-cols-3 gap-1 text-center">
-                  <div>
-                    <div className="text-gray-300 text-xs">Total</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.length}</div>
-                    <div className="text-gray-400 text-xs">100%</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-300 text-xs">Pares</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => n !== 0 && n % 2 === 0).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => n !== 0 && n % 2 === 0).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-300 text-xs">Ímpares</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => n % 2 === 1).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => n % 2 === 1).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Coluna 2 - Cores */}
-              <div className="bg-gray-700 rounded p-2">
-                <h4 className="text-white font-semibold mb-2 text-xs">🎨 Cores</h4>
-                <div className="grid grid-cols-3 gap-1 text-center">
-                  <div>
-                    <div className="text-red-400 text-xs">● Verm.</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(n)).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(n)).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-300 text-xs">● Pretos</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => n !== 0 && ![1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(n)).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => n !== 0 && ![1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(n)).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                  <div>
-                    <div className="text-green-400 text-xs">● Verde</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => n === 0).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => n === 0).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Coluna 3 - Faixas */}
-              <div className="bg-gray-700 rounded p-2">
-                <h4 className="text-white font-semibold mb-2 text-xs">📈 Faixas</h4>
-                <div className="grid grid-cols-2 gap-1 text-center">
-                  <div>
-                    <div className="text-gray-300 text-xs">1-18</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => n >= 1 && n <= 18).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => n >= 1 && n <= 18).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-300 text-xs">19-36</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => n >= 19 && n <= 36).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => n >= 19 && n <= 36).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Coluna 4 - Dúzias */}
-              <div className="bg-gray-700 rounded p-2">
-                <h4 className="text-white font-semibold mb-2 text-xs">🎲 Dúzias</h4>
-                <div className="grid grid-cols-3 gap-1 text-center">
-                  <div>
-                    <div className="text-gray-300 text-xs">1ª</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => n >= 1 && n <= 12).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => n >= 1 && n <= 12).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-300 text-xs">2ª</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => n >= 13 && n <= 24).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => n >= 13 && n <= 24).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-300 text-xs">3ª</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => n >= 25 && n <= 36).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => n >= 25 && n <= 36).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Coluna 5 - Colunas */}
-              <div className="bg-gray-700 rounded p-2">
-                <h4 className="text-white font-semibold mb-2 text-xs">📋 Colunas</h4>
-                <div className="grid grid-cols-3 gap-1 text-center">
-                  <div>
-                    <div className="text-gray-300 text-xs">Col 1</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34].includes(n)).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34].includes(n)).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-300 text-xs">Col 2</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35].includes(n)).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35].includes(n)).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-300 text-xs">Col 3</div>
-                    <div className="text-white font-bold text-sm">{lastNumbers.filter(n => [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36].includes(n)).length}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((lastNumbers.filter(n => [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36].includes(n)).length / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Coluna 6 - I7I */}
-              <div className="bg-gray-700 rounded p-2">
-                <h4 className="text-white font-semibold mb-2 text-xs">📊 I7I</h4>
-                <div className="grid grid-cols-3 gap-1 text-center">
-                  <div>
-                    <div className="text-gray-300 text-xs">Entradas</div>
-                    <div className="text-white font-bold text-sm">{patternDetectedCount}</div>
-                    <div className="text-gray-400 text-xs">{lastNumbers.length > 0 ? Math.round((patternDetectedCount / lastNumbers.length) * 100) : 0}%</div>
-                  </div>
-                  <div>
-                    <div className="text-green-400 text-xs">WIN</div>
-                    <div className="text-white font-bold text-sm">{winCount}</div>
-                    <div className="text-gray-400 text-xs">{patternDetectedCount > 0 ? Math.round((winCount / patternDetectedCount) * 100) : 0}%</div>
-                  </div>
-                  <div>
-                    <div className="text-red-400 text-xs">LOSS</div>
-                    <div className="text-white font-bold text-sm">{lossCount}</div>
-                    <div className="text-gray-400 text-xs">{patternDetectedCount > 0 ? Math.round((lossCount / patternDetectedCount) * 100) : 0}%</div>
-                  </div>
-                </div>
-              </div>
+            {/* Usar o componente StatisticsCards com tema escuro */}
+            <div className="[&_.bg-white]:bg-gray-700 [&_.text-gray-800]:text-white [&_.text-gray-600]:text-gray-300 [&_.text-gray-500]:text-gray-400 [&_.shadow-md]:shadow-lg">
+              <StatisticsCards 
+                statistics={statisticsData} 
+                patternDetectedCount={patternDetectedCount}
+                winCount={winCount}
+                lossCount={lossCount}
+              />
             </div>
           </div>
         </div>
