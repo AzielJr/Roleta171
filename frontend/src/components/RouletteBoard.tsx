@@ -1666,7 +1666,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                   </div>
                   <div className="text-center">
                     <span className="bg-green-200 text-green-800 px-1 py-0.5 rounded text-xs font-semibold">
-                      30 números (81%)  -  ou  -  32 números (88%)
+                      30 números (81%)  -  ou  -  32 números (86%)
                     </span>
                   </div>
                 </div>
