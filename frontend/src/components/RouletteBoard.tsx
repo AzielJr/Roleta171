@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '../utils/cn';
 import { StatisticsCards } from './StatisticsCards';
+import { BalanceManager } from './BalanceManager';
 import { useStatistics } from '../hooks/useStatistics';
 import { calculateStatistics } from '../utils/statisticsCalculator';
 import { getNumberColor as getNumberColorUtil } from '../utils/rouletteConfig';
@@ -1989,6 +1990,11 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         </div>
       </div>
     )}
+
+    {/* Gerenciador de Saldo */}
+    <div className="max-w-7xl mx-auto mt-6">
+      <BalanceManager />
+    </div>
     </>
   );
 };
