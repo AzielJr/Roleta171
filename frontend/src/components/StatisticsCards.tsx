@@ -7,9 +7,11 @@ interface StatisticsCardsProps {
   patternDetectedCount?: number;
   winCount?: number;
   lossCount?: number;
+  numbersWithoutPattern?: number;
+  totalNumbersWithoutPattern?: number;
 }
 
-export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0 }: StatisticsCardsProps) {
+export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0 }: StatisticsCardsProps) {
   const {
     totalNumbers,
     colorPercentages,
@@ -20,7 +22,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
   } = useStatistics(statistics);
 
   const StatCard = ({ title, data, colors }: {
-    title: string;
+    title: string | React.ReactNode;
     data: Array<{ label: string; value: number; percentage: number }>;
     colors: string[];
   }) => (
@@ -96,7 +98,12 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
         />
 
         <StatCard
-          title="📊 Sistema I7I"
+          title={
+            <div className="flex justify-between items-center w-full">
+              <span>📊 171</span>
+              <span className="font-normal text-xs text-gray-500">Qtd: <span className="font-bold text-white">{numbersWithoutPattern}</span> - Méd: <span className="font-bold text-white">{patternDetectedCount > 0 ? Math.round((totalNumbers / patternDetectedCount) * 100) / 100 : 0}</span></span>
+            </div>
+          }
           data={[
             { label: 'Entradas', value: patternDetectedCount, percentage: totalNumbers > 0 ? Math.round((patternDetectedCount / totalNumbers) * 100) : 0 },
             { label: 'WIN', value: winCount, percentage: patternDetectedCount > 0 ? Math.round((winCount / patternDetectedCount) * 100) : 0 },

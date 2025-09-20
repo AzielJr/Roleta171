@@ -12,3 +12,127 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Animações personalizadas para transições mais sofisticadas */
+@keyframes slideInFromRight {
+  0% {
+    opacity: 0;
+    transform: translateX(40px) scale(0.9) rotateY(15deg);
+    filter: blur(8px);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translateX(10px) scale(0.95) rotateY(5deg);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1) rotateY(0deg);
+    filter: blur(0);
+  }
+}
+
+@keyframes slideOutToRight {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1) rotateY(0deg);
+    filter: blur(0);
+  }
+  50% {
+    opacity: 0.3;
+    transform: translateX(15px) scale(0.95) rotateY(-5deg);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(40px) scale(0.9) rotateY(-15deg);
+    filter: blur(8px);
+  }
+}
+
+@keyframes slideInFromLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-40px) scale(0.9) rotateY(-15deg);
+    filter: blur(8px);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translateX(-10px) scale(0.95) rotateY(-5deg);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1) rotateY(0deg);
+    filter: blur(0);
+  }
+}
+
+@keyframes slideOutToLeft {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1) rotateY(0deg);
+    filter: blur(0);
+  }
+  50% {
+    opacity: 0.3;
+    transform: translateX(-15px) scale(0.95) rotateY(5deg);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-40px) scale(0.9) rotateY(15deg);
+    filter: blur(8px);
+  }
+}
+
+@keyframes fadeInScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translateY(20px);
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes fadeOutScale {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8) translateY(-20px);
+    filter: blur(4px);
+  }
+}
+
+/* Classes utilitárias para as animações */
+.animate-slide-in-right {
+  animation: slideInFromRight 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-slide-out-right {
+  animation: slideOutToRight 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInFromLeft 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-slide-out-left {
+  animation: slideOutToLeft 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-fade-in-scale {
+  animation: fadeInScale 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-fade-out-scale {
+  animation: fadeOutScale 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}

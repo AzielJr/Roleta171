@@ -79,6 +79,28 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [highlightedBetNumbers, setHighlightedBetNumbers] = useState<number[]>([]);
   const [highlightedRiskNumbers, setHighlightedRiskNumbers] = useState<number[]>([]);
   
+  // Estados para o modal de cálculo de lucro
+  const [showProfitModal, setShowProfitModal] = useState(false);
+  const [profitParams, setProfitParams] = useState({
+    days: 30,
+    startDate: new Date().toISOString().split('T')[0],
+    initialValue: 100.00,
+    dailyProfitPercent: 3.00,
+    compoundInterest: true
+  });
+  const [profitResults, setProfitResults] = useState<Array<{
+    date: string;
+    currentBalance: number;
+    dailyProfit: number;
+    totalAccumulated: number;
+  }>>([]);
+  
+  // Estado para contar números sorteados sem padrão detectado
+  const [numbersWithoutPattern, setNumbersWithoutPattern] = useState<number>(0);
+  
+  // Estado para acumular o total de números sem padrão (para calcular média)
+  const [totalNumbersWithoutPattern, setTotalNumbersWithoutPattern] = useState<number>(0);
+  
   // Estado para contar quantas vezes o popup apareceu (Entrada)
   const [patternDetectedCount, setPatternDetectedCount] = useState<number>(0);
 
@@ -291,15 +313,24 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
   // Função para detectar padrão de 2 números consecutivos em grupo de até 5 na sequência real
   const detectPattern = (history: number[]): PatternAlert | null => {
-    if (history.length < 2) return null;
+    console.log(`[DEBUG] Detectando padrão no histórico:`, history);
+    
+    if (history.length < 2) {
+      console.log(`[DEBUG] Histórico muito pequeno (${history.length} números)`);
+      return null;
+    }
     
     // Verificar apenas os últimos 2 números sorteados consecutivamente
     const lastNumber = history[history.length - 1];
     const secondLastNumber = history[history.length - 2];
     
+    console.log(`[DEBUG] Últimos 2 números: ${secondLastNumber} e ${lastNumber}`);
+    
     // Encontrar posições na sequência da roleta
     const pos1 = ROULETTE_SEQUENCE.indexOf(lastNumber);
     const pos2 = ROULETTE_SEQUENCE.indexOf(secondLastNumber);
+    
+    console.log(`[DEBUG] Posições na roleta: ${secondLastNumber}(pos ${pos2}) e ${lastNumber}(pos ${pos1})`);
     
     if (pos1 === -1 || pos2 === -1) return null;
     
@@ -309,21 +340,31 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       37 - Math.abs(pos1 - pos2)
     );
     
+    console.log(`[DEBUG] Distância entre números: ${distance}`);
+    
     // Se a distância for <= 4 (grupo de até 5 números), detectou padrão
     if (distance <= 4) {
+      console.log(`[DEBUG] PADRÃO DETECTADO! Distância ${distance} <= 4`);
+      
       const strategy = calculateBettingStrategy([secondLastNumber, lastNumber]);
       
       let message = `Padrão detectado! Os números ${secondLastNumber} e ${lastNumber} saíram consecutivamente em um grupo de ${distance + 1} números na sequência da roleta.`;
       
       if (strategy) {
         message += `\n\n🎯 ESTRATÉGIA DE APOSTA:\nAposte nos números: ${strategy.betNumbers.join(' e ')}\n(cada um com 7 vizinhos de cada lado)\n\n📊 COBERTURA:\n• Números apostados (30): ${strategy.coveredNumbers.join(', ')}\n• Números no risco (7): ${strategy.riskNumbers.join(', ')}`;
+        console.log(`[DEBUG] Estratégia calculada:`, strategy);
       }
       
-      return {
+      const alert = {
         numbers: [secondLastNumber, lastNumber],
         positions: [pos2, pos1],
         message: message
       };
+      
+      console.log(`[DEBUG] Retornando alerta:`, alert);
+      return alert;
+    } else {
+      console.log(`[DEBUG] Sem padrão - distância ${distance} > 4`);
     }
     
     return null;
@@ -410,6 +451,12 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     if (pattern) {
       // Sempre computar estatísticas
       setPatternDetectedCount((prev) => prev + 1);
+      
+      // Acumular o valor atual antes de zerar
+      setTotalNumbersWithoutPattern((prev) => prev + numbersWithoutPattern);
+      
+      // Zerar contador de números sem padrão quando padrão é detectado
+      setNumbersWithoutPattern(0);
 
       // Extrair números para apostar (todos os 2 números)
       const betNumbers = pattern.message.includes('Aposte nos números:') ? 
@@ -448,6 +495,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         // Destacar TODOS os números de risco, não apenas primeiro e último
         setHighlightedRiskNumbers(sortedRiskNumbers);
       }
+    } else {
+      // Se não detectou padrão, incrementar contador
+      setNumbersWithoutPattern((prev) => prev + 1);
     }
   };
 
@@ -475,6 +525,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     waitingForNextNumberRef.current = false;
     lastPatternNumbersRef.current = {covered: [], risk: []};
     isSimulatingRef.current = false;
+    setNumbersWithoutPattern(0); // Zerar contador ao limpar tela
+    setTotalNumbersWithoutPattern(0); // Zerar total acumulado ao limpar tela
   };
 
   const getNumberColor = (num: number): string => {
@@ -494,6 +546,11 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     // Limpar destaques do popup quando houver seleção manual
     setHighlightedBetNumbers([]);
     setHighlightedRiskNumbers([]);
+    
+    // Fechar automaticamente o padrão detectado ao selecionar novo número
+    if (patternAlert) {
+      setPatternAlert(null);
+    }
     
     // Definir como último número selecionado
     setLastSelectedNumber(num);
@@ -517,7 +574,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const addToLastNumbers = (num: number) => {
     setLastNumbers(prev => {
       const newList = [num, ...prev];
-      return newList.slice(0, 50); // Manter apenas os últimos 50
+      return newList.slice(0, 60); // Manter apenas os últimos 60
     });
   };
 
@@ -614,7 +671,378 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     }));
   };
 
-  // Função para simular sorteio automático dos primeiros 50 números
+  // Função para forçar padrão 171
+  const forcePattern171 = () => {
+    // Verificar se há pelo menos um número sorteado
+    if (lastNumbers.length === 0) {
+      alert('É necessário ter pelo menos um número sorteado para aplicar o Padrão 171.');
+      return;
+    }
+
+    const lastNumber = lastNumbers[0]; // Último número sorteado
+    const position = ROULETTE_SEQUENCE.indexOf(lastNumber);
+    
+    if (position === -1) {
+      alert('Erro: número não encontrado na sequência da roleta.');
+      return;
+    }
+
+    // Calcular os 7 números: 3 anteriores + número atual + 3 posteriores
+    const exposedNumbers: number[] = [];
+    
+    // Adicionar 3 números anteriores
+    for (let i = 3; i >= 1; i--) {
+      const prevIndex = (position - i + 37) % 37;
+      exposedNumbers.push(ROULETTE_SEQUENCE[prevIndex]);
+    }
+    
+    // Adicionar o número atual
+    exposedNumbers.push(lastNumber);
+    
+    // Adicionar 3 números posteriores
+    for (let i = 1; i <= 3; i++) {
+      const nextIndex = (position + i) % 37;
+      exposedNumbers.push(ROULETTE_SEQUENCE[nextIndex]);
+    }
+
+    // Calcular os 30 números restantes (não expostos)
+    const remainingNumbers = ROULETTE_SEQUENCE.filter(num => !exposedNumbers.includes(num));
+    
+    // Função para obter vizinhos de um número (7 de cada lado = 15 números total incluindo o próprio)
+    const getNeighborsFor15Coverage = (num: number): number[] => {
+      const pos = ROULETTE_SEQUENCE.indexOf(num);
+      if (pos === -1) return [];
+      
+      const neighbors: number[] = [];
+      
+      // Adicionar o próprio número
+      neighbors.push(num);
+      
+      // Adicionar 7 vizinhos de cada lado
+      for (let i = 1; i <= 7; i++) {
+        // Vizinho à esquerda
+        const leftPos = (pos - i + 37) % 37;
+        neighbors.push(ROULETTE_SEQUENCE[leftPos]);
+        
+        // Vizinho à direita
+        const rightPos = (pos + i) % 37;
+        neighbors.push(ROULETTE_SEQUENCE[rightPos]);
+      }
+      
+      return neighbors;
+    };
+
+    // Encontrar os 2 números ideais que cobrem os 30 números restantes
+    let bestCoverageNumbers: number[] = [];
+    let maxCoverage = 0;
+
+    // Testar todas as combinações possíveis de 2 números
+    for (let i = 0; i < ROULETTE_SEQUENCE.length; i++) {
+      for (let j = i + 1; j < ROULETTE_SEQUENCE.length; j++) {
+        const num1 = ROULETTE_SEQUENCE[i];
+        const num2 = ROULETTE_SEQUENCE[j];
+        
+        // Obter cobertura de ambos os números
+        const coverage1 = getNeighborsFor15Coverage(num1);
+        const coverage2 = getNeighborsFor15Coverage(num2);
+        
+        // Combinar coberturas (sem duplicatas)
+        const totalCoverage = [...new Set([...coverage1, ...coverage2])];
+        
+        // Verificar quantos dos 30 números restantes são cobertos
+        const coveredRemainingNumbers = remainingNumbers.filter(num => totalCoverage.includes(num));
+        
+        // Se cobrir exatamente os 30 números restantes (ou o máximo possível)
+        if (coveredRemainingNumbers.length > maxCoverage) {
+          maxCoverage = coveredRemainingNumbers.length;
+          bestCoverageNumbers = [num1, num2];
+        }
+      }
+    }
+
+    // Limpar destaques anteriores
+    setPatternAlert(null);
+    
+    // Destacar os 7 números expostos como números de risco (vermelho)
+    setHighlightedRiskNumbers(exposedNumbers);
+    
+    // Destacar os 2 números de cobertura como números de aposta (verde)
+    setHighlightedBetNumbers(bestCoverageNumbers);
+    
+    // Acumular o valor atual antes de zerar
+    setTotalNumbersWithoutPattern((prev) => prev + numbersWithoutPattern);
+    
+    // Não zerar contador de números sem padrão quando Padrão 171 é acionado
+    // setNumbersWithoutPattern(0);
+    
+    // Mostrar informação do padrão aplicado
+    console.log(`Padrão 171 aplicado baseado no número ${lastNumber}`);
+    console.log(`Números expostos (7):`, exposedNumbers);
+    console.log(`Números de cobertura (2):`, bestCoverageNumbers);
+    console.log(`Cobertura: ${maxCoverage} de 30 números restantes`);
+  };
+
+  // Função para calcular lucro
+  const calculateProfit = () => {
+    if (profitParams.initialValue <= 0 || profitParams.dailyProfitPercent <= 0) {
+      alert('Por favor, preencha valores válidos para Valor Inicial e % Lucro ao Dia.');
+      return;
+    }
+
+    const results = [];
+    let currentBalance = profitParams.initialValue;
+    let totalAccumulated = 0;
+    const startDate = new Date(profitParams.startDate);
+
+    for (let day = 0; day < profitParams.days; day++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(startDate.getDate() + day);
+      
+      let dailyProfit;
+      if (profitParams.compoundInterest) {
+        // Juros compostos: lucro baseado no saldo atual
+        dailyProfit = currentBalance * (profitParams.dailyProfitPercent / 100);
+      } else {
+        // Juros simples: lucro baseado no valor inicial
+        dailyProfit = profitParams.initialValue * (profitParams.dailyProfitPercent / 100);
+      }
+      
+      currentBalance += dailyProfit;
+      totalAccumulated += dailyProfit;
+
+      results.push({
+        date: currentDate.toLocaleDateString('pt-BR'),
+        currentBalance: parseFloat(currentBalance.toFixed(2)),
+        dailyProfit: parseFloat(dailyProfit.toFixed(2)),
+        totalAccumulated: parseFloat(totalAccumulated.toFixed(2))
+      });
+    }
+
+    setProfitResults(results);
+  };
+
+  // Função para imprimir resultados
+  const printResults = () => {
+    if (profitResults.length === 0) return;
+
+    const totalFinalBalance = profitResults[profitResults.length - 1]?.currentBalance || 0;
+    const totalProfit = profitResults[profitResults.length - 1]?.totalAccumulated || 0;
+    const interestType = profitParams.compoundInterest ? 'Compostos' : 'Simples';
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Relatório de Cálculo de Lucro</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 20px;
+          }
+          .header h1 {
+            color: #4CAF50;
+            margin: 0;
+          }
+          .header p {
+            margin-top: 10px;
+            margin-bottom: 0px;
+          }
+          .params {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            margin-top: 10px;
+          }
+          .params h3 {
+            margin-top: 0;
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+          }
+          .params-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            text-align: center;
+          }
+          .param-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+          }
+          .param-label {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #555;
+            font-size: 14px;
+          }
+          .param-value {
+            background-color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+            color: #333;
+            min-width: 80px;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            margin-top: -10px;
+          }
+          th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: right;
+          }
+          th {
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
+          }
+          td:first-child {
+            text-align: center;
+          }
+          .totals {
+            background-color: #e8f5e8;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+          }
+          .totals h3 {
+            margin-top: 0;
+            color: #2e7d32;
+          }
+          .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: bold;
+          }
+          .print-btn {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+          }
+          .print-btn:hover {
+            background-color: #1976D2;
+            transform: scale(1.1);
+          }
+          @media print {
+            .print-btn {
+              display: none !important;
+            }
+            body {
+              margin: 0;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>💰 Relatório de Cálculo de Lucro</h1>
+          <p>Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
+        </div>
+
+        <div class="params">
+          <h3>📋 Parâmetros Utilizados</h3>
+          <div class="params-grid">
+            <div class="param-item">
+              <div class="param-label">Quantidade de Dias</div>
+              <div class="param-value">${profitParams.days} dias</div>
+            </div>
+            <div class="param-item">
+              <div class="param-label">Data Inicial</div>
+              <div class="param-value">${new Date(profitParams.startDate).toLocaleDateString('pt-BR')}</div>
+            </div>
+            <div class="param-item">
+              <div class="param-label">Valor Inicial</div>
+              <div class="param-value">R$ ${profitParams.initialValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+            </div>
+            <div class="param-item">
+              <div class="param-label">% Lucro ao Dia</div>
+              <div class="param-value">${profitParams.dailyProfitPercent.toFixed(2)}%</div>
+            </div>
+            <div class="param-item">
+              <div class="param-label">Tipo de Juros</div>
+              <div class="param-value">${interestType}</div>
+            </div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Saldo Atual (R$)</th>
+              <th>Lucro Diário (R$)</th>
+              <th>Total Acumulado (R$)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${profitResults.map(result => `
+              <tr>
+                <td>${result.date}</td>
+                <td>R$ ${result.currentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                <td>R$ ${result.dailyProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                <td>R$ ${result.totalAccumulated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="totals">
+          <h3>📊 Resumo Final</h3>
+          <div class="total-row">
+            <span>Saldo Final:</span>
+            <span>R$ ${totalFinalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div class="total-row">
+            <span>Lucro Total:</span>
+            <span>R$ ${totalProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div class="total-row">
+            <span>Rentabilidade:</span>
+            <span>${((totalProfit / profitParams.initialValue) * 100).toFixed(2)}%</span>
+          </div>
+        </div>
+
+        <button class="print-btn" onclick="window.print()" title="Imprimir Relatório">
+          🖨️
+        </button>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+    }
+  };
+
+  // Função para simular sorteio automático dos primeiros 60 números
   const simulateAutoDrawing = () => {
     if (isSimulating) {
       // Parar a simulação
@@ -631,7 +1059,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       let count = 0;
       
       const interval = setInterval(() => {
-        if (count >= 50) {
+        if (count >= 60) {
           clearInterval(interval);
           setIsSimulating(false);
           isSimulatingRef.current = false;
@@ -704,154 +1132,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
   return (
     <>
-      {/* Popup de Alerta de Padrão */}
-      {patternAlert && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2">
-          <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-8">
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex flex-col">
-                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <span className="text-3xl">🎯</span>
-                      Padrão Detectado - Estratégia de Aposta
-                    </h2>
-                    <p className="text-sm text-gray-600 ml-11">
-                      Sistema encontrou uma oportunidade de aposta otimizada
-                    </p>
-                  </div>
-                  <button
-            onClick={() => setShowAddNumbersModal(true)}
-            className="bg-yellow-100 hover:bg-yellow-200 text-black text-xs px-3 py-1 rounded transition-colors font-semibold"
-            style={{height: '20px', fontSize: '11px', lineHeight: '1'}}
-            title="Adicionar números já sorteados"
-          >
-            <div className="flex items-center gap-1">
-              <span>➕</span>
-              Adicionar Nºs
-            </div>
-          </button>
-          <button
-                    onClick={() => {
-                      setPatternAlert(null);
-                      setHighlightedBetNumbers([]);
-                      setHighlightedRiskNumbers([]);
-                    }}
-                    className="text-gray-500 hover:text-gray-700 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-              
-              <div className="grid md:grid-cols-2 gap-8">
-                {/* Coluna da Esquerda - Números Sugeridos */}
-                <div className="bg-green-50 p-6 rounded-lg border-2 border-green-200">
-                  <h3 className="text-xl font-bold text-green-800 mb-4 flex items-center">
-                    <span className="text-2xl mr-2">💰</span>
-                    NÚMEROS PARA APOSTAR
-                  </h3>
-                  <p className="text-sm text-green-700 mb-4">Aposte nestes números (cada um com 7 vizinhos):</p>
-                  <div className="flex justify-center gap-4 mb-4">
-                    {(() => {
-                      const strategy = patternAlert.message.includes('Aposte nos números:') ? 
-                        patternAlert.message.split('Aposte nos números: ')[1]?.split('\n')[0]?.split(' e ') : 
-                        ['15', '23'];
-                      return strategy.map((numStr, index) => {
-                        const num = parseInt(numStr.trim());
-                        return (
-                          <div
-                            key={num}
-                            className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg transform hover:scale-105 ${
-                              getNumberColor(num)
-                            } ring-4 ring-green-300`}
-                          >
-                            {num}
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                  <div className="text-center">
-                    <span className="bg-green-200 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
-                      Cobertura: 30 números (81%)
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Coluna da Direita - Números de Risco */}
-                <div className="bg-red-50 p-6 rounded-lg border-2 border-red-200">
-                  <h3 className="text-xl font-bold text-red-800 mb-4 flex items-center">
-                    <span className="text-2xl mr-2">⚠️</span>
-                    NÚMEROS NO RISCO
-                  </h3>
-                  <p className="text-sm text-red-700 mb-4">Números descobertos (sequência real da roleta):</p>
-                  <div className="flex flex-wrap gap-2 justify-center mb-4">
-                    {(() => {
-                      const riskNumbers = patternAlert.message.includes('Números no risco (7):') ? 
-                        patternAlert.message.split('Números no risco (7): ')[1]?.split('\n')[0]?.split(', ').map(n => parseInt(n.trim())) : 
-                        [14, 31, 9, 22, 18, 29, 7];
-                      
-                      // Manter a ordem original da lista (não ordenar pela sequência Race)
-                      const allRiskNumbers = riskNumbers;
-                      
-                      return allRiskNumbers.map((num, index) => {
-                        const isFirst = index === 0;
-                        const isLast = index === allRiskNumbers.length - 1;
-                        const isHighlighted = isFirst || isLast;
-                        
-                        return (
-                          <div
-                            key={num}
-                            className={`${isHighlighted ? 'w-12 h-12 ring-2 ring-red-400' : 'w-10 h-10'} rounded-full flex items-center justify-center text-white font-medium text-sm opacity-75 ${
-                              getNumberColor(num)
-                            } ${isHighlighted ? 'transform scale-110' : ''}`}
-                          >
-                            {num}
-                          </div>
-                        );
-                      });
-                    })()
-                  }
-                  </div>
-                  <div className="text-center">
-                    <span className="bg-red-200 text-red-800 px-3 py-1 rounded-full text-sm font-semibold">
-                      Risco: 7 números (19%)
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Números do Padrão Detectado */}
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="text-lg font-semibold text-blue-800 mb-3">📊 Padrão Detectado:</h4>
-                <div className="flex flex-col items-center gap-3">
-                  <div className="flex items-center justify-center gap-4">
-                    <span className="text-blue-700">Números consecutivos:</span>
-                    {patternAlert.numbers.map((num, index) => (
-                      <div key={num} className="flex flex-col items-center">
-                        <div className="text-xs text-gray-400 mb-1 font-mono">
-                          {patternAlert.positions[index] + 1}
-                        </div>
-                        <div
-                          className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${
-                            getNumberColor(num)
-                          } shadow-md`}
-                        >
-                          {num}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              
-
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Modal para adicionar números */}
       {showAddNumbersModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
@@ -920,8 +1200,44 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       <div className="max-w-7xl mx-auto mb-auto p-6 bg-green-700 rounded-xl shadow-2xl" style={{marginTop: '-20px'}}>
       {/* Título e botões na mesma linha */}
       <div className="flex justify-between items-center" style={{marginTop: '-10px', marginBottom: '9px'}}>
-        <h1 className="text-2xl font-bold text-white" style={{marginTop: '-15px'}}>Roleta Europeia</h1>
+        <div className="flex items-center gap-3">
+          <img src="/logo-171.svg" alt="Logo 171" className="w-8 h-8" />
+          <h1 className="text-2xl font-bold text-white" style={{marginTop: '-15px'}}>Roleta 171</h1>
+        </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => setShowAddNumbersModal(true)}
+            className="bg-yellow-100 hover:bg-yellow-200 text-black text-xs px-3 py-1 rounded transition-colors font-semibold"
+            style={{height: '20px', fontSize: '11px', lineHeight: '1'}}
+            title="Adicionar números já sorteados"
+          >
+            <div className="flex items-center gap-1">
+              <span>➕</span>
+              Adicionar Nºs
+            </div>
+          </button>
+          <button
+            onClick={() => setShowProfitModal(true)}
+            className="bg-amber-800 hover:bg-amber-900 text-white text-xs px-3 py-1 rounded transition-colors font-semibold"
+            style={{height: '20px', fontSize: '11px', lineHeight: '1', minWidth: 'fit-content'}}
+            title="Calcular lucro com base em parâmetros financeiros"
+          >
+            <div className="flex items-center gap-1 whitespace-nowrap">
+              <span>💰</span>
+              <span>Calcular Lucro</span>
+            </div>
+          </button>
+          <button
+            onClick={forcePattern171}
+            className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded transition-colors font-semibold"
+            style={{height: '20px', fontSize: '11px', lineHeight: '1', minWidth: 'fit-content'}}
+            title="Forçar padrão 171: marcar 7 números expostos baseado no último número sorteado"
+          >
+            <div className="flex items-center gap-1 whitespace-nowrap">
+              <span>🎯</span>
+              <span>Padrão 171</span>
+            </div>
+          </button>
           <button
             onClick={simulateAutoDrawing}
             className={cn(
@@ -950,29 +1266,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
              </div>
           </button>
           <button
-            onClick={() => setShowAddNumbersModal(true)}
-            className="bg-yellow-100 hover:bg-yellow-200 text-black text-xs px-3 py-1 rounded transition-colors font-semibold"
-            style={{height: '20px', fontSize: '11px', lineHeight: '1'}}
-            title="Adicionar números já sorteados"
-          >
-            <div className="flex items-center gap-1">
-              <span>➕</span>
-              Adicionar Nºs
-            </div>
-          </button>
-          <button
             onClick={clearScreen}
-            className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded transition-colors"
+            className="bg-white hover:bg-gray-100 text-black text-xs px-3 py-1 rounded transition-colors border border-gray-300"
             style={{height: '20px', fontSize: '11px', lineHeight: '1'}}
             title="Limpar toda a tela e iniciar novo sorteio"
           >
             <div className="flex items-center gap-1">
-              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clipRule="evenodd" />
-                <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3l1.5 1.5a1 1 0 01-1.414 1.414L9.5 10.5A1 1 0 019 9.5V6a1 1 0 011-1z" clipRule="evenodd" />
-                <path fillRule="evenodd" d="M6 2a1 1 0 000 2v5a1 1 0 00.293.707l6.414 6.414a1 1 0 001.414-1.414L7.414 8.414A1 1 0 007 8V4a3 3 0 10-1-2z" clipRule="evenodd" />
-              </svg>
-              Limpar Tela
+              🗑️ Limpar
             </div>
           </button>
           {onLogout && (
@@ -994,7 +1294,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       </div>
       
       {/* Box com últimos números sorteados */}
-      <div className="bg-gray-600 rounded-lg p-4 mb-6">
+      <div className="bg-gray-600 rounded-lg p-4" style={{marginBottom: '14px'}}>
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-white font-semibold">Últimos Números Sorteados:</h3>
           <div className="flex gap-2">
@@ -1033,7 +1333,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 <span
                   key={`${num}-${index}`}
                   className={cn(
-                    'w-10 h-10 rounded-full font-bold text-sm flex items-center justify-center text-white border-2 border-gray-400',
+                    'w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center text-white border-2 border-gray-400',
                     getNumberColor(num),
                     isLastSelected ? 'ring-2 ring-yellow-400 scale-110' : ''
                   )}
@@ -1047,6 +1347,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         </div>
       </div>
       
+      {/* Layout Principal */}
       <div className="flex gap-6">
         {/* Painel Principal - Esquerda */}
         <div className="flex-1">
@@ -1094,13 +1395,38 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                         const isLastSelected = lastSelectedNumber === num;
                         const isHighlightedBet = highlightedBetNumbers.includes(num);
                         const isHighlightedRisk = highlightedRiskNumbers.includes(num);
+                        
+                        // Verificar se é um número da estratégia quando padrão está ativo
+                        const isStrategyNumber = patternAlert && (() => {
+                          console.log(`[DEBUG] Verificando número ${num} da linha superior com padrão:`, patternAlert?.message);
+                          
+                          let strategy = [];
+                          
+                          if (patternAlert?.message.includes('Aposte nos números:')) {
+                            const numbersText = patternAlert.message.split('Aposte nos números: ')[1]?.split('\n')[0];
+                            if (numbersText) {
+                              strategy = numbersText.split(' e ').map(s => s.trim());
+                              console.log(`[DEBUG] Números da estratégia extraídos:`, strategy);
+                            }
+                          }
+                          
+                          const isStrategy = strategy.some(numStr => parseInt(numStr.trim()) === num);
+                          console.log(`[DEBUG] Número ${num} é da estratégia:`, isStrategy);
+                          
+                          return isStrategy;
+                        })();
+                        
                         return (
                           <div
                             key={`race-top-${num}`}
                             className={cn(
-                              'w-7 h-7 rounded text-xs font-bold flex items-center justify-center text-white border-2 border-gray-400',
+                              'w-7 h-7 rounded text-xs font-bold flex items-center justify-center text-white border-2',
                               getNumberColor(num),
-                              isLastSelected ? 'ring-2 ring-yellow-400 scale-110' : '',
+                              isLastSelected 
+                                ? 'border-yellow-400 border-2 ring-2 ring-yellow-300 scale-125 shadow-lg animate-pulse' 
+                                : isStrategyNumber
+                                ? 'ring-4 ring-blue-400 border-blue-500 scale-110 shadow-xl animate-pulse'
+                                : 'border-gray-400',
                               isHighlightedBet ? 'ring-2 ring-green-400 scale-110 shadow-lg' : '',
                               isHighlightedRisk ? 'ring-2 ring-red-400 scale-110 shadow-lg' : ''
                             )}
@@ -1121,13 +1447,36 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                           const isLastSelected = lastSelectedNumber === num;
                           const isHighlightedBet = highlightedBetNumbers.includes(num);
                           const isHighlightedRisk = highlightedRiskNumbers.includes(num);
+                          
+                          // Verificar se é um número da estratégia quando padrão está ativo
+                          const isStrategyNumber = patternAlert && (() => {
+                            console.log(`[DEBUG] Verificando número ${num} com padrão:`, patternAlert?.message);
+                            
+                            let strategy = [];
+                            
+                            if (patternAlert?.message.includes('Aposte nos números:')) {
+                              const numbersText = patternAlert.message.split('Aposte nos números: ')[1]?.split('\n')[0];
+                              if (numbersText) {
+                                strategy = numbersText.split(' e ').map(s => s.trim());
+                                console.log(`[DEBUG] Números da estratégia extraídos:`, strategy);
+                              }
+                            }
+                            
+                            const isStrategy = strategy.some(numStr => parseInt(numStr.trim()) === num);
+                            console.log(`[DEBUG] Número ${num} é da estratégia:`, isStrategy);
+                            
+                            return isStrategy;
+                          })();
+                          
                           return (
                             <div
                               className={cn(
-                                'w-7 h-7 rounded text-xs font-bold flex items-center justify-center text-white border-2 border-gray-400',
+                                'w-7 h-7 rounded text-xs font-bold flex items-center justify-center text-white border-2',
                                 getNumberColor(num),
                                 isLastSelected 
                                   ? 'border-yellow-400 border-2 ring-2 ring-yellow-300 scale-125 shadow-lg animate-pulse' 
+                                  : isStrategyNumber
+                                  ? 'ring-4 ring-blue-400 border-blue-500 scale-110 shadow-xl animate-pulse'
                                   : 'border-gray-400',
                                 isHighlightedBet ? 'ring-2 ring-green-400 scale-110 shadow-lg' : '',
                                 isHighlightedRisk ? 'ring-2 ring-red-400 scale-110 shadow-lg' : ''
@@ -1150,13 +1499,36 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                           const isLastSelected = lastSelectedNumber === num;
                           const isHighlightedBet = highlightedBetNumbers.includes(num);
                           const isHighlightedRisk = highlightedRiskNumbers.includes(num);
+                          
+                          // Verificar se é um número da estratégia quando padrão está ativo
+                          const isStrategyNumber = patternAlert && (() => {
+                            console.log(`[DEBUG] Verificando número ${num} com padrão:`, patternAlert?.message);
+                            
+                            let strategy = [];
+                            
+                            if (patternAlert?.message.includes('Aposte nos números:')) {
+                              const numbersText = patternAlert.message.split('Aposte nos números: ')[1]?.split('\n')[0];
+                              if (numbersText) {
+                                strategy = numbersText.split(' e ').map(s => s.trim());
+                                console.log(`[DEBUG] Números da estratégia extraídos:`, strategy);
+                              }
+                            }
+                            
+                            const isStrategy = strategy.some(numStr => parseInt(numStr.trim()) === num);
+                            console.log(`[DEBUG] Número ${num} é da estratégia:`, isStrategy);
+                            
+                            return isStrategy;
+                          })();
+                          
                           return (
                             <div
                               className={cn(
-                                'w-7 h-7 rounded text-xs font-bold flex items-center justify-center text-white border-2 border-gray-400',
+                                'w-7 h-7 rounded text-xs font-bold flex items-center justify-center text-white border-2',
                                 getNumberColor(num),
                                 isLastSelected 
                                   ? 'border-yellow-400 border-2 ring-2 ring-yellow-300 scale-125 shadow-lg animate-pulse' 
+                                  : isStrategyNumber
+                                  ? 'ring-4 ring-blue-400 border-blue-500 scale-110 shadow-xl animate-pulse'
                                   : 'border-gray-400',
                                 isHighlightedBet ? 'ring-2 ring-green-400 scale-110 shadow-lg' : '',
                                 isHighlightedRisk ? 'ring-2 ring-red-400 scale-110 shadow-lg' : ''
@@ -1176,14 +1548,37 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                         const isLastSelected = lastSelectedNumber === num;
                         const isHighlightedBet = highlightedBetNumbers.includes(num);
                         const isHighlightedRisk = highlightedRiskNumbers.includes(num);
+                        
+                        // Verificar se é um número da estratégia quando padrão está ativo
+                        const isStrategyNumber = patternAlert && (() => {
+                          console.log(`[DEBUG] Verificando número ${num} da linha inferior com padrão:`, patternAlert?.message);
+                          
+                          let strategy = [];
+                          
+                          if (patternAlert?.message.includes('Aposte nos números:')) {
+                            const numbersText = patternAlert.message.split('Aposte nos números: ')[1]?.split('\n')[0];
+                            if (numbersText) {
+                              strategy = numbersText.split(' e ').map(s => s.trim());
+                              console.log(`[DEBUG] Números da estratégia extraídos:`, strategy);
+                            }
+                          }
+                          
+                          const isStrategy = strategy.some(numStr => parseInt(numStr.trim()) === num);
+                          console.log(`[DEBUG] Número ${num} é da estratégia:`, isStrategy);
+                          
+                          return isStrategy;
+                        })();
+                        
                         return (
                           <div
                             key={`race-bottom-${num}`}
                             className={cn(
-                              'w-7 h-7 rounded text-xs font-bold flex items-center justify-center text-white border-2 border-gray-400',
+                              'w-7 h-7 rounded text-xs font-bold flex items-center justify-center text-white border-2',
                               getNumberColor(num),
                               isLastSelected 
                                 ? 'border-yellow-400 border-2 ring-2 ring-yellow-300 scale-125 shadow-lg animate-pulse' 
+                                : isStrategyNumber
+                                ? 'ring-4 ring-blue-400 border-blue-500 scale-110 shadow-xl animate-pulse'
                                 : 'border-gray-400',
                               isHighlightedBet ? 'ring-2 ring-green-400 scale-110 shadow-lg' : '',
                               isHighlightedRisk ? 'ring-2 ring-red-400 scale-110 shadow-lg' : ''
@@ -1201,30 +1596,399 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             </div>
           </div>
 
-          {/* Painel de Estatísticas - Direita */}
-          <div className="flex-1 bg-gray-800 rounded-lg p-3 h-fit" style={{marginTop: '-21px'}}>
-            {/* Cabeçalho com título à esquerda e total à direita */}
-            <div className="flex justify-between items-center -mt-1.5" style={{marginBottom: '3px'}}>
-              <h3 className="text-white font-bold text-sm">📊 Estatísticas dos Sorteios</h3>
-              <div className="text-white text-sm">
-                <span className="text-gray-300">Total de Números Chamados: </span>
-                <span className="font-bold text-blue-400">{lastNumbers.length}</span>
+          {/* Container que alterna entre Estatísticas e Padrão Detectado */}
+          <div className="relative" style={{marginTop: '-21px'}}>
+            {/* Container de Padrão Detectado */}
+            <div 
+              className={`absolute inset-0 bg-white rounded-lg p-3 h-fit transform-gpu ${
+                patternAlert 
+                  ? 'animate-slide-in-right' 
+                  : 'animate-slide-out-right pointer-events-none'
+              }`}
+              style={{
+                willChange: 'transform, opacity, filter'
+              }}
+            >
+              {/* Botão X no canto superior direito */}
+              <button
+                onClick={() => {
+                  setPatternAlert(null);
+                }}
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-lg w-6 h-6 flex items-center justify-center rounded-full border border-red-400 hover:border-red-500 transition-colors leading-none z-10"
+              >
+                ×
+              </button>
+
+              {/* Cabeçalho */}
+              <div className="flex justify-between items-center -mt-1.5" style={{marginBottom: '3px'}}>
+                <h3 className="text-gray-800 font-bold text-sm flex items-center gap-1">
+                  <span className="text-lg">🎯</span>
+                  Padrão Detectado - Estratégia 171
+                </h3>
               </div>
-            </div>
-            
-            {/* Usar o componente StatisticsCards com tema escuro */}
-            <div className="[&_.bg-white]:bg-gray-700 [&_.text-gray-800]:text-white [&_.text-gray-600]:text-gray-300 [&_.text-gray-500]:text-gray-400 [&_.shadow-md]:shadow-lg">
-              <StatisticsCards 
-                statistics={statisticsData} 
-                patternDetectedCount={patternDetectedCount}
-                winCount={winCount}
-                lossCount={lossCount}
-              />
+              
+              {/* Conteúdo em 3 colunas */}
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                {/* Coluna 1: Números Sugeridos */}
+                <div className="bg-green-50 p-2 rounded border border-green-200 min-h-[150px]">
+                  <h4 className="font-bold text-green-800 mb-7 flex items-center justify-between text-xs">
+                    <div className="flex items-center">
+                      <span className="text-sm mr-1">💰</span>
+                      APOSTAR
+                    </div>
+                    <span className="font-normal text-green-700">Números + 7 vizinhos:</span>
+                  </h4>
+                  <div className="flex justify-center gap-1 mb-2">
+                    {(() => {
+                      let strategy = ['15', '23']; // valores padrão
+                      
+                      if (patternAlert?.message.includes('Aposte nos números:')) {
+                        const numbersText = patternAlert.message.split('Aposte nos números: ')[1]?.split('\n')[0];
+                        if (numbersText) {
+                          strategy = numbersText.split(' e ').map(s => s.trim());
+                        }
+                      }
+                      
+                      return strategy.map((numStr, index) => {
+                        const num = parseInt(numStr.trim());
+                        return (
+                          <div
+                            key={num}
+                            className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow ${
+                              getNumberColor(num)
+                            } ring-1 ring-green-300`}
+                          >
+                            {num}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                  <div className="text-center">
+                    <span className="bg-green-200 text-green-800 px-1 py-0.5 rounded text-xs font-semibold">
+                      30 números (81%)  -  ou  -  32 números (88%)
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Coluna 2: Números de Risco */}
+                <div className="bg-red-50 p-2 rounded border border-red-200 min-h-[150px]">
+                  <h4 className="font-bold text-red-800 mb-7 flex items-center justify-between text-xs">
+                    <div className="flex items-center">
+                      <span className="text-sm mr-1">⚠️</span>
+                      RISCO
+                    </div>
+                    <span className="font-normal text-red-700">Números expostos:</span>
+                  </h4>
+                  <div className="flex flex-wrap gap-0.5 justify-center mb-2">
+                    {(() => {
+                      const riskNumbers = patternAlert?.message.includes('Números no risco (7):') ? 
+                        patternAlert.message.split('Números no risco (7): ')[1]?.split('\n')[0]?.split(', ').map(n => parseInt(n.trim())) : 
+                        [14, 31, 9, 22, 18, 29, 7];
+                      
+                      return riskNumbers.slice(0, 7).map((num, index) => {
+                        const isFirst = index === 0;
+                        const isLast = index === riskNumbers.length - 1;
+                        const isHighlighted = isFirst || isLast;
+                        
+                        return (
+                          <div
+                            key={num}
+                            className={`${isHighlighted ? 'w-11 h-11 ring-1 ring-red-400' : 'w-10 h-10'} rounded-full flex items-center justify-center text-white font-medium text-lg opacity-75 ${
+                              getNumberColor(num)
+                            }`}
+                          >
+                            {num}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                  <div className="text-center mt-3">
+                    <span className="bg-red-200 text-red-800 px-1 py-0.5 rounded text-xs font-semibold">
+                      7 números (19%)  -  ou  -  5 números (13%)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Coluna 3: Padrão Detectado */}
+                <div className="bg-blue-50 p-2 rounded border border-blue-200 min-h-[150px]">
+                  <h4 className="font-semibold text-blue-800 mb-7 flex items-center justify-between text-xs">
+                    <div className="flex items-center">
+                      📊 PADRÃO 171
+                    </div>
+                    <span className="font-normal text-blue-700">Números consecutivos:</span>
+                  </h4>
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="flex flex-wrap gap-0.5 justify-center">
+                      {patternAlert?.numbers.map((num, index) => (
+                        <div key={num} className="flex flex-col items-center">
+                          <div className="text-xs text-gray-400 mb-0.5 font-mono" style={{fontSize: '10px'}}>
+                            {patternAlert.positions[index] + 1}
+                          </div>
+                          <div
+                            className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg ${
+                              getNumberColor(num)
+                            } shadow-sm`}
+                          >
+                            {num}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Container de Estatísticas - Fora do layout principal */}
+      <div 
+        className={`bg-gray-800 rounded-lg p-3 h-fit transform-gpu ${
+          patternAlert 
+            ? 'animate-slide-out-left pointer-events-none' 
+            : 'animate-slide-in-left'
+        }`}
+        style={{
+          marginTop: '-5px',
+          willChange: 'transform, opacity, filter'
+        }}
+      >
+        {/* Cabeçalho com título à esquerda e total à direita */}
+        <div className="flex justify-between items-center -mt-1.5" style={{marginBottom: '3px'}}>
+          <h3 className="text-white font-bold text-sm">📊 Estatística do Sorteio</h3>
+          <div className="text-white text-sm">
+            <span className="text-gray-300">Total de Números Chamados: </span>
+            <span className="font-bold text-blue-400">{lastNumbers.length}</span>
+          </div>
+        </div>
+        
+        {/* Usar o componente StatisticsCards com tema escuro */}
+        <div className="[&_.bg-white]:bg-gray-700 [&_.text-gray-800]:text-white [&_.text-gray-600]:text-gray-300 [&_.text-gray-500]:text-gray-400 [&_.shadow-md]:shadow-lg">
+          <StatisticsCards 
+            statistics={statisticsData} 
+            patternDetectedCount={patternDetectedCount}
+            winCount={winCount}
+            lossCount={lossCount}
+            numbersWithoutPattern={numbersWithoutPattern}
+            totalNumbersWithoutPattern={totalNumbersWithoutPattern}
+          />
+        </div>
+      </div>
     </div>
+
+    {/* Modal de Cálculo de Lucro */}
+    {showProfitModal && (
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[500px] flex">
+          {/* Lado Esquerdo - Formulário */}
+          <div className="w-1/2 p-6 border-r border-gray-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-800">💰 Calcular Lucro</h2>
+              <button
+                onClick={() => {
+                  setShowProfitModal(false);
+                  setProfitResults([]);
+                }}
+                className="text-gray-500 hover:text-gray-700 text-lg w-8 h-8 flex items-center justify-center rounded-full border border-red-400 hover:border-red-500 transition-colors leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Primeira linha: Qtde. Dias e Data Inicial */}
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Qtde. Dias:
+                  </label>
+                  <input
+                    type="number"
+                    value={profitParams.days}
+                    onChange={(e) => setProfitParams(prev => ({
+                      ...prev,
+                      days: parseInt(e.target.value) || 30
+                    }))}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    min="1"
+                    max="365"
+                  />
+                </div>
+
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Data Inicial:
+                  </label>
+                  <input
+                    type="date"
+                    value={profitParams.startDate}
+                    onChange={(e) => setProfitParams(prev => ({
+                      ...prev,
+                      startDate: e.target.value
+                    }))}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+
+              {/* Segunda linha: Valor Inicial e % Lucro ao Dia */}
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Valor Inicial (R$):
+                  </label>
+                  <input
+                    type="number"
+                    value={profitParams.initialValue.toFixed(2)}
+                    onChange={(e) => setProfitParams(prev => ({
+                      ...prev,
+                      initialValue: parseFloat(e.target.value) || 0
+                    }))}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-right"
+                    min="0"
+                    step="0.01"
+                    placeholder="100.00"
+                  />
+                </div>
+
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    % Lucro ao Dia:
+                  </label>
+                  <input
+                    type="number"
+                    value={profitParams.dailyProfitPercent.toFixed(2)}
+                    onChange={(e) => setProfitParams(prev => ({
+                      ...prev,
+                      dailyProfitPercent: parseFloat(e.target.value) || 0
+                    }))}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-right"
+                    min="0"
+                    step="0.01"
+                    placeholder="3.00"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="compoundInterest"
+                  checked={profitParams.compoundInterest}
+                  onChange={(e) => setProfitParams(prev => ({
+                    ...prev,
+                    compoundInterest: e.target.checked
+                  }))}
+                  className="mr-2 w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                />
+                <label htmlFor="compoundInterest" className="text-sm font-medium text-gray-700">
+                  Juros Compostos?
+                </label>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setProfitParams({
+                      days: 30,
+                      startDate: new Date().toISOString().split('T')[0],
+                      initialValue: 100,
+                      dailyProfitPercent: 3,
+                      compoundInterest: false
+                    });
+                    setProfitResults([]);
+                  }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition-colors"
+                >
+                  🗑️ Limpar
+                </button>
+                <button
+                  onClick={printResults}
+                  disabled={profitResults.length === 0}
+                  className={`flex-1 py-2 px-4 rounded-lg transition-colors ${
+                    profitResults.length === 0 
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  🖨️ Imprimir
+                </button>
+                <button
+                  onClick={calculateProfit}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition-colors"
+                >
+                  🧮 Calcular
+                </button>
+              </div>
+
+              {/* Totalizadores abaixo dos botões */}
+              {profitResults.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="bg-green-50 p-3 rounded-lg">
+                      <div className="text-gray-600">Total de Lucro:</div>
+                      <div className="text-lg font-bold text-green-600">
+                        R$ {profitResults[profitResults.length - 1]?.totalAccumulated.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0,00'}
+                      </div>
+                    </div>
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                      <div className="text-gray-600">Total Geral:</div>
+                      <div className="text-lg font-bold text-blue-600">
+                        R$ {profitResults[profitResults.length - 1]?.currentBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0,00'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Lado Direito - Resultados */}
+          <div className="w-1/2 p-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">📊 Resultados</h3>
+            
+            {profitResults.length > 0 ? (
+              <div className="h-full flex flex-col">
+                <div className="overflow-y-auto" style={{maxHeight: 'calc(11 * 2.5rem - 50px)'}}>
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-gray-50">
+                      <tr>
+                        <th className="text-left p-2 border-b font-semibold">Data</th>
+                        <th className="text-right p-2 border-b font-semibold">Saldo Atual</th>
+                        <th className="text-right p-2 border-b font-semibold">Lucro Diário</th>
+                        <th className="text-right p-2 border-b font-semibold">Total Acum.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {profitResults.map((result, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="p-2 border-b">{result.date}</td>
+                          <td className="p-2 border-b text-right">R$ {result.currentBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                          <td className="p-2 border-b text-right text-green-600">R$ {result.dailyProfit.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                          <td className="p-2 border-b text-right font-semibold">R$ {result.totalAccumulated.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* Totalizadores removidos daqui - agora estão no lado esquerdo */}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="text-center">
+                  <div className="text-4xl mb-2">📈</div>
+                  <p>Preencha os parâmetros e clique em "Calcular" para ver os resultados</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 };
