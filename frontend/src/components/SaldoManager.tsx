@@ -1,0 +1,725 @@
+import React, { useState, useEffect } from 'react';
+import { useBalance } from '../contexts/BalanceContext';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import HistoricoSaldos from './HistoricoSaldos';
+
+interface SaldoManagerProps {
+  className?: string;
+}
+
+export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) => {
+  const { user } = useAuth();
+  const { currentSaldoRecord, loading, refreshBalance } = useBalance();
+  const [saldoAtual, setSaldoAtual] = useState<string>('');
+  const [saldoInicial, setSaldoInicial] = useState<string>('');
+  const [data, setData] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showHistorico, setShowHistorico] = useState(false);
+
+  // Atualiza os campos quando o registro atual muda
+  useEffect(() => {
+    if (currentSaldoRecord) {
+      // Verificar se é um registro real - qualquer valor diferente de zero ou ID não temporário
+      const hasRealData = currentSaldoRecord.saldo_inicial !== 0 || 
+                         currentSaldoRecord.saldo_atual !== 0 || 
+                         currentSaldoRecord.saldo_anterior !== 0 ||
+                         currentSaldoRecord.vlr_lucro !== 0 ||
+                         (currentSaldoRecord.id && currentSaldoRecord.id !== 'temp');
+      
+      console.log('currentSaldoRecord:', currentSaldoRecord);
+        console.log('hasRealData:', hasRealData);
+        console.log('Data do registro:', currentSaldoRecord.data);
+      
+      if (hasRealData) {
+        // Formatar com 2 casas decimais
+        const saldoAtualFormatted = (currentSaldoRecord.saldo_atual || 0).toLocaleString('pt-BR', { 
+          minimumFractionDigits: 2, 
+          maximumFractionDigits: 2 
+        }).replace('.', '').replace(',', '.');
+        const saldoInicialFormatted = (currentSaldoRecord.saldo_inicial || currentSaldoRecord.saldo_anterior || 0).toLocaleString('pt-BR', { 
+          minimumFractionDigits: 2, 
+          maximumFractionDigits: 2 
+        }).replace('.', '').replace(',', '.');
+        
+        setSaldoAtual(saldoAtualFormatted);
+        setSaldoInicial(saldoInicialFormatted);
+        setData(currentSaldoRecord.data || new Date().toISOString().split('T')[0]);
+        setShowCreateForm(false);
+        setIsEditing(false); // Garantir que não está em modo edição
+      } else {
+        // Se é um registro vazio/temporário, mostrar formulário de criação
+        setShowCreateForm(true);
+        fetchLastBalance();
+      }
+    } else {
+      // Se não há registro, mostrar formulário de criação automaticamente
+      setShowCreateForm(true);
+      // Buscar último saldo para usar como saldo inicial
+      fetchLastBalance();
+    }
+  }, [currentSaldoRecord]);
+
+  // Função para buscar o último saldo atual para usar como saldo inicial
+  const fetchLastBalance = async (setSaldoAtualToo = false) => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('r171_saldo')
+        .select('saldo_atual')
+        .eq('id_senha', user.id)
+        .order('data', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (data && !error) {
+        const saldoFormatted = (data.saldo_atual || 0).toLocaleString('pt-BR', { 
+          minimumFractionDigits: 2, 
+          maximumFractionDigits: 2 
+        }).replace('.', '').replace(',', '.');
+        setSaldoInicial(saldoFormatted);
+        
+        // Se solicitado, também definir o saldo atual com o mesmo valor
+        if (setSaldoAtualToo) {
+          setSaldoAtual(saldoFormatted);
+        }
+      }
+    } catch (error) {
+      console.log('Nenhum saldo anterior encontrado, usando 0 como padrão');
+      setSaldoInicial('0.00');
+      if (setSaldoAtualToo) {
+        setSaldoAtual('0.00');
+      }
+    }
+  };
+
+  // Calcula o lucro em tempo real
+  const calcularLucro = (saldoAtualValue: number, saldoInicialValue: number) => {
+    const vlrLucro = saldoAtualValue - saldoInicialValue;
+    const perLucro = saldoInicialValue !== 0 ? (vlrLucro / saldoInicialValue) * 100 : 0;
+    return { vlrLucro, perLucro };
+  };
+
+  const handleSave = async () => {
+    if (!currentSaldoRecord && !showCreateForm) return;
+
+    const saldoAtualNum = parseFloat(saldoAtual) || 0;
+    const saldoInicialNum = parseFloat(saldoInicial) || 0;
+    const { vlrLucro, perLucro } = calcularLucro(saldoAtualNum, saldoInicialNum);
+
+    console.log('=== INÍCIO DO PROCESSO DE SALVAMENTO ===');
+    console.log('Data selecionada:', data);
+    console.log('Saldo Inicial:', saldoInicialNum);
+    console.log('Saldo Atual:', saldoAtualNum);
+    console.log('Valor Lucro:', vlrLucro);
+    console.log('Percentual Lucro:', perLucro);
+    console.log('ID do usuário:', user?.id);
+    console.log('Registro atual existe?', !!currentSaldoRecord);
+    console.log('Modo criação?', showCreateForm);
+
+    setIsSaving(true);
+    try {
+      // Verificar se é um registro real (não temporário) e se não estamos no modo de criação
+      const isRealRecord = currentSaldoRecord && currentSaldoRecord.id !== 'temp' && !showCreateForm;
+      
+      if (isRealRecord) {
+        // Atualizar registro existente
+        console.log('=== ATUALIZANDO REGISTRO EXISTENTE ===');
+        console.log('ID do registro:', currentSaldoRecord.id);
+        
+        const { data: updateResult, error } = await supabase
+          .from('r171_saldo')
+          .update({
+            data: data,
+            saldo_inicial: saldoInicialNum,
+            saldo_atual: saldoAtualNum,
+            vlr_lucro: vlrLucro,
+            per_lucro: perLucro
+          })
+          .eq('id', currentSaldoRecord.id)
+          .select(); // Adicionar select para ver o resultado
+
+        console.log('Resultado da atualização:', updateResult);
+        
+        if (error) {
+          console.error('Erro ao atualizar saldo:', error);
+          console.error('Detalhes do erro:', JSON.stringify(error, null, 2));
+          alert('Erro ao salvar os dados. Verifique o console para mais detalhes.');
+          return;
+        }
+        
+        console.log('Atualização realizada com sucesso!');
+      } else {
+        // Criar novo registro
+        console.log('=== CRIANDO NOVO REGISTRO ===');
+        console.log('Motivo da criação:', {
+          'Não há registro atual': !currentSaldoRecord,
+          'Registro é temporário': currentSaldoRecord?.id === 'temp',
+          'Modo criação ativo': showCreateForm
+        });
+        
+        const newRecord = {
+          id_senha: user?.id,
+          data: data,
+          saldo_inicial: saldoInicialNum,
+          saldo_atual: saldoAtualNum,
+          vlr_lucro: vlrLucro,
+          per_lucro: perLucro
+        };
+        
+        console.log('Dados para inserção:', newRecord);
+        
+        const { data: insertResult, error } = await supabase
+          .from('r171_saldo')
+          .insert(newRecord)
+          .select(); // Adicionar select para ver o resultado
+
+        console.log('Resultado da inserção:', insertResult);
+
+        if (error) {
+          console.error('Erro ao criar saldo:', error);
+          console.error('Detalhes do erro:', JSON.stringify(error, null, 2));
+          console.error('Código do erro:', error.code);
+          console.error('Mensagem do erro:', error.message);
+          alert('Erro ao criar registro. Verifique o console para mais detalhes.');
+          return;
+        }
+        
+        console.log('Inserção realizada com sucesso!');
+      }
+
+      console.log('=== ATUALIZANDO DADOS LOCAIS ===');
+      // Atualiza os dados locais
+      await refreshBalance();
+      
+      // Se foi um novo cadastro, ir para modo edição
+      if (!isRealRecord) {
+        setShowCreateForm(false);
+        setIsEditing(true);
+      } else {
+        setIsEditing(false);
+        setShowCreateForm(false);
+      }
+      
+      alert('Saldo salvo com sucesso!');
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      alert('Erro inesperado ao salvar os dados.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (currentSaldoRecord) {
+      // Formatar com 2 casas decimais
+      const saldoAtualFormatted = (currentSaldoRecord.saldo_atual || 0).toLocaleString('pt-BR', { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+      }).replace('.', '').replace(',', '.');
+      const saldoInicialFormatted = (currentSaldoRecord.saldo_inicial || currentSaldoRecord.saldo_anterior || 0).toLocaleString('pt-BR', { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+      }).replace('.', '').replace(',', '.');
+      
+      setSaldoAtual(saldoAtualFormatted);
+      setSaldoInicial(saldoInicialFormatted);
+    } else {
+      // Se não há registro, limpar campos
+      setSaldoAtual('0.00');
+      setSaldoInicial('0.00');
+    }
+    
+    // Sempre fechar os formulários e voltar para a tela de visualização
+    setIsEditing(false);
+    setShowCreateForm(false);
+  };
+
+  // Valores atuais para cálculo em tempo real
+  const saldoAtualNum = parseFloat(saldoAtual) || 0;
+  const saldoInicialNum = parseFloat(saldoInicial) || 0;
+  
+  // Se estiver no modo de criação e os campos ainda não foram preenchidos, mostrar valores zerados
+  const shouldShowZeroValues = showCreateForm && saldoAtualNum === 0 && saldoInicialNum === 0;
+  const { vlrLucro, perLucro } = shouldShowZeroValues ? { vlrLucro: 0, perLucro: 0 } : calcularLucro(saldoAtualNum, saldoInicialNum);
+
+  if (loading) {
+    return (
+      <div className={`bg-gray-100 rounded-lg p-6 ${className}`}>
+        <div className="text-center text-gray-600">Carregando dados do saldo...</div>
+      </div>
+    );
+  }
+
+  if (!currentSaldoRecord && !showCreateForm) {
+    return (
+      <div className={`bg-gray-100 rounded-lg p-6 ${className}`}>
+        <div className="text-center text-gray-600">
+          <div className="text-4xl mb-2">💰</div>
+          <p>Nenhum registro de saldo encontrado para hoje.</p>
+          <p className="text-sm mt-2">Faça login para criar um registro automático.</p>
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            ➕ Criar Registro de Saldo
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (showCreateForm) {
+    return (
+      <div className={`bg-white rounded-lg shadow-lg p-6 ${className}`}>
+        {/* Cabeçalho */}
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-bold text-gray-800">💰 Criar Registro de Saldo</h3>
+          <div className="text-sm text-gray-500">
+            {new Date().toLocaleDateString('pt-BR')} - {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+
+        {/* Campos de Entrada */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+          {/* Data */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Data de Cadastro
+            </label>
+            <input
+              type="date"
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+              className="w-full px-4 py-3 border border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg text-lg font-semibold transition-colors"
+            />
+          </div>
+
+          {/* Saldo Inicial */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Saldo Inicial (R$)
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              value={saldoInicial}
+              onChange={(e) => {
+                const value = e.target.value.replace(',', '.');
+                setSaldoInicial(value);
+              }}
+              className="w-full px-4 py-3 border border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg text-lg font-semibold transition-colors text-right"
+              placeholder="0,00"
+            />
+          </div>
+
+          {/* Saldo Atual */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Saldo Atual (R$)
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              value={saldoAtual}
+              onChange={(e) => {
+                const value = e.target.value.replace(',', '.');
+                setSaldoAtual(value);
+              }}
+              className="w-full px-4 py-3 border border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg text-lg font-semibold transition-colors text-right"
+              placeholder="0,00"
+            />
+          </div>
+
+          {/* Valor do Lucro */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Valor do Lucro (R$)
+            </label>
+            <div className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold bg-gray-50 text-right ${
+              vlrLucro >= 0 ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {vlrLucro >= 0 ? '+' : ''}R$ {vlrLucro.toLocaleString('pt-BR', { 
+                minimumFractionDigits: 2, 
+                maximumFractionDigits: 2 
+              })}
+            </div>
+          </div>
+
+          {/* Percentual do Lucro */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Percentual do Lucro (%)
+            </label>
+            <div className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold bg-gray-50 text-right ${
+              perLucro >= 0 ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {perLucro >= 0 ? '+' : ''}{perLucro.toLocaleString('pt-BR', { 
+                minimumFractionDigits: 2, 
+                maximumFractionDigits: 2 
+              })}%
+            </div>
+          </div>
+        </div>
+
+        {/* Botões de Ação */}
+        <div className="flex justify-end space-x-3 mb-6">
+          <button
+            onClick={handleCancel}
+            disabled={isSaving}
+            className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium disabled:opacity-50"
+          >
+            ❌ Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
+          >
+            {isSaving ? '⏳ Salvando...' : '💾 Criar Registro'}
+          </button>
+        </div>
+
+        {/* Sugestões de Lucro */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            💡 Sugestões de Lucro (baseado no saldo inicial):
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[2.34, 3.73, 4.73, 10.00].map((percentage, index) => {
+              const saldoInicialNum = parseFloat(saldoInicial) || 0;
+              const suggestedValue = saldoInicialNum * (1 + percentage / 100);
+              
+              // Cores diferentes para cada card
+              const colors = [
+                { bg: 'bg-blue-50', border: 'border-blue-200', hover: 'hover:bg-blue-100', textMedium: 'text-blue-700', textBold: 'text-blue-800' },
+                { bg: 'bg-green-50', border: 'border-green-200', hover: 'hover:bg-green-100', textMedium: 'text-green-700', textBold: 'text-green-800' },
+                { bg: 'bg-purple-50', border: 'border-purple-200', hover: 'hover:bg-purple-100', textMedium: 'text-purple-700', textBold: 'text-purple-800' },
+                { bg: 'bg-orange-50', border: 'border-orange-200', hover: 'hover:bg-orange-100', textMedium: 'text-orange-700', textBold: 'text-orange-800' }
+              ];
+              const color = colors[index];
+              
+              return (
+                <div
+                  key={percentage}
+                  className={`p-3 ${color.bg} border ${color.border} rounded-lg transition-colors text-center`}
+                >
+                  <div className={`text-sm font-medium ${color.textMedium}`}>+{percentage}%</div>
+                  <div className={`text-lg font-bold ${color.textBold}`}>
+                    R$ {suggestedValue.toLocaleString('pt-BR', { 
+                      minimumFractionDigits: 2, 
+                      maximumFractionDigits: 2 
+                    })}
+                  </div>
+                </div>
+              );
+            })}</div>
+        </div>
+
+      </div>
+    );
+  }
+
+  return (
+    <div className={`bg-white rounded-lg shadow-lg p-6 ${className}`}>
+      {/* Cabeçalho */}
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-xl font-bold text-gray-800">💰 Saldo Atual</h3>
+      </div>
+
+      {!isEditing ? (
+        /* Modo Visualização */
+        <div className="space-y-6">
+          {/* Todos os campos em uma linha */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {/* Data */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Data
+              </label>
+              <div className="text-xl font-bold text-gray-800">
+                {currentSaldoRecord?.data ? currentSaldoRecord.data.split('-').reverse().join('/') : new Date().toLocaleDateString('pt-BR')}
+              </div>
+            </div>
+
+            {/* Saldo Inicial */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <label className="block text-sm font-medium text-blue-700 mb-1">
+                Saldo Inicial
+              </label>
+              <div className="text-xl font-bold text-blue-800">
+                R$ {(currentSaldoRecord.saldo_inicial || 0).toLocaleString('pt-BR', { 
+                  minimumFractionDigits: 2, 
+                  maximumFractionDigits: 2 
+                })}
+              </div>
+            </div>
+
+            {/* Saldo Atual */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <label className="block text-sm font-medium text-green-700 mb-1">
+                Saldo Atual
+              </label>
+              <div className={`text-xl font-bold ${(currentSaldoRecord.saldo_atual || 0) >= 0 ? 'text-green-800' : 'text-red-600'}`}>
+                R$ {(currentSaldoRecord.saldo_atual || 0).toLocaleString('pt-BR', { 
+                  minimumFractionDigits: 2, 
+                  maximumFractionDigits: 2 
+                })}
+              </div>
+            </div>
+
+            {/* Valor do Lucro */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <label className="block text-sm font-medium text-yellow-700 mb-1">
+                Valor do Lucro
+              </label>
+              <div className={`text-xl font-bold text-right ${(() => {
+                const vlrLucroDisplay = currentSaldoRecord.vlr_lucro !== null && currentSaldoRecord.vlr_lucro !== undefined 
+                  ? currentSaldoRecord.vlr_lucro 
+                  : (currentSaldoRecord.saldo_atual || 0) - (currentSaldoRecord.saldo_inicial || 0);
+                return vlrLucroDisplay >= 0 ? 'text-green-600' : 'text-red-600';
+              })()}`}>
+                {(() => {
+                  const vlrLucroDisplay = currentSaldoRecord.vlr_lucro !== null && currentSaldoRecord.vlr_lucro !== undefined 
+                    ? currentSaldoRecord.vlr_lucro 
+                    : (currentSaldoRecord.saldo_atual || 0) - (currentSaldoRecord.saldo_inicial || 0);
+                  return `${vlrLucroDisplay >= 0 ? '+' : ''}R$ ${Math.abs(vlrLucroDisplay).toLocaleString('pt-BR', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  })}`;
+                })()}
+              </div>
+            </div>
+
+            {/* Percentual do Lucro */}
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <label className="block text-sm font-medium text-purple-700 mb-1">
+                Percentual do Lucro
+              </label>
+              <div className={`text-xl font-bold text-right ${(() => {
+                const perLucroDisplay = currentSaldoRecord.per_lucro !== null && currentSaldoRecord.per_lucro !== undefined 
+                  ? currentSaldoRecord.per_lucro 
+                  : (currentSaldoRecord.saldo_inicial || 0) !== 0 
+                    ? (((currentSaldoRecord.saldo_atual || 0) - (currentSaldoRecord.saldo_inicial || 0)) / (currentSaldoRecord.saldo_inicial || 0)) * 100 
+                    : 0;
+                return perLucroDisplay >= 0 ? 'text-green-600' : 'text-red-600';
+              })()}`}>
+                {(() => {
+                  const perLucroDisplay = currentSaldoRecord.per_lucro !== null && currentSaldoRecord.per_lucro !== undefined 
+                    ? currentSaldoRecord.per_lucro 
+                    : (currentSaldoRecord.saldo_inicial || 0) !== 0 
+                      ? (((currentSaldoRecord.saldo_atual || 0) - (currentSaldoRecord.saldo_inicial || 0)) / (currentSaldoRecord.saldo_inicial || 0)) * 100 
+                      : 0;
+                  return `${perLucroDisplay >= 0 ? '+' : ''}${perLucroDisplay.toLocaleString('pt-BR', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  })}%`;
+                })()}
+              </div>
+            </div>
+          </div>
+
+          {/* Botões de Ação */}
+          <div className="flex justify-between space-x-3">
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowHistorico(true)}
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+              >
+                📊 Histórico de Saldos
+              </button>
+              <button
+                onClick={() => {
+                  // Inicializar campos para novo cadastro
+                  setData(new Date().toISOString().split('T')[0]); // Data de hoje
+                  setSaldoAtual('0.00'); // Zerar saldo atual temporariamente
+                  setSaldoInicial('0.00'); // Zerar saldo inicial temporariamente
+                  fetchLastBalance(true); // Buscar último saldo e definir tanto inicial quanto atual
+                  setShowCreateForm(true);
+                }}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+              >
+                ➕ Cadastrar Saldo
+              </button>
+            </div>
+            <button
+              onClick={() => setIsEditing(true)}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              ✏️ Editar Saldo
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Modo Edição */
+        <div>
+          {/* Campos de Entrada */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+            {/* Data */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data de Cadastro
+              </label>
+              <input
+                type="date"
+                value={data}
+                onChange={(e) => setData(e.target.value)}
+                disabled={!isEditing}
+                className={`w-full px-4 py-3 border rounded-lg text-lg font-semibold text-right ${
+                  isEditing 
+                    ? 'border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200' 
+                    : 'border-gray-300 bg-gray-50'
+                } transition-colors`}
+              />
+            </div>
+
+            {/* Saldo Inicial */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Saldo Inicial (R$)
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*[.,]?[0-9]*"
+                value={saldoInicial}
+                onChange={(e) => {
+                  const value = e.target.value.replace(',', '.');
+                  setSaldoInicial(value);
+                }}
+                disabled={!isEditing}
+                className={`w-full px-4 py-3 border rounded-lg text-lg font-semibold text-right ${
+                  isEditing 
+                    ? 'border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200' 
+                    : 'border-gray-300 bg-gray-50'
+                } transition-colors`}
+                placeholder="0,00"
+              />
+            </div>
+
+            {/* Saldo Atual */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Saldo Atual (R$)
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*[.,]?[0-9]*"
+                value={saldoAtual}
+                onChange={(e) => {
+                  const value = e.target.value.replace(',', '.');
+                  setSaldoAtual(value);
+                }}
+                disabled={!isEditing}
+                className={`w-full px-4 py-3 border rounded-lg text-lg font-semibold text-right ${
+                  isEditing 
+                    ? 'border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200' 
+                    : 'border-gray-300 bg-gray-50'
+                } transition-colors`}
+                placeholder="0,00"
+              />
+            </div>
+
+            {/* Valor do Lucro */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Valor do Lucro (R$)
+              </label>
+              <div className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold bg-gray-50 text-right ${
+                vlrLucro >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {vlrLucro >= 0 ? '+' : ''}R$ {vlrLucro.toLocaleString('pt-BR', { 
+                  minimumFractionDigits: 2, 
+                  maximumFractionDigits: 2 
+                })}
+              </div>
+            </div>
+
+            {/* Percentual do Lucro */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Percentual do Lucro (%)
+              </label>
+              <div className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold bg-gray-50 text-right ${
+                perLucro >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {perLucro >= 0 ? '+' : ''}{perLucro.toLocaleString('pt-BR', { 
+                  minimumFractionDigits: 2, 
+                  maximumFractionDigits: 2 
+                })}%
+              </div>
+            </div>
+          </div>
+
+          {/* Sugestões de Lucro */}
+          <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            💡 Sugestões de Lucro (baseado no saldo inicial):
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[2.34, 3.73, 4.73, 10.00].map((percentage, index) => {
+              const saldoInicialNum = parseFloat(saldoInicial) || 0;
+              const suggestedValue = saldoInicialNum * (1 + percentage / 100);
+              
+              // Cores diferentes para cada card
+              const colors = [
+                { bg: 'bg-blue-50', border: 'border-blue-200', hover: 'hover:bg-blue-100', textMedium: 'text-blue-700', textBold: 'text-blue-800' },
+                { bg: 'bg-green-50', border: 'border-green-200', hover: 'hover:bg-green-100', textMedium: 'text-green-700', textBold: 'text-green-800' },
+                { bg: 'bg-purple-50', border: 'border-purple-200', hover: 'hover:bg-purple-100', textMedium: 'text-purple-700', textBold: 'text-purple-800' },
+                { bg: 'bg-orange-50', border: 'border-orange-200', hover: 'hover:bg-orange-100', textMedium: 'text-orange-700', textBold: 'text-orange-800' }
+              ];
+              const color = colors[index];
+              
+              return (
+                <div
+                  key={percentage}
+                  className={`p-3 ${color.bg} border ${color.border} rounded-lg transition-colors text-center`}
+                >
+                  <div className={`text-sm font-medium ${color.textMedium}`}>+{percentage}%</div>
+                  <div className={`text-lg font-bold ${color.textBold}`}>
+                    R$ {suggestedValue.toLocaleString('pt-BR', { 
+                      minimumFractionDigits: 2, 
+                      maximumFractionDigits: 2 
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Botões de Ação no Modo Edição */}
+        <div className="flex justify-end space-x-3 mt-6">
+          <button
+            onClick={handleCancel}
+            disabled={isSaving}
+            className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors font-medium disabled:opacity-50"
+          >
+            ❌ Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
+          >
+            {isSaving ? '⏳ Salvando...' : '💾 Salvar'}
+          </button>
+        </div>
+        </div>
+      )}
+
+      {/* Modal de Histórico */}
+      {showHistorico && (
+        <HistoricoSaldos onClose={() => setShowHistorico(false)} />
+      )}
+    </div>
+  );
+};
+
+export default SaldoManager;

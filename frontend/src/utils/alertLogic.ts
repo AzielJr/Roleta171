@@ -29,29 +29,105 @@ function getNumberNeighbors(num: number): number[] {
   return neighbors;
 }
 
-// Função para encontrar os 2 números ideais para apostar baseado na região dos números que saíram
-function findOptimalBettingNumbers(raceNum1: number, raceNum2: number): number[] {
-  const index1 = WHEEL_ORDER.indexOf(raceNum1);
-  const index2 = WHEEL_ORDER.indexOf(raceNum2);
+// Função para calcular os 7 números expostos baseado na nova lógica
+export function calculateExposedNumbers(raceNum1: number, raceNum2: number): number[] {
+  // Encontra o primeiro índice onde qualquer um dos números aparece
+  let firstFoundIndex = -1;
+  let firstFoundNumber = null;
   
-  if (index1 === -1 || index2 === -1) return [];
-  
-  // Calcula o ponto médio entre os dois números na roda
-  let midIndex1, midIndex2;
-  
-  if (Math.abs(index1 - index2) <= WHEEL_ORDER.length / 2) {
-    // Caso normal - números próximos
-    const avgIndex = Math.round((index1 + index2) / 2);
-    midIndex1 = (avgIndex + 8) % WHEEL_ORDER.length; // +8 posições do meio
-    midIndex2 = (avgIndex + 16) % WHEEL_ORDER.length; // +16 posições do meio
-  } else {
-    // Caso circular - números distantes (passam pelo 0)
-    const avgIndex = Math.round((index1 + index2 + WHEEL_ORDER.length) / 2) % WHEEL_ORDER.length;
-    midIndex1 = (avgIndex + 8) % WHEEL_ORDER.length;
-    midIndex2 = (avgIndex + 16) % WHEEL_ORDER.length;
+  for (let i = 0; i < WHEEL_ORDER.length; i++) {
+    if (WHEEL_ORDER[i] === raceNum1 || WHEEL_ORDER[i] === raceNum2) {
+      firstFoundIndex = i;
+      firstFoundNumber = WHEEL_ORDER[i];
+      break;
+    }
   }
   
-  return [WHEEL_ORDER[midIndex1], WHEEL_ORDER[midIndex2]];
+  if (firstFoundIndex === -1) {
+    return [];
+  }
+  
+  // Determina qual é o segundo número
+  const secondNumber = firstFoundNumber === raceNum1 ? raceNum2 : raceNum1;
+  
+  // Varre os próximos 5 índices para ver se existe o segundo número
+  let secondFoundInRange = false;
+  for (let i = 1; i <= 5; i++) {
+    const checkIndex = (firstFoundIndex + i) % WHEEL_ORDER.length;
+    if (WHEEL_ORDER[checkIndex] === secondNumber) {
+      secondFoundInRange = true;
+      break;
+    }
+  }
+  
+  let startIndex;
+  if (secondFoundInRange) {
+    // Se encontrou o segundo número nos próximos 5 índices, usa primeiro índice - 1
+    startIndex = (firstFoundIndex - 1 + WHEEL_ORDER.length) % WHEEL_ORDER.length;
+    
+    // Captura os próximos 7 números (sequência normal)
+    const exposedNumbers: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      const currentIndex = (startIndex + i) % WHEEL_ORDER.length;
+      exposedNumbers.push(WHEEL_ORDER[currentIndex]);
+    }
+    return exposedNumbers;
+  } else {
+    // Se não encontrou, usa índice do segundo número - 1
+    const secondNumberIndex = WHEEL_ORDER.indexOf(secondNumber);
+    startIndex = (secondNumberIndex - 1 + WHEEL_ORDER.length) % WHEEL_ORDER.length;
+    
+    // Captura os próximos 7 números (sequência normal circular)
+    const exposedNumbers: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      const currentIndex = (startIndex + i) % WHEEL_ORDER.length;
+      exposedNumbers.push(WHEEL_ORDER[currentIndex]);
+    }
+    return exposedNumbers;
+  }
+}
+
+// Função para encontrar os 2 números ideais para apostar que cobrem os 30 números restantes
+function findOptimalBettingNumbers(exposedNumbers: number[]): number[] {
+  // Todos os números da roleta
+  const allNumbers = Array.from({ length: 37 }, (_, i) => i);
+  
+  // Números que precisam ser cobertos (30 números = 37 - 7 expostos)
+  const numbersToCover = allNumbers.filter(num => !exposedNumbers.includes(num));
+  
+  // Testa todas as combinações possíveis de 2 números para encontrar a melhor cobertura
+  let bestCombination = [];
+  let maxCoverage = 0;
+  
+  for (let i = 0; i < WHEEL_ORDER.length; i++) {
+    for (let j = i + 1; j < WHEEL_ORDER.length; j++) {
+      const num1 = WHEEL_ORDER[i];
+      const num2 = WHEEL_ORDER[j];
+      
+      // Calcula cobertura dos dois números (cada um com 7 vizinhos de cada lado)
+      const coverage1 = getNumberNeighbors(num1);
+      const coverage2 = getNumberNeighbors(num2);
+      const totalCoverage = [...new Set([...coverage1, ...coverage2])];
+      
+      // Verifica quantos dos números necessários são cobertos
+      const coveredFromNeeded = numbersToCover.filter(num => totalCoverage.includes(num));
+      
+      if (coveredFromNeeded.length > maxCoverage) {
+        maxCoverage = coveredFromNeeded.length;
+        bestCombination = [num1, num2];
+      }
+      
+      // Se conseguiu cobrir todos os 30 números, pode parar
+      if (maxCoverage === 30) {
+        break;
+      }
+    }
+    if (maxCoverage === 30) {
+      break;
+    }
+  }
+  
+  return bestCombination;
 }
 
 // Função para verificar se dois números estão dentro de 5 posições consecutivas na roda
@@ -94,9 +170,9 @@ export function checkForRaceCondition(history: RouletteEntry[]): {
   }
 
   // Pega APENAS os 2 ÚLTIMOS números chamados
-  const lastTwoEntries = history.slice(-2);
-  const lastNumber = lastTwoEntries[1].number;
-  const secondLastNumber = lastTwoEntries[0].number;
+  const lastTwoEntries = history.slice(0, 2); // Corrigido: slice(0, 2) para pegar os 2 primeiros (mais recentes)
+  const lastNumber = lastTwoEntries[0].number; // O mais recente
+  const secondLastNumber = lastTwoEntries[1].number; // O segundo mais recente
   
   // Verificações de segurança
   if (typeof lastNumber !== 'number' || typeof secondLastNumber !== 'number') {
@@ -108,10 +184,19 @@ export function checkForRaceCondition(history: RouletteEntry[]): {
     };
   }
   
-  // Verifica se os 2 últimos números são diferentes e estão dentro de 5 posições na roda
-  if (lastNumber !== secondLastNumber && areWithinFivePositions(lastNumber, secondLastNumber)) {
-    // Race detectada! Encontra os 2 números ideais para apostar
-    const suggestedNumbers = findOptimalBettingNumbers(lastNumber, secondLastNumber);
+  // Verifica se há race condition:
+  // 1. Se os números são iguais (mesmo número digitado 2x) - SEMPRE aciona o padrão
+  // 2. Se os números são diferentes E estão dentro de 5 posições na roda
+  const sameNumber = lastNumber === secondLastNumber;
+  const differentButClose = lastNumber !== secondLastNumber && areWithinFivePositions(lastNumber, secondLastNumber);
+  
+  if (sameNumber || differentButClose) {
+    // Race detectada! Calcula os números expostos usando a nova lógica
+    // IMPORTANTE: Passa secondLastNumber primeiro (mais antigo) e lastNumber segundo (mais recente)
+    const exposedNumbers = calculateExposedNumbers(secondLastNumber, lastNumber);
+    
+    // Encontra os 2 números ideais para apostar que cobrem os 30 números restantes
+    const suggestedNumbers = findOptimalBettingNumbers(exposedNumbers);
     
     // Calcula a cobertura dos números sugeridos (cada um cobre 15 números)
     const coverage1 = getNumberNeighbors(suggestedNumbers[0]);
@@ -120,15 +205,11 @@ export function checkForRaceCondition(history: RouletteEntry[]): {
     // União dos dois conjuntos de cobertura (deve cobrir 30 números)
     const coveredNumbers = [...new Set([...coverage1, ...coverage2])];
     
-    // Números em risco são todos os outros (deve ser exatamente 7 números)
-    const allNumbers = Array.from({ length: 37 }, (_, i) => i);
-    const riskNumbers = allNumbers.filter(num => !coveredNumbers.includes(num));
-    
     return {
       hasRace: true,
-      raceNumbers: suggestedNumbers, // Agora retorna os números sugeridos, não os que saíram
-      coveredNumbers,
-      riskNumbers
+      raceNumbers: suggestedNumbers, // Os 2 números para apostar
+      coveredNumbers, // Todos os números cobertos pelas apostas
+      riskNumbers: exposedNumbers // Os 7 números expostos (em risco)
     };
   }
 

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useBalance } from '../hooks/useBalance';
+import React, { useState, useEffect } from 'react';
+import { useBalance } from '../contexts/BalanceContext';
 
 interface BalanceManagerProps {
   className?: string;
@@ -9,12 +9,12 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
   const { 
     balance, 
     transactions, 
-    isLoading, 
+    loading, 
     addEntry, 
-    addExit, 
-    setBalanceManually,
-    clearHistory,
-    resetBalance 
+    removeEntry, 
+    adjustBalance,
+    currentSaldoRecord,
+    refreshBalance 
   } = useBalance();
 
   const [showTransactions, setShowTransactions] = useState(false);
@@ -33,28 +33,32 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
     }
   };
 
-  const handleAddExit = () => {
+  const handleAddExit = async () => {
     const amount = parseFloat(exitAmount);
     if (amount > 0) {
-      try {
-        addExit(amount, exitDescription || 'Aposta');
+      const success = await removeEntry(amount, exitDescription || 'Aposta');
+      if (success) {
         setExitAmount('');
         setExitDescription('');
-      } catch (error) {
-        alert('Saldo insuficiente!');
+      } else {
+        alert('Erro ao registrar saída. Tente novamente.');
       }
     }
   };
 
-  const handleSetManualBalance = () => {
+  const handleSetManualBalance = async () => {
     const amount = parseFloat(manualBalance);
     if (amount >= 0) {
-      setBalanceManually(amount, 'Ajuste manual do saldo');
-      setManualBalance('');
+      const success = await adjustBalance(amount, 'Ajuste manual do saldo');
+      if (success) {
+        setManualBalance('');
+      } else {
+        alert('Erro ao ajustar saldo. Tente novamente.');
+      }
     }
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className={`bg-gray-100 rounded-lg p-4 ${className}`}>
         <div className="text-center text-gray-600">Carregando saldo...</div>
@@ -70,13 +74,23 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
         <div className="text-right">
           <div className="text-sm text-gray-600">Saldo Atual</div>
           <div className={`text-xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
+          {currentSaldoRecord && (
+            <div className="text-xs text-gray-500">
+              {new Date(currentSaldoRecord.data).toLocaleDateString('pt-BR')}
+              {currentSaldoRecord.vlr_lucro !== 0 && (
+                <span className={`ml-2 ${currentSaldoRecord.vlr_lucro >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  ({currentSaldoRecord.vlr_lucro >= 0 ? '+' : ''}R$ {currentSaldoRecord.vlr_lucro?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Controles de Entrada e Saída */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      {/* Controles de Entrada, Saída e Sugestões */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         {/* Entrada */}
         <div className="bg-green-50 p-3 rounded-lg border border-green-200">
           <h4 className="font-semibold text-green-800 mb-2">➕ Adicionar Entrada</h4>
@@ -137,6 +151,57 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
             </button>
           </div>
         </div>
+
+        {/* Sugestões de Lucro */}
+        <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
+          <h4 className="font-semibold text-purple-800 mb-2">💡 Sugestões</h4>
+          <div className="space-y-2">
+            {/* Lucro de 3% */}
+            <div className="bg-white p-2 rounded border border-purple-100">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-purple-700">Lucro de 3%</span>
+                <div className="text-right">
+                  <div className="text-xs text-gray-600">
+                    +R$ {(balance * 0.03).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-sm font-bold text-purple-600">
+                    R$ {(balance * 1.03).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Lucro de 5% */}
+            <div className="bg-white p-2 rounded border border-purple-100">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-purple-700">Lucro de 5%</span>
+                <div className="text-right">
+                  <div className="text-xs text-gray-600">
+                    +R$ {(balance * 0.05).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-sm font-bold text-purple-600">
+                    R$ {(balance * 1.05).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Lucro de 10% */}
+            <div className="bg-white p-2 rounded border border-purple-100">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-purple-700">Lucro de 10%</span>
+                <div className="text-right">
+                  <div className="text-xs text-gray-600">
+                    +R$ {(balance * 0.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-sm font-bold text-purple-600">
+                    R$ {(balance * 1.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Ajuste Manual do Saldo */}
@@ -171,22 +236,11 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
           {showTransactions ? 'Ocultar' : 'Ver'} Histórico ({transactions.length})
         </button>
         <button
-          onClick={clearHistory}
-          className="bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded font-semibold transition-colors"
-          title="Limpar histórico (manter saldo)"
+          onClick={refreshBalance}
+          className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded font-semibold transition-colors"
+          title="Atualizar saldo do banco de dados"
         >
-          Limpar Histórico
-        </button>
-        <button
-          onClick={() => {
-            if (confirm('Tem certeza que deseja resetar tudo? Esta ação não pode ser desfeita.')) {
-              resetBalance();
-            }
-          }}
-          className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded font-semibold transition-colors"
-          title="Resetar saldo e histórico"
-        >
-          Reset
+          Atualizar
         </button>
       </div>
 
@@ -224,7 +278,7 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
                       <div className={`font-bold ${
                         transaction.type === 'entrada' ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {transaction.type === 'entrada' ? '+' : '-'}R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        {transaction.type === 'entrada' ? '+' : '-'}R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
                   </div>

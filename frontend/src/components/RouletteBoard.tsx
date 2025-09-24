@@ -5,6 +5,7 @@ import { BalanceManager } from './BalanceManager';
 import { useStatistics } from '../hooks/useStatistics';
 import { calculateStatistics } from '../utils/statisticsCalculator';
 import { getNumberColor as getNumberColorUtil } from '../utils/rouletteConfig';
+import { checkForRaceCondition } from '../utils/alertLogic';
 
 interface SelectedNumbers {
   numbers: number[];
@@ -76,9 +77,17 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [addNumbersInput, setAddNumbersInput] = useState('');
   const drawnHistoryRef = useRef<number[]>([]);
   
+  // Estado para controlar padrão forçado
+  const [forcedPattern, setForcedPattern] = useState<{
+    exposedNumbers: number[];
+    remainingNumbers: number[];
+    baseNumbers: number[];
+  } | null>(null);
+  
   // Estados para destacar números na race quando popup aparecer
   const [highlightedBetNumbers, setHighlightedBetNumbers] = useState<number[]>([]);
   const [highlightedRiskNumbers, setHighlightedRiskNumbers] = useState<number[]>([]);
+  const [highlightedBaseNumbers, setHighlightedBaseNumbers] = useState<number[]>([]);
   
   // Estados para o modal de cálculo de lucro
   const [showProfitModal, setShowProfitModal] = useState(false);
@@ -518,6 +527,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     setPatternAlert(null);
     setHighlightedBetNumbers([]);
     setHighlightedRiskNumbers([]);
+    setHighlightedBaseNumbers([]);
     setPatternDetectedCount(0);
     setWinCount(0);
     setLossCount(0);
@@ -541,28 +551,21 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   };
 
   const toggleNumber = (num: number) => {
-    // Limpar seleção anterior primeiro
-    setLastSelectedNumber(null);
-    
-    // Limpar destaques do popup quando houver seleção manual
+    // Limpar destaques anteriores
     setHighlightedBetNumbers([]);
     setHighlightedRiskNumbers([]);
+    setHighlightedBaseNumbers([]);
     
-    // Fechar automaticamente o padrão detectado ao selecionar novo número
+    // Descartar alerta se existir
     if (patternAlert) {
       setPatternAlert(null);
     }
     
-    // Definir como último número selecionado
     setLastSelectedNumber(num);
     
-    // Adicionar o número aos últimos sorteados
-    addToLastNumbers(num);
+    // Adicionar número ao histórico
+    setLastNumbers(prev => [num, ...prev.slice(0, 9)]);
     
-    // Adicionar ao histórico para detecção de padrões
-    addToHistory(num);
-    
-    // Manter a funcionalidade de seleção original
     setSelected(prev => ({
       ...prev,
       numbers: prev.numbers.includes(num)
@@ -688,22 +691,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       return;
     }
 
-    // Calcular os 7 números: 3 anteriores + número atual + 3 posteriores
+    // Calcular os 7 números expostos conforme documentação: voltar 3 posições e contar 7
+    const startIndex = (position - 3 + 37) % 37;
     const exposedNumbers: number[] = [];
     
-    // Adicionar 3 números anteriores
-    for (let i = 3; i >= 1; i--) {
-      const prevIndex = (position - i + 37) % 37;
-      exposedNumbers.push(ROULETTE_SEQUENCE[prevIndex]);
-    }
-    
-    // Adicionar o número atual
-    exposedNumbers.push(lastNumber);
-    
-    // Adicionar 3 números posteriores
-    for (let i = 1; i <= 3; i++) {
-      const nextIndex = (position + i) % 37;
-      exposedNumbers.push(ROULETTE_SEQUENCE[nextIndex]);
+    for (let i = 0; i < 7; i++) {
+      const index = (startIndex + i) % 37;
+      exposedNumbers.push(ROULETTE_SEQUENCE[index]);
     }
 
     // Calcular os 30 números restantes (não expostos)
@@ -761,25 +755,34 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       }
     }
 
-    // Limpar destaques anteriores
+    // Limpar padrão detectado automaticamente
     setPatternAlert(null);
     
-    // Destacar os 7 números expostos como números de risco (vermelho)
+    // Configurar padrão forçado
+    setForcedPattern({
+      exposedNumbers,
+      remainingNumbers,
+      baseNumbers: bestCoverageNumbers
+    });
+    
+    // Destacar números conforme documentação do Padrão Forçado:
+    // - 7 números expostos como risco (mantêm cor original, primeiro e último com borda especial)
     setHighlightedRiskNumbers(exposedNumbers);
     
-    // Destacar os 2 números de cobertura como números de aposta (verde)
-    setHighlightedBetNumbers(bestCoverageNumbers);
+    // - 30 números restantes para apostar (amarelo)
+    setHighlightedBetNumbers(remainingNumbers);
+    
+    // - 2 números base (azul com borda branca)
+    setHighlightedBaseNumbers(bestCoverageNumbers);
     
     // Acumular o valor atual antes de zerar
     setTotalNumbersWithoutPattern((prev) => prev + numbersWithoutPattern);
     
-    // Não zerar contador de números sem padrão quando Padrão 171 é acionado
-    // setNumbersWithoutPattern(0);
-    
     // Mostrar informação do padrão aplicado
-    console.log(`Padrão 171 aplicado baseado no número ${lastNumber}`);
+    console.log(`Padrão 171 Forçado aplicado baseado no número ${lastNumber}`);
     console.log(`Números expostos (7):`, exposedNumbers);
-    console.log(`Números de cobertura (2):`, bestCoverageNumbers);
+    console.log(`Números para apostar (30):`, remainingNumbers);
+    console.log(`Números base (2):`, bestCoverageNumbers);
     console.log(`Cobertura: ${maxCoverage} de 30 números restantes`);
   };
 
@@ -1091,6 +1094,44 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     lastPatternNumbersRef.current = lastPatternNumbers;
   }, [lastPatternNumbers]);
 
+  // useEffect para detectar padrão de corrida automaticamente
+  useEffect(() => {
+    if (lastNumbers.length >= 2) {
+      // Converter lastNumbers para o formato esperado pela função checkForRaceCondition
+      const history = lastNumbers.map((number, index) => ({
+        number,
+        timestamp: Date.now() - (index * 1000) // Simular timestamps
+      }));
+
+      const raceResult = checkForRaceCondition(history);
+      
+      if (raceResult.hasRace) {
+        console.log('[DEBUG] Padrão de corrida detectado automaticamente:', raceResult);
+        
+        // Gerar mensagem do alerta
+        const message = `Race detectada! Aposte nos números: ${raceResult.raceNumbers.join(' e ')}\n\nNúmeros no risco (7): ${raceResult.riskNumbers.join(', ')}\n\nCobertura: ${raceResult.coveredNumbers.length} números (${Math.round((raceResult.coveredNumbers.length / 37) * 100)}%)`;
+        
+        // Definir o alerta do padrão
+        setPatternAlert({
+          numbers: raceResult.raceNumbers,
+          positions: raceResult.raceNumbers.map(num => ROULETTE_SEQUENCE.indexOf(num)),
+          message: message
+        });
+        
+        // Destacar números conforme o padrão detectado
+        setHighlightedBetNumbers(raceResult.raceNumbers); // Números para apostar (azul)
+        setHighlightedRiskNumbers(raceResult.riskNumbers); // Números de risco (borda especial)
+        setHighlightedBaseNumbers(raceResult.coveredNumbers); // Números cobertos (azul claro)
+      } else {
+        // Limpar destaques se não há padrão
+        setPatternAlert(null);
+        setHighlightedBetNumbers([]);
+        setHighlightedRiskNumbers([]);
+        setHighlightedBaseNumbers([]);
+      }
+    }
+  }, [lastNumbers]);
+
   const renderNumber = (num: number) => {
     const isLastSelected = lastSelectedNumber === num;
     const isLastDrawn = lastDrawnNumber === num;
@@ -1304,7 +1345,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               onClick={simulateDrawing}
               className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-semibold transition-colors"
             >
-              Simular Próximo
+              Simular
             </button>
             
             <button
@@ -1320,7 +1361,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               className="bg-red-600 hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white px-3 py-1 rounded text-sm font-semibold transition-colors"
               title="Apagar Último"
             >
-              Apagar Último
+              Apagar
             </button>
           </div>
         </div>
@@ -1396,6 +1437,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                         const isLastSelected = lastSelectedNumber === num;
                         const isHighlightedBet = highlightedBetNumbers.includes(num);
                         const isHighlightedRisk = highlightedRiskNumbers.includes(num);
+                        const isHighlightedBase = highlightedBaseNumbers.includes(num);
+                        
+                        // Verificar se é padrão forçado
+                        const isForcedPattern = forcedPattern !== null;
+                        
+                        // Verificar se é primeiro ou último número exposto no padrão forçado
+                        const isFirstExposed = isForcedPattern && forcedPattern?.exposedNumbers[0] === num;
+                        const isLastExposed = isForcedPattern && forcedPattern?.exposedNumbers[forcedPattern.exposedNumbers.length - 1] === num;
                         
                         // Verificar se é um número da estratégia quando padrão está ativo
                         const isStrategyNumber = patternAlert && (() => {
@@ -1428,8 +1477,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                 : isStrategyNumber
                                 ? 'ring-4 ring-blue-400 border-blue-500 scale-110 shadow-xl animate-pulse'
                                 : 'border-gray-400',
-                              isHighlightedBet ? 'ring-2 ring-green-400 scale-110 shadow-lg' : '',
-                              isHighlightedRisk ? 'ring-2 ring-red-400 scale-110 shadow-lg' : ''
+                              // Cores do Padrão Forçado 171 conforme documentação
+                              isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black scale-110 shadow-lg' : 
+                              !isForcedPattern && isHighlightedBet ? 'bg-blue-500 text-white ring-2 ring-blue-400 scale-110 shadow-lg' : '',
+                              isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                              isHighlightedRisk ? 'scale-110 shadow-lg' : '',
+                              isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                              !isForcedPattern && isHighlightedBase ? 'bg-blue-200 text-blue-900 ring-1 ring-blue-300' : ''
                             )}
                             title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                           >
@@ -1448,6 +1502,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                           const isLastSelected = lastSelectedNumber === num;
                           const isHighlightedBet = highlightedBetNumbers.includes(num);
                           const isHighlightedRisk = highlightedRiskNumbers.includes(num);
+                          const isHighlightedBase = highlightedBaseNumbers.includes(num);
+                          
+                          // Verificar se é padrão forçado
+                          const isForcedPattern = forcedPattern !== null;
+                          
+                          // Verificar se é primeiro ou último número exposto no padrão forçado
+                          const isFirstExposed = isForcedPattern && forcedPattern?.exposedNumbers[0] === num;
+                          const isLastExposed = isForcedPattern && forcedPattern?.exposedNumbers[forcedPattern.exposedNumbers.length - 1] === num;
                           
                           // Verificar se é um número da estratégia quando padrão está ativo
                           const isStrategyNumber = patternAlert && (() => {
@@ -1479,8 +1541,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                   : isStrategyNumber
                                   ? 'ring-4 ring-blue-400 border-blue-500 scale-110 shadow-xl animate-pulse'
                                   : 'border-gray-400',
-                                isHighlightedBet ? 'ring-2 ring-green-400 scale-110 shadow-lg' : '',
-                                isHighlightedRisk ? 'ring-2 ring-red-400 scale-110 shadow-lg' : ''
+                                // Cores do Padrão Forçado 171 conforme documentação
+                                isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black scale-110 shadow-lg' : 
+                                !isForcedPattern && isHighlightedBet ? 'bg-blue-500 text-white ring-2 ring-blue-400 scale-110 shadow-lg' : '',
+                                isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                                isHighlightedRisk ? 'scale-110 shadow-lg' : '',
+                                isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                                !isForcedPattern && isHighlightedBase ? 'bg-blue-200 text-blue-900 ring-1 ring-blue-300' : ''
                               )}
                               title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                             >
@@ -1500,6 +1567,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                           const isLastSelected = lastSelectedNumber === num;
                           const isHighlightedBet = highlightedBetNumbers.includes(num);
                           const isHighlightedRisk = highlightedRiskNumbers.includes(num);
+                          const isHighlightedBase = highlightedBaseNumbers.includes(num);
+                          
+                          // Verificar se é padrão forçado
+                          const isForcedPattern = forcedPattern !== null;
+                          
+                          // Verificar se é primeiro ou último número exposto no padrão forçado
+                          const isFirstExposed = isForcedPattern && forcedPattern?.exposedNumbers[0] === num;
+                          const isLastExposed = isForcedPattern && forcedPattern?.exposedNumbers[forcedPattern.exposedNumbers.length - 1] === num;
                           
                           // Verificar se é um número da estratégia quando padrão está ativo
                           const isStrategyNumber = patternAlert && (() => {
@@ -1531,8 +1606,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                   : isStrategyNumber
                                   ? 'ring-4 ring-blue-400 border-blue-500 scale-110 shadow-xl animate-pulse'
                                   : 'border-gray-400',
-                                isHighlightedBet ? 'ring-2 ring-green-400 scale-110 shadow-lg' : '',
-                                isHighlightedRisk ? 'ring-2 ring-red-400 scale-110 shadow-lg' : ''
+                                // Cores do Padrão Forçado 171 conforme documentação
+                                isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black scale-110 shadow-lg' : 
+                                !isForcedPattern && isHighlightedBet ? 'bg-blue-500 text-white ring-2 ring-blue-400 scale-110 shadow-lg' : '',
+                                isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                                isHighlightedRisk ? 'scale-110 shadow-lg' : '',
+                                isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                                !isForcedPattern && isHighlightedBase ? 'bg-blue-200 text-blue-900 ring-1 ring-blue-300' : ''
                               )}
                               title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                             >
@@ -1549,6 +1629,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                         const isLastSelected = lastSelectedNumber === num;
                         const isHighlightedBet = highlightedBetNumbers.includes(num);
                         const isHighlightedRisk = highlightedRiskNumbers.includes(num);
+                        const isHighlightedBase = highlightedBaseNumbers.includes(num);
+                        
+                        // Verificar se é padrão forçado
+                        const isForcedPattern = forcedPattern !== null;
+                        
+                        // Verificar se é primeiro ou último número exposto no padrão forçado
+                        const isFirstExposed = isForcedPattern && forcedPattern?.exposedNumbers[0] === num;
+                        const isLastExposed = isForcedPattern && forcedPattern?.exposedNumbers[forcedPattern.exposedNumbers.length - 1] === num;
                         
                         // Verificar se é um número da estratégia quando padrão está ativo
                         const isStrategyNumber = patternAlert && (() => {
@@ -1581,8 +1669,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                 : isStrategyNumber
                                 ? 'ring-4 ring-blue-400 border-blue-500 scale-110 shadow-xl animate-pulse'
                                 : 'border-gray-400',
-                              isHighlightedBet ? 'ring-2 ring-green-400 scale-110 shadow-lg' : '',
-                              isHighlightedRisk ? 'ring-2 ring-red-400 scale-110 shadow-lg' : ''
+                              // Cores do Padrão Forçado 171 conforme documentação
+                               isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black scale-110 shadow-lg' : 
+                               !isForcedPattern && isHighlightedBet ? 'bg-blue-500 text-white ring-2 ring-blue-400 scale-110 shadow-lg' : '',
+                               isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                               isHighlightedRisk ? 'scale-110 shadow-lg' : '',
+                               isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                               !isForcedPattern && isHighlightedBase ? 'bg-blue-200 text-blue-900 ring-1 ring-blue-300' : ''
                             )}
                             title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                           >
