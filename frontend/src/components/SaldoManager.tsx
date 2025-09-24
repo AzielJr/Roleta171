@@ -23,11 +23,10 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
   useEffect(() => {
     if (currentSaldoRecord) {
       // Verificar se é um registro real - qualquer valor diferente de zero ou ID não temporário
-      const hasRealData = currentSaldoRecord.saldo_inicial !== 0 || 
-                         currentSaldoRecord.saldo_atual !== 0 || 
-                         currentSaldoRecord.saldo_anterior !== 0 ||
-                         currentSaldoRecord.vlr_lucro !== 0 ||
-                         (currentSaldoRecord.id && currentSaldoRecord.id !== 'temp');
+      const hasRealData = currentSaldoRecord.saldo_inicial !== 0 ||
+          currentSaldoRecord.saldo_atual !== 0 ||
+          currentSaldoRecord.vlr_lucro !== 0 ||
+          (currentSaldoRecord.id && currentSaldoRecord.id !== 'temp');
       
       console.log('currentSaldoRecord:', currentSaldoRecord);
         console.log('hasRealData:', hasRealData);
@@ -39,7 +38,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
           minimumFractionDigits: 2, 
           maximumFractionDigits: 2 
         }).replace('.', '').replace(',', '.');
-        const saldoInicialFormatted = (currentSaldoRecord.saldo_inicial || currentSaldoRecord.saldo_anterior || 0).toLocaleString('pt-BR', { 
+        const saldoInicialFormatted = (currentSaldoRecord.saldo_inicial || 0).toLocaleString('pt-BR', { 
           minimumFractionDigits: 2, 
           maximumFractionDigits: 2 
         }).replace('.', '').replace(',', '.');
@@ -220,7 +219,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
         minimumFractionDigits: 2, 
         maximumFractionDigits: 2 
       }).replace('.', '').replace(',', '.');
-      const saldoInicialFormatted = (currentSaldoRecord.saldo_inicial || currentSaldoRecord.saldo_anterior || 0).toLocaleString('pt-BR', { 
+      const saldoInicialFormatted = (currentSaldoRecord.saldo_inicial || 0).toLocaleString('pt-BR', { 
         minimumFractionDigits: 2, 
         maximumFractionDigits: 2 
       }).replace('.', '').replace(',', '.');
@@ -342,7 +341,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
               Valor do Lucro (R$)
             </label>
             <div className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold bg-gray-50 text-right ${
-              vlrLucro >= 0 ? 'text-green-600' : 'text-red-600'
+              vlrLucro >= 0 ? 'text-green-600' : 'text-amber-900'
             }`}>
               {vlrLucro >= 0 ? '+' : ''}R$ {vlrLucro.toLocaleString('pt-BR', { 
                 minimumFractionDigits: 2, 
@@ -357,7 +356,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
               Percentual do Lucro (%)
             </label>
             <div className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold bg-gray-50 text-right ${
-              perLucro >= 0 ? 'text-green-600' : 'text-red-600'
+              perLucro >= 0 ? 'text-green-600' : 'text-amber-900'
             }`}>
               {perLucro >= 0 ? '+' : ''}{perLucro.toLocaleString('pt-BR', { 
                 minimumFractionDigits: 2, 
@@ -465,7 +464,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
               <label className="block text-sm font-medium text-green-700 mb-1">
                 Saldo Atual
               </label>
-              <div className={`text-xl font-bold ${(currentSaldoRecord.saldo_atual || 0) >= 0 ? 'text-green-800' : 'text-red-600'}`}>
+              <div className={`text-xl font-bold ${(currentSaldoRecord.saldo_atual || 0) >= 0 ? 'text-green-800' : 'text-amber-900'}`}>
                 R$ {(currentSaldoRecord.saldo_atual || 0).toLocaleString('pt-BR', { 
                   minimumFractionDigits: 2, 
                   maximumFractionDigits: 2 
@@ -482,7 +481,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
                 const vlrLucroDisplay = currentSaldoRecord.vlr_lucro !== null && currentSaldoRecord.vlr_lucro !== undefined 
                   ? currentSaldoRecord.vlr_lucro 
                   : (currentSaldoRecord.saldo_atual || 0) - (currentSaldoRecord.saldo_inicial || 0);
-                return vlrLucroDisplay >= 0 ? 'text-green-600' : 'text-red-600';
+                return vlrLucroDisplay >= 0 ? 'text-green-600' : 'text-amber-900';
               })()}`}>
                 {(() => {
                   const vlrLucroDisplay = currentSaldoRecord.vlr_lucro !== null && currentSaldoRecord.vlr_lucro !== undefined 
@@ -507,7 +506,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
                   : (currentSaldoRecord.saldo_inicial || 0) !== 0 
                     ? (((currentSaldoRecord.saldo_atual || 0) - (currentSaldoRecord.saldo_inicial || 0)) / (currentSaldoRecord.saldo_inicial || 0)) * 100 
                     : 0;
-                return perLucroDisplay >= 0 ? 'text-green-600' : 'text-red-600';
+                return perLucroDisplay >= 0 ? 'text-green-600' : 'text-amber-900';
               })()}`}>
                 {(() => {
                   const perLucroDisplay = currentSaldoRecord.per_lucro !== null && currentSaldoRecord.per_lucro !== undefined 
@@ -632,7 +631,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
                 Valor do Lucro (R$)
               </label>
               <div className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold bg-gray-50 text-right ${
-                vlrLucro >= 0 ? 'text-green-600' : 'text-red-600'
+                vlrLucro >= 0 ? 'text-green-600' : 'text-amber-900'
               }`}>
                 {vlrLucro >= 0 ? '+' : ''}R$ {vlrLucro.toLocaleString('pt-BR', { 
                   minimumFractionDigits: 2, 
@@ -647,7 +646,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
                 Percentual do Lucro (%)
               </label>
               <div className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold bg-gray-50 text-right ${
-                perLucro >= 0 ? 'text-green-600' : 'text-red-600'
+                perLucro >= 0 ? 'text-green-600' : 'text-amber-900'
               }`}>
                 {perLucro >= 0 ? '+' : ''}{perLucro.toLocaleString('pt-BR', { 
                   minimumFractionDigits: 2, 

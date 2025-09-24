@@ -73,14 +73,14 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
         <h3 className="text-lg font-bold text-gray-800">💰 Gerenciador de Saldo</h3>
         <div className="text-right">
           <div className="text-sm text-gray-600">Saldo Atual</div>
-          <div className={`text-xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <div className={`text-xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-amber-900'}`}>
             R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           {currentSaldoRecord && (
             <div className="text-xs text-gray-500">
               {new Date(currentSaldoRecord.data).toLocaleDateString('pt-BR')}
               {currentSaldoRecord.vlr_lucro !== 0 && (
-                <span className={`ml-2 ${currentSaldoRecord.vlr_lucro >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <span className={`ml-2 ${currentSaldoRecord.vlr_lucro >= 0 ? 'text-green-600' : 'text-amber-900'}`}>
                   ({currentSaldoRecord.vlr_lucro >= 0 ? '+' : ''}R$ {currentSaldoRecord.vlr_lucro?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                 </span>
               )}
@@ -276,7 +276,7 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
                         </div>
                       </div>
                       <div className={`font-bold ${
-                        transaction.type === 'entrada' ? 'text-green-600' : 'text-red-600'
+                        transaction.type === 'entrada' ? 'text-green-600' : 'text-amber-900'
                       }`}>
                         {transaction.type === 'entrada' ? '+' : '-'}R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>

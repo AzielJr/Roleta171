@@ -18,33 +18,89 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
   // Definir datas padrão (primeiro dia do mês corrente até hoje)
   useEffect(() => {
     const hoje = new Date();
-    const primeiroDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    // Usar um período mais amplo: 3 meses atrás até hoje
+    const treseMesesAtras = new Date(hoje.getFullYear(), hoje.getMonth() - 3, 1);
     
+    console.log('=== DEFININDO DATAS PADRÃO ===');
+    console.log('Hoje:', hoje);
+    console.log('Três meses atrás:', treseMesesAtras);
+    console.log('Data final (hoje):', hoje.toISOString().split('T')[0]);
+    console.log('Data inicial (3 meses atrás):', treseMesesAtras.toISOString().split('T')[0]);
+    
+    // Definir data final como hoje e inicial como 3 meses atrás
     setDataFinal(hoje.toISOString().split('T')[0]);
-    setDataInicial(primeiroDiaDoMes.toISOString().split('T')[0]);
+    setDataInicial(treseMesesAtras.toISOString().split('T')[0]);
   }, []);
 
   // Carregar histórico
   const carregarHistorico = async () => {
     if (!user) return;
 
+    console.log('=== CARREGANDO HISTÓRICO ===');
+    console.log('Data inicial:', dataInicial);
+    console.log('Data final:', dataFinal);
+    console.log('User ID:', user.id);
+    console.log('Tipo do User ID:', typeof user.id);
+
     setLoading(true);
     try {
+      // Primeiro, vamos fazer uma query sem filtros para ver todos os registros
+      const { data: todosRegistros } = await supabase
+        .from('r171_saldo')
+        .select('*')
+        .eq('id_senha', 1)
+        .order('data', { ascending: true });
+      
+      console.log('=== TODOS OS REGISTROS (SEM FILTRO) ===');
+      console.log('Total de registros no banco:', todosRegistros?.length || 0);
+      if (todosRegistros) {
+        const registro24 = todosRegistros.find(r => r.data === '2025-09-24');
+        console.log('🔍 Registro do dia 24 existe no banco?', registro24 ? 'SIM ✅' : 'NÃO ❌');
+        if (registro24) {
+          console.log('📊 Dados do registro 24 no banco:', registro24);
+        }
+      }
+
+      // Query com filtros
       let query = supabase
         .from('r171_saldo')
         .select('*')
-        .eq('id_senha', user.id)
-        .order('data', { ascending: true });
+        .eq('id_senha', 1);
+
+      console.log('=== QUERY COM FILTRO DE USUÁRIO ===');
+      console.log('User ID original:', user.id);
+      console.log('Forçando id_senha = 1 (baseado nos dados do banco)');
 
       // Aplicar filtros de data se definidos
       if (dataInicial) {
         query = query.gte('data', dataInicial);
+        console.log('✅ Filtro data inicial aplicado:', dataInicial);
       }
+      
       if (dataFinal) {
-        query = query.lte('data', dataFinal);
+        // Adicionar um dia à data final para incluir o dia selecionado
+        const dataFinalObj = new Date(dataFinal);
+        dataFinalObj.setDate(dataFinalObj.getDate() + 1);
+        const dataFinalCorrigida = dataFinalObj.toISOString().split('T')[0];
+        
+        query = query.lt('data', dataFinalCorrigida);
+        console.log('✅ Filtro data final aplicado:', dataFinalCorrigida, '(para incluir', dataFinal, ')');
+        console.log('🔍 DEBUG: 2025-09-24 < ' + dataFinalCorrigida + '?', '2025-09-24' < dataFinalCorrigida);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.order('data', { ascending: true });
+
+      console.log('=== RESULTADO DA QUERY COM FILTROS ===');
+      console.log('Total de registros encontrados:', data?.length || 0);
+      
+      if (data) {
+        console.log('Registros encontrados:', data);
+        const registro24 = data.find(r => r.data === '2025-09-24');
+        console.log('🔍 Registro do dia 24 encontrado na query filtrada?', registro24 ? 'SIM ✅' : 'NÃO ❌');
+        if (registro24) {
+          console.log('📊 Dados completos do registro 24:', registro24);
+        }
+      }
 
       if (error) {
         console.error('Erro ao carregar histórico:', error);
@@ -68,15 +124,40 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
   }, [user, dataInicial, dataFinal]);
 
   const aplicarFiltro = () => {
+    console.log('🔥 BOTÃO FILTRAR CLICADO! 🔥');
+    console.log('=== APLICANDO FILTROS MANUALMENTE ===');
+    console.log('Data inicial input:', dataInicial);
+    console.log('Data final input:', dataFinal);
+    
+    // Verificar se as datas estão no formato correto
+    if (dataFinal) {
+      console.log('Verificação manual: 2025-09-24 <= ' + dataFinal + '?', '2025-09-24' <= dataFinal);
+      console.log('Comparação de strings:', {
+        '2025-09-24': '2025-09-24',
+        dataFinal: dataFinal,
+        resultado: '2025-09-24' <= dataFinal
+      });
+      
+      // Debug adicional para conversão de datas
+      const dataFinalObj = new Date(dataFinal);
+      dataFinalObj.setDate(dataFinalObj.getDate() + 1);
+      const dataFinalCorrigida = dataFinalObj.toISOString().split('T')[0];
+      console.log('🔍 DEBUG CONVERSÃO DE DATAS:');
+      console.log('Data final original:', dataFinal);
+      console.log('Data final + 1 dia:', dataFinalCorrigida);
+      console.log('2025-09-24 < ' + dataFinalCorrigida + '?', '2025-09-24' < dataFinalCorrigida);
+    }
+    
     carregarHistorico();
   };
 
   const limparFiltro = () => {
     const hoje = new Date();
-    const primeiroDiaDoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    // Usar um período mais amplo: 3 meses atrás até hoje
+    const treseMesesAtras = new Date(hoje.getFullYear(), hoje.getMonth() - 3, 1);
     
     setDataFinal(hoje.toISOString().split('T')[0]);
-    setDataInicial(primeiroDiaDoMes.toISOString().split('T')[0]);
+    setDataInicial(treseMesesAtras.toISOString().split('T')[0]);
     setFiltroAplicado(false);
   };
 
@@ -130,9 +211,10 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
         }
         .header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+            margin-top: -20px;
             border-bottom: 2px solid #333;
-            padding-bottom: 20px;
+            padding-bottom: 10px;
         }
         .header p {
             margin-top: -10px;
@@ -474,10 +556,21 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
               />
             </div>
             <button
-              onClick={aplicarFiltro}
-              className="w-full lg:w-auto px-3 lg:px-4 py-1.5 lg:py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              onClick={() => {
+                console.log('🔥 BOTÃO FILTRAR CLICADO! 🔥');
+                console.log('=== APLICANDO FILTROS MANUALMENTE ===');
+                console.log('Data inicial input:', dataInicial);
+                console.log('Data final input:', dataFinal);
+                aplicarFiltro();
+              }}
+              className="w-full lg:w-auto px-6 lg:px-8 py-3 lg:py-4 text-lg bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-bold border-4 border-yellow-400 shadow-lg animate-pulse"
+              style={{
+                background: 'linear-gradient(45deg, #dc2626, #ef4444)',
+                boxShadow: '0 0 20px rgba(220, 38, 38, 0.5)',
+                transform: 'scale(1.1)'
+              }}
             >
-              🔍 Filtrar
+              🔥🔥🔥 FILTRAR HISTÓRICO AQUI 🔥🔥🔥
             </button>
             <button
               onClick={limparFiltro}
@@ -548,17 +641,17 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                           {formatarMoeda(saldo.saldo_inicial || 0)}
                         </td>
                         <td className={`border border-gray-300 px-2 lg:px-4 py-0.5 lg:py-1 text-right font-semibold text-xs lg:text-sm ${
-                          (saldo.saldo_atual || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                          (saldo.saldo_atual || 0) >= 0 ? 'text-green-600' : 'text-amber-900'
                         }`}>
                           {formatarMoeda(saldo.saldo_atual || 0)}
                         </td>
                         <td className={`border border-gray-300 px-2 lg:px-4 py-0.5 lg:py-1 text-right font-semibold text-xs lg:text-sm ${
-                          valorLucro >= 0 ? 'text-green-600' : 'text-red-600'
+                          valorLucro >= 0 ? 'text-green-600' : 'text-amber-900'
                         }`}>
                           {formatarMoeda(valorLucro)}
                         </td>
                         <td className={`border border-gray-300 px-2 lg:px-4 py-0.5 lg:py-1 text-right font-semibold text-xs lg:text-sm ${
-                          percentualLucro >= 0 ? 'text-green-600' : 'text-red-600'
+                          percentualLucro >= 0 ? 'text-green-600' : 'text-yellow-100'
                         }`}>
                           {formatarPercentual(percentualLucro)}
                         </td>
@@ -597,7 +690,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
               <div className="text-center">
                 <div className="text-sm text-gray-600">Lucro Total</div>
                 <div className={`text-xl font-bold ${
-                  saldos.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                  saldos.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0) >= 0 ? 'text-green-600' : 'text-amber-900'
                 }`}>
                   {formatarMoeda(saldos.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0))}
                 </div>
@@ -610,7 +703,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
               </div>
               <div className="text-center">
                 <div className="text-sm text-gray-600">Menor Saldo</div>
-                <div className="text-xl font-bold text-red-600">
+                <div className="text-xl font-bold text-amber-900">
                   {formatarMoeda(Math.min(...saldos.map(s => s.saldo_atual || 0)))}
                 </div>
               </div>
@@ -621,7 +714,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                     const totalLucro = saldos.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0);
                     const totalRegistros = saldos.length;
                     const mediaReais = totalRegistros > 0 ? totalLucro / totalRegistros : 0;
-                    return mediaReais >= 0 ? 'text-green-600' : 'text-red-600';
+                    return mediaReais >= 0 ? 'text-green-600' : 'text-amber-900';
                   })()
                 }`}>
                   {(() => {
@@ -641,7 +734,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                       return (s.saldo_inicial || 0) > 0 ? (lucro / (s.saldo_inicial || 0)) * 100 : 0;
                     });
                     const mediaPercentual = percentuais.length > 0 ? percentuais.reduce((acc, p) => acc + p, 0) / percentuais.length : 0;
-                    return mediaPercentual >= 0 ? 'text-green-600' : 'text-red-600';
+                    return mediaPercentual >= 0 ? 'text-green-600' : 'text-amber-900';
                   })()
                 }`}>
                   {(() => {

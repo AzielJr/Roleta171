@@ -45,7 +45,6 @@ export interface R171Saldo {
   data: string | null
   saldo_inicial: number | null
   saldo_atual: number | null
-  saldo_anterior: number | null
   vlr_lucro: number | null
   per_lucro: number | null
 }
