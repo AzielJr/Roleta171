@@ -551,16 +551,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   };
 
   const toggleNumber = (num: number) => {
-    // Limpar destaques anteriores
-    setHighlightedBetNumbers([]);
-    setHighlightedRiskNumbers([]);
-    setHighlightedBaseNumbers([]);
-    
-    // Descartar alerta se existir
-    if (patternAlert) {
-      setPatternAlert(null);
-    }
-    
     setLastSelectedNumber(num);
     
     // Adicionar número ao histórico
@@ -1106,7 +1096,15 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       const raceResult = checkForRaceCondition(history);
       
       if (raceResult.hasRace) {
-        console.log('[DEBUG] Padrão de corrida detectado automaticamente:', raceResult);
+        console.log('[DEBUG] Padrão de corrida detectado automaticamente:', {
+          ...raceResult,
+          riskNumbersDetalhado: raceResult.riskNumbers.map((num, index) => ({
+            numero: num,
+            posicao: index,
+            isPrimeiro: index === 0,
+            isUltimo: index === raceResult.riskNumbers.length - 1
+          }))
+        });
         
         // Gerar mensagem do alerta
         const message = `Race detectada! Aposte nos números: ${raceResult.raceNumbers.join(' e ')}\n\nNúmeros no risco (7): ${raceResult.riskNumbers.join(', ')}\n\nCobertura: ${raceResult.coveredNumbers.length} números (${Math.round((raceResult.coveredNumbers.length / 37) * 100)}%)`;
@@ -1119,9 +1117,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         });
         
         // Destacar números conforme o padrão detectado
-        setHighlightedBetNumbers(raceResult.raceNumbers); // Números para apostar (azul)
+        setHighlightedBetNumbers(raceResult.coveredNumbers); // Números cobertos (amarelo)
         setHighlightedRiskNumbers(raceResult.riskNumbers); // Números de risco (borda especial)
-        setHighlightedBaseNumbers(raceResult.coveredNumbers); // Números cobertos (azul claro)
+        setHighlightedBaseNumbers(raceResult.raceNumbers); // Números base para apostar (azul)
       } else {
         // Limpar destaques se não há padrão
         setPatternAlert(null);
@@ -1249,87 +1247,70 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         <div className="flex gap-2">
           <button
             onClick={() => setShowAddNumbersModal(true)}
-            className="bg-yellow-100 hover:bg-yellow-200 text-black text-xs px-3 py-1 rounded transition-colors font-semibold"
-            style={{height: '20px', fontSize: '11px', lineHeight: '1'}}
+            className="bg-yellow-100 hover:bg-yellow-200 text-black text-xs rounded transition-colors font-semibold flex items-center justify-center"
+            style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
             title="Adicionar números já sorteados"
           >
-            <div className="flex items-center gap-1">
-              <span>➕</span>
-              Adicionar Nºs
-            </div>
+            ➕
           </button>
           <button
             onClick={() => setShowProfitModal(true)}
-            className="bg-amber-800 hover:bg-amber-900 text-white text-xs px-3 py-1 rounded transition-colors font-semibold"
-            style={{height: '20px', fontSize: '11px', lineHeight: '1', minWidth: 'fit-content'}}
+            className="bg-amber-800 hover:bg-amber-900 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
+            style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
             title="Calcular lucro com base em parâmetros financeiros"
           >
-            <div className="flex items-center gap-1 whitespace-nowrap">
-              <span>💰</span>
-              <span>Calcular Lucro</span>
-            </div>
+            💰
           </button>
           <button
             onClick={forcePattern171}
-            className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded transition-colors font-semibold"
-            style={{height: '20px', fontSize: '11px', lineHeight: '1', minWidth: 'fit-content'}}
+            className="bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
+            style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
             title="Forçar padrão 171: marcar 7 números expostos baseado no último número sorteado"
           >
-            <div className="flex items-center gap-1 whitespace-nowrap">
-              <span>🎯</span>
-              <span>Padrão 171</span>
-            </div>
+            🎯
           </button>
           <button
             onClick={simulateAutoDrawing}
             className={cn(
-               "text-black text-xs px-3 py-1 rounded transition-colors font-semibold",
+               "text-black text-xs rounded transition-colors font-semibold flex items-center justify-center",
                isSimulating 
                  ? "bg-red-500 hover:bg-red-600 text-white" 
                  : "bg-gray-400 hover:bg-gray-500"
              )}
-            style={{height: '20px', fontSize: '11px', lineHeight: '1'}}
+            style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
             title={isSimulating ? "Parar simulação automática" : "Simular sorteio automático dos primeiros 50 números"}
           >
-            <div className="flex items-center gap-1">
-               {isSimulating ? (
-                 <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                   <rect x="6" y="4" width="2" height="12" />
-                   <rect x="12" y="4" width="2" height="12" />
-                 </svg>
-               ) : (
-                 <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                   <path d="M10 2C5.58 2 2 5.58 2 10s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/>
-                   <circle cx="10" cy="10" r="2"/>
-                   <path d="M10 6l2 2-2 2-2-2z"/>
-                 </svg>
-               )}
-               {isSimulating ? 'Parar Simulação' : 'Simular Sorteio'}
-             </div>
+            {isSimulating ? (
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <rect x="6" y="4" width="2" height="12" />
+                <rect x="12" y="4" width="2" height="12" />
+              </svg>
+            ) : (
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 2C5.58 2 2 5.58 2 10s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/>
+                <circle cx="10" cy="10" r="2"/>
+                <path d="M10 6l2 2-2 2-2-2z"/>
+              </svg>
+            )}
           </button>
           <button
             onClick={clearScreen}
-            className="bg-white hover:bg-gray-100 text-black text-xs px-3 py-1 rounded transition-colors border border-gray-300"
-            style={{height: '20px', fontSize: '11px', lineHeight: '1'}}
+            className="bg-white hover:bg-gray-100 text-black text-xs rounded transition-colors border border-gray-300 flex items-center justify-center"
+            style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
             title="Limpar toda a tela e iniciar novo sorteio"
           >
-            <div className="flex items-center gap-1">
-              🗑️ Limpar
-            </div>
+            🗑️
           </button>
           {onLogout && (
             <button
               onClick={onLogout}
-              className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-1 rounded transition-colors"
-              style={{height: '20px', fontSize: '11px', lineHeight: '1'}}
+              className="bg-orange-500 hover:bg-orange-600 text-white text-xs rounded transition-colors flex items-center justify-center"
+              style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
               title="Sair do sistema"
             >
-              <div className="flex items-center gap-1">
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 01-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
-                </svg>
-                Sair
-              </div>
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 01-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
+              </svg>
             </button>
           )}
         </div>
@@ -1428,10 +1409,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
               {/* Race Sequence - Sequência Real da Roleta */}
               <div className="ml-4">
-                <div className="bg-gray-700 rounded-lg p-3">
+                <div className="bg-gray-700 rounded-lg p-3 px-6">
                   {/* Formato da race real */}
                   <div className="w-full font-mono">
-                    {/* Linha superior: 05 24 16 33 01 20 14 31 09 22 18 29 07 28 12 35 03 */}
+                    {/* Linha superior: 05 24 16 33 01 20 14 31 09 22 18 29 07 28 12 35 03 26 */}
                     <div className="flex justify-center gap-1 mb-1 mt-2.5">
                       {[5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3].map((num, index) => {
                         const isLastSelected = lastSelectedNumber === num;
@@ -1446,25 +1427,48 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                         const isFirstExposed = isForcedPattern && forcedPattern?.exposedNumbers[0] === num;
                         const isLastExposed = isForcedPattern && forcedPattern?.exposedNumbers[forcedPattern.exposedNumbers.length - 1] === num;
                         
-                        // Verificar se é um número da estratégia quando padrão está ativo
-                        const isStrategyNumber = patternAlert && (() => {
-                          console.log(`[DEBUG] Verificando número ${num} da linha superior com padrão:`, patternAlert?.message);
-                          
-                          let strategy = [];
-                          
-                          if (patternAlert?.message.includes('Aposte nos números:')) {
-                            const numbersText = patternAlert.message.split('Aposte nos números: ')[1]?.split('\n')[0];
-                            if (numbersText) {
-                              strategy = numbersText.split(' e ').map(s => s.trim());
-                              console.log(`[DEBUG] Números da estratégia extraídos:`, strategy);
-                            }
-                          }
-                          
-                          const isStrategy = strategy.some(numStr => parseInt(numStr.trim()) === num);
-                          console.log(`[DEBUG] Número ${num} é da estratégia:`, isStrategy);
-                          
-                          return isStrategy;
-                        })();
+                        // Verificar se é um dos 2 números para apostar no Padrão Detectado
+                        const isDetectedBetNumber = patternAlert?.type === 'race' && patternAlert?.betNumbers?.includes(num);
+                        
+                        // Verificar se é primeiro ou último número exposto no Padrão Detectado
+                        // USAR A MESMA LÓGICA DO CARD RISCO!
+                        const riskNumbers = patternAlert?.message.includes('Números no risco (7):') ? 
+                          patternAlert.message.split('Números no risco (7): ')[1]?.split('\n')[0]?.split(', ').map(n => parseInt(n.trim())) : 
+                          [];
+                        const isFirstRiskDetected = riskNumbers.length > 0 && riskNumbers[0] === num;
+                        const isLastRiskDetected = riskNumbers.length > 0 && riskNumbers[6] === num;
+                        
+                        // Debug logs para TODOS os números da race sequence (linha inferior)
+                        if (patternAlert && (num === 26 || num === 21)) {
+                          console.log(`🚨 NÚMERO CRÍTICO ${num} - RACE SEQUENCE INFERIOR:`, {
+                            numero: num,
+                            isHighlightedRisk,
+                            isFirstRiskDetected,
+                            isLastRiskDetected,
+                            shouldHaveBorder: isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected),
+                            riskNumbers: riskNumbers,
+                            originalRiskNumbers: patternAlert?.riskNumbers,
+                            patternAlert: patternAlert,
+                            APLICANDO_BORDAS_INLINE: (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)),
+                            highlightedRiskNumbers: highlightedRiskNumbers
+                          });
+                        }
+                        
+                        // Debug logs para TODOS os números da race sequence (linha superior)
+                        if (patternAlert && (num === 26 || num === 21)) {
+                          console.log(`🚨 NÚMERO CRÍTICO ${num} - RACE SEQUENCE SUPERIOR:`, {
+                            numero: num,
+                            isHighlightedRisk,
+                            isFirstRiskDetected,
+                            isLastRiskDetected,
+                            shouldHaveBorder: isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected),
+                            riskNumbers: riskNumbers,
+                            originalRiskNumbers: patternAlert?.riskNumbers,
+                            patternAlert: patternAlert,
+                            APLICANDO_BORDAS_INLINE: (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)),
+                            highlightedRiskNumbers: highlightedRiskNumbers
+                          });
+                        }
                         
                         return (
                           <div
@@ -1474,17 +1478,26 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                               getNumberColor(num),
                               isLastSelected 
                                 ? 'border-yellow-400 border-2 ring-2 ring-yellow-300 scale-125 shadow-lg animate-pulse' 
-                                : isStrategyNumber
-                                ? 'ring-4 ring-blue-400 border-blue-500 scale-110 shadow-xl animate-pulse'
+                                : isDetectedBetNumber
+                                ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse'
                                 : 'border-gray-400',
                               // Cores do Padrão Forçado 171 conforme documentação
-                              isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black scale-110 shadow-lg' : 
-                              !isForcedPattern && isHighlightedBet ? 'bg-blue-500 text-white ring-2 ring-blue-400 scale-110 shadow-lg' : '',
+                              isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
                               isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
                               isHighlightedRisk ? 'scale-110 shadow-lg' : '',
+                              // Cores do Padrão Detectado 171 conforme documentação - BORDAS BRANCAS OSCILANTES
+                               (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
                               isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                              !isForcedPattern && isHighlightedBase ? 'bg-blue-200 text-blue-900 ring-1 ring-blue-300' : ''
+                              !isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                              !isForcedPattern && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : ''
                             )}
+                            style={
+                              (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? {
+                                border: '2px solid white !important',
+                                boxShadow: '0 0 0 2px white, 0 0 10px white !important',
+                                animation: 'pulse 2s infinite !important'
+                              } : {}
+                            }
                             title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                           >
                             {num.toString().padStart(2, '0')}
@@ -1511,43 +1524,36 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                           const isFirstExposed = isForcedPattern && forcedPattern?.exposedNumbers[0] === num;
                           const isLastExposed = isForcedPattern && forcedPattern?.exposedNumbers[forcedPattern.exposedNumbers.length - 1] === num;
                           
-                          // Verificar se é um número da estratégia quando padrão está ativo
-                          const isStrategyNumber = patternAlert && (() => {
-                            console.log(`[DEBUG] Verificando número ${num} com padrão:`, patternAlert?.message);
-                            
-                            let strategy = [];
-                            
-                            if (patternAlert?.message.includes('Aposte nos números:')) {
-                              const numbersText = patternAlert.message.split('Aposte nos números: ')[1]?.split('\n')[0];
-                              if (numbersText) {
-                                strategy = numbersText.split(' e ').map(s => s.trim());
-                                console.log(`[DEBUG] Números da estratégia extraídos:`, strategy);
-                              }
-                            }
-                            
-                            const isStrategy = strategy.some(numStr => parseInt(numStr.trim()) === num);
-                            console.log(`[DEBUG] Número ${num} é da estratégia:`, isStrategy);
-                            
-                            return isStrategy;
-                          })();
+                          // Verificar se é um dos 2 números para apostar no Padrão Detectado
+                          const isDetectedBetNumber = patternAlert?.type === 'race' && patternAlert?.betNumbers?.includes(num);
+                          
+                        // Verificar se é primeiro ou último número exposto no Padrão Detectado
+                        // USAR A MESMA LÓGICA DO CARD RISCO!
+                        const riskNumbers = patternAlert?.message.includes('Números no risco (7):') ? 
+                          patternAlert.message.split('Números no risco (7): ')[1]?.split('\n')[0]?.split(', ').map(n => parseInt(n.trim())) : 
+                          [];
+                        const isFirstRiskDetected = riskNumbers.length > 0 && riskNumbers[0] === num;
+                        const isLastRiskDetected = riskNumbers.length > 0 && riskNumbers[6] === num;
                           
                           return (
                             <div
                               className={cn(
-                                'w-7 h-7 rounded text-xs font-bold flex items-center justify-center text-white border-2',
+                                'w-7 h-7 rounded text-xs font-bold flex items-center justify-center text-white border-2 -ml-2.5',
                                 getNumberColor(num),
                                 isLastSelected 
                                   ? 'border-yellow-400 border-2 ring-2 ring-yellow-300 scale-125 shadow-lg animate-pulse' 
-                                  : isStrategyNumber
-                                  ? 'ring-4 ring-blue-400 border-blue-500 scale-110 shadow-xl animate-pulse'
+                                  : isDetectedBetNumber
+                                  ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse'
                                   : 'border-gray-400',
                                 // Cores do Padrão Forçado 171 conforme documentação
-                                isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black scale-110 shadow-lg' : 
-                                !isForcedPattern && isHighlightedBet ? 'bg-blue-500 text-white ring-2 ring-blue-400 scale-110 shadow-lg' : '',
+                                isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
                                 isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
                                 isHighlightedRisk ? 'scale-110 shadow-lg' : '',
+                                // Cores do Padrão Detectado 171 conforme documentação - BORDAS BRANCAS OSCILANTES
+                                 (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
                                 isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                                !isForcedPattern && isHighlightedBase ? 'bg-blue-200 text-blue-900 ring-1 ring-blue-300' : ''
+                                !isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                                !isForcedPattern && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : ''
                               )}
                               title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                             >
@@ -1556,12 +1562,12 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                           );
                         })()}
                         
-                        {/* Espaços vazios para posicionar corretamente */}
+                        {/* Espaços vazios para posicionar o 26 acima do 0 */}
                         {Array.from({length: 16}, (_, i) => (
                           <div key={`spacer-${i}`} className="w-7 h-7"></div>
                         ))}
                         
-                        {/* 26 posicionado acima do 00 */}
+                        {/* 26 posicionado acima do 0 */}
                         {(() => {
                           const num = 26;
                           const isLastSelected = lastSelectedNumber === num;
@@ -1576,25 +1582,16 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                           const isFirstExposed = isForcedPattern && forcedPattern?.exposedNumbers[0] === num;
                           const isLastExposed = isForcedPattern && forcedPattern?.exposedNumbers[forcedPattern.exposedNumbers.length - 1] === num;
                           
-                          // Verificar se é um número da estratégia quando padrão está ativo
-                          const isStrategyNumber = patternAlert && (() => {
-                            console.log(`[DEBUG] Verificando número ${num} com padrão:`, patternAlert?.message);
-                            
-                            let strategy = [];
-                            
-                            if (patternAlert?.message.includes('Aposte nos números:')) {
-                              const numbersText = patternAlert.message.split('Aposte nos números: ')[1]?.split('\n')[0];
-                              if (numbersText) {
-                                strategy = numbersText.split(' e ').map(s => s.trim());
-                                console.log(`[DEBUG] Números da estratégia extraídos:`, strategy);
-                              }
-                            }
-                            
-                            const isStrategy = strategy.some(numStr => parseInt(numStr.trim()) === num);
-                            console.log(`[DEBUG] Número ${num} é da estratégia:`, isStrategy);
-                            
-                            return isStrategy;
-                          })();
+                          // Verificar se é um dos 2 números para apostar no Padrão Detectado
+                          const isDetectedBetNumber = patternAlert?.type === 'race' && patternAlert?.betNumbers?.includes(num);
+                          
+                          // Verificar se é primeiro ou último número exposto no Padrão Detectado
+                          // USAR A MESMA LÓGICA DO CARD RISCO!
+                          const riskNumbers = patternAlert?.message.includes('Números no risco (7):') ? 
+                            patternAlert.message.split('Números no risco (7): ')[1]?.split('\n')[0]?.split(', ').map(n => parseInt(n.trim())) : 
+                            [];
+                          const isFirstRiskDetected = riskNumbers.length > 0 && riskNumbers[0] === num;
+                          const isLastRiskDetected = riskNumbers.length > 0 && riskNumbers[6] === num;
                           
                           return (
                             <div
@@ -1603,16 +1600,18 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                 getNumberColor(num),
                                 isLastSelected 
                                   ? 'border-yellow-400 border-2 ring-2 ring-yellow-300 scale-125 shadow-lg animate-pulse' 
-                                  : isStrategyNumber
-                                  ? 'ring-4 ring-blue-400 border-blue-500 scale-110 shadow-xl animate-pulse'
+                                  : isDetectedBetNumber
+                                  ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse'
                                   : 'border-gray-400',
                                 // Cores do Padrão Forçado 171 conforme documentação
-                                isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black scale-110 shadow-lg' : 
-                                !isForcedPattern && isHighlightedBet ? 'bg-blue-500 text-white ring-2 ring-blue-400 scale-110 shadow-lg' : '',
+                                isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
                                 isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
                                 isHighlightedRisk ? 'scale-110 shadow-lg' : '',
+                                // Cores do Padrão Detectado 171 conforme documentação - BORDAS BRANCAS OSCILANTES
+                                (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
                                 isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                                !isForcedPattern && isHighlightedBase ? 'bg-blue-200 text-blue-900 ring-1 ring-blue-300' : ''
+                                !isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                                !isForcedPattern && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : ''
                               )}
                               title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                             >
@@ -1638,25 +1637,16 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                         const isFirstExposed = isForcedPattern && forcedPattern?.exposedNumbers[0] === num;
                         const isLastExposed = isForcedPattern && forcedPattern?.exposedNumbers[forcedPattern.exposedNumbers.length - 1] === num;
                         
-                        // Verificar se é um número da estratégia quando padrão está ativo
-                        const isStrategyNumber = patternAlert && (() => {
-                          console.log(`[DEBUG] Verificando número ${num} da linha inferior com padrão:`, patternAlert?.message);
-                          
-                          let strategy = [];
-                          
-                          if (patternAlert?.message.includes('Aposte nos números:')) {
-                            const numbersText = patternAlert.message.split('Aposte nos números: ')[1]?.split('\n')[0];
-                            if (numbersText) {
-                              strategy = numbersText.split(' e ').map(s => s.trim());
-                              console.log(`[DEBUG] Números da estratégia extraídos:`, strategy);
-                            }
-                          }
-                          
-                          const isStrategy = strategy.some(numStr => parseInt(numStr.trim()) === num);
-                          console.log(`[DEBUG] Número ${num} é da estratégia:`, isStrategy);
-                          
-                          return isStrategy;
-                        })();
+                        // Verificar se é um dos 2 números para apostar no Padrão Detectado
+                        const isDetectedBetNumber = patternAlert?.type === 'race' && patternAlert?.betNumbers?.includes(num);
+                        
+                        // Verificar se é primeiro ou último número exposto no Padrão Detectado
+                        // USAR A MESMA LÓGICA DO CARD RISCO!
+                        const riskNumbers = patternAlert?.message.includes('Números no risco (7):') ? 
+                          patternAlert.message.split('Números no risco (7): ')[1]?.split('\n')[0]?.split(', ').map(n => parseInt(n.trim())) : 
+                          [];
+                        const isFirstRiskDetected = riskNumbers.length > 0 && riskNumbers[0] === num;
+                        const isLastRiskDetected = riskNumbers.length > 0 && riskNumbers[6] === num;
                         
                         return (
                           <div
@@ -1666,17 +1656,26 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                               getNumberColor(num),
                               isLastSelected 
                                 ? 'border-yellow-400 border-2 ring-2 ring-yellow-300 scale-125 shadow-lg animate-pulse' 
-                                : isStrategyNumber
-                                ? 'ring-4 ring-blue-400 border-blue-500 scale-110 shadow-xl animate-pulse'
+                                : isDetectedBetNumber
+                                ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse'
                                 : 'border-gray-400',
                               // Cores do Padrão Forçado 171 conforme documentação
-                               isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black scale-110 shadow-lg' : 
-                               !isForcedPattern && isHighlightedBet ? 'bg-blue-500 text-white ring-2 ring-blue-400 scale-110 shadow-lg' : '',
-                               isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                               isHighlightedRisk ? 'scale-110 shadow-lg' : '',
-                               isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                               !isForcedPattern && isHighlightedBase ? 'bg-blue-200 text-blue-900 ring-1 ring-blue-300' : ''
+                              isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
+                              isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                              isHighlightedRisk ? 'scale-110 shadow-lg' : '',
+                              // Cores do Padrão Detectado 171 conforme documentação - BORDAS BRANCAS OSCILANTES
+                               (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
+                              isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                              !isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                              !isForcedPattern && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : ''
                             )}
+                            style={
+                              (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? {
+                                border: '2px solid white !important',
+                                boxShadow: '0 0 0 2px white, 0 0 10px white !important',
+                                animation: 'pulse 2s infinite !important'
+                              } : {}
+                            }
                             title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                           >
                             {num.toString().padStart(2, '0')}
@@ -1781,14 +1780,23 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                         [14, 31, 9, 22, 18, 29, 7];
                       
                       return riskNumbers.slice(0, 7).map((num, index) => {
-                        const isFirst = index === 0;
-                        const isLast = index === riskNumbers.length - 1;
+                        const isFirst = index === 0;  // Primeiro da lista (26)
+                        const isLast = index === 6;   // Último da lista (21) - forçando index 6
                         const isHighlighted = isFirst || isLast;
+                        
+                        console.log(`🎯 CARD RISCO - Número ${num}:`, {
+                          index,
+                          isFirst,
+                          isLast,
+                          isHighlighted,
+                          totalNumbers: riskNumbers.length,
+                          forcedCondition: `index === 0 (${index === 0}) || index === 6 (${index === 6})`
+                        });
                         
                         return (
                           <div
                             key={num}
-                            className={`${isHighlighted ? 'w-11 h-11 ring-1 ring-red-400' : 'w-10 h-10'} rounded-full flex items-center justify-center text-white font-medium text-lg opacity-75 ${
+                            className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg ${
                               getNumberColor(num)
                             }`}
                           >
