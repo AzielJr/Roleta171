@@ -25,6 +25,7 @@ interface PatternAlert {
   type?: string;
   betNumbers?: number[];
   riskNumbers?: number[];
+  baseNumbers?: number[];  // Adicionando baseNumbers à interface
 }
 
 interface RouletteProps {
@@ -428,8 +429,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     baseNumbers: number[];
   } | null>(null);
   
-  // Estado para controlar se o modo "Forçar padrão 171" está ativo (persistente)
-  const [isForcePattern171Active, setIsForcePattern171Active] = useState(false);
+  // Estado para controlar o toggle automático do padrão 171
+  const [isAutoPattern171Active, setIsAutoPattern171Active] = useState(false);
   
   // Estados para destacar números na race quando popup aparecer
   const [highlightedBetNumbers, setHighlightedBetNumbers] = useState<number[]>([]);
@@ -920,16 +921,15 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     // Adicionar número aos últimos números
     addToLastNumbers(num);
     
-    // Se o modo "Forçar padrão 171" estiver ativo, aplicar o padrão ANTES de adicionar ao histórico
-    // para que tenha prioridade sobre a detecção automática
-    if (isForcePattern171Active) {
-      applyForcePattern171();
-    }
-    
     // Adicionar ao histórico para detecção de padrões (COM popup na seleção manual)
-    // Só adiciona se o padrão forçado não estiver ativo para evitar conflitos
-    if (!isForcePattern171Active) {
-      addToHistory(num);
+    addToHistory(num);
+    
+    // Se o toggle automático estiver ativo, aplicar o padrão 171
+    if (isAutoPattern171Active) {
+      // Usar setTimeout para garantir que o estado seja atualizado primeiro
+      setTimeout(() => {
+        forcePattern171(num); // Passar o número atual diretamente
+      }, 10);
     }
     
     setSelected(prev => ({
@@ -1048,41 +1048,26 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     }));
   };
 
-  // Função para forçar padrão 171 (agora com estado persistente)
-  const forcePattern171 = () => {
-    // Toggle do estado ativo
-    const newActiveState = !isForcePattern171Active;
-    setIsForcePattern171Active(newActiveState);
+  // Função para forçar padrão 171
+  const forcePattern171 = (specificNumber?: number) => {
+    // Usar o número específico passado ou o último número sorteado
+    let targetNumber: number;
     
-    if (!newActiveState) {
-      // Se desativando, limpar tudo
-      setForcedPattern(null);
-      setHighlightedRiskNumbers([]);
-      setHighlightedBetNumbers([]);
-      setHighlightedBaseNumbers([]);
-      console.log('Modo "Forçar padrão 171" desativado');
-      return;
-    }
-    
-    // Se ativando, aplicar o padrão
-    applyForcePattern171();
-  };
-  
-  // Função separada para aplicar o padrão 171
-  const applyForcePattern171 = () => {
-    // Verificar se há pelo menos um número sorteado
-    if (lastNumbers.length === 0) {
-      alert('É necessário ter pelo menos um número sorteado para aplicar o Padrão 171.');
-      setIsForcePattern171Active(false);
-      return;
+    if (specificNumber !== undefined) {
+      targetNumber = specificNumber;
+    } else {
+      // Verificar se há pelo menos um número sorteado
+      if (lastNumbers.length === 0) {
+        alert('É necessário ter pelo menos um número sorteado para aplicar o Padrão 171.');
+        return;
+      }
+      targetNumber = lastNumbers[0]; // Último número sorteado
     }
 
-    const lastNumber = lastNumbers[0]; // Último número sorteado
-    const position = ROULETTE_SEQUENCE.indexOf(lastNumber);
+    const position = ROULETTE_SEQUENCE.indexOf(targetNumber);
     
     if (position === -1) {
       alert('Erro: número não encontrado na sequência da roleta.');
-      setIsForcePattern171Active(false);
       return;
     }
 
@@ -1150,8 +1135,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       }
     }
 
-    // Limpar padrão detectado automaticamente
-    setPatternAlert(null);
+    // Limpar padrão detectado automaticamente apenas se não for chamada pelo toggle automático
+    if (!specificNumber) {
+      setPatternAlert(null);
+    }
     
     // Configurar padrão forçado
     setForcedPattern({
@@ -1522,13 +1509,20 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           setPatternAlert({
             numbers: lastTwoNumbers,
             positions: lastTwoNumbers.map(num => ROULETTE_SEQUENCE.indexOf(num)),
-            message: message
+            message: message,
+            type: 'race',
+            betNumbers: raceResult.coveredNumbers,  // Os 30 números para apostar (amarelo)
+            riskNumbers: raceResult.riskNumbers,    // Os 7 números de risco
+            baseNumbers: raceResult.raceNumbers     // Os 2 números base (azul)
           });
           
           // Destacar números conforme o padrão detectado
           setHighlightedBetNumbers(raceResult.coveredNumbers); // Números cobertos (amarelo)
           setHighlightedRiskNumbers(raceResult.riskNumbers); // Números de risco (borda especial)
           setHighlightedBaseNumbers(raceResult.raceNumbers); // Números base para apostar (azul)
+          
+          // Limpar padrão forçado para dar prioridade ao padrão principal
+          setForcedPattern(null);
         }
       } else {
         // Limpar destaques se não há padrão (apenas se não estiver simulando)
@@ -1696,20 +1690,25 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             💰
           </button>
           <button
-            onClick={forcePattern171}
-            className={cn(
-              "text-white text-xs rounded transition-colors font-semibold flex items-center justify-center",
-              isForcePattern171Active 
-                ? "bg-purple-800 ring-2 ring-yellow-400 animate-pulse" 
-                : "bg-purple-600 hover:bg-purple-700"
-            )}
+            onClick={() => forcePattern171()}
+            className="bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
             style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
-            title={isForcePattern171Active 
-              ? "Modo Forçar padrão 171 ATIVO - Clique para desativar" 
-              : "Forçar padrão 171: marcar 7 números expostos baseado no último número sorteado"
-            }
+            title="Forçar padrão 171: marcar 7 números expostos baseado no último número sorteado"
           >
             🎯
+          </button>
+          <button
+            onClick={() => setIsAutoPattern171Active(!isAutoPattern171Active)}
+            className={cn(
+              "text-xs rounded transition-colors font-semibold flex items-center justify-center",
+              isAutoPattern171Active 
+                ? "bg-green-500 hover:bg-green-600 text-white ring-2 ring-green-300 animate-pulse" 
+                : "bg-gray-400 hover:bg-gray-500 text-white"
+            )}
+            style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+            title={isAutoPattern171Active ? "Toggle ATIVO: Padrão 171 será aplicado automaticamente a cada número selecionado" : "Toggle INATIVO: Clique para ativar aplicação automática do padrão 171"}
+          >
+            🔄
           </button>
           <button
             onClick={simulateAutoDrawing}
@@ -1858,9 +1857,16 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                     <div className="flex justify-center gap-1 mb-1 mt-2.5">
                       {[5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3].map((num, index) => {
                         const isLastSelected = lastSelectedNumber === num;
-                        const isHighlightedBet = highlightedBetNumbers.includes(num);
-                        const isHighlightedRisk = highlightedRiskNumbers.includes(num);
-                        const isHighlightedBase = highlightedBaseNumbers.includes(num);
+                        // Para o padrão principal (race), usar dados diretos do patternAlert
+                        const isHighlightedBet = patternAlert && patternAlert.type === 'race' 
+                          ? patternAlert.betNumbers?.includes(num) || false
+                          : highlightedBetNumbers.includes(num);
+                        const isHighlightedRisk = patternAlert && patternAlert.type === 'race'
+                          ? patternAlert.riskNumbers?.includes(num) || false
+                          : highlightedRiskNumbers.includes(num);
+                        const isHighlightedBase = patternAlert && patternAlert.type === 'race'
+                          ? patternAlert.baseNumbers?.includes(num) || false
+                          : highlightedBaseNumbers.includes(num);
                         
                         // Verificar se é padrão forçado
                         const isForcedPattern = forcedPattern !== null;
@@ -1923,15 +1929,15 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                 : isDetectedBetNumber
                                 ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse'
                                 : 'border-gray-400',
-                              // Cores do Padrão Forçado 171 conforme documentação
-                              isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
-                              isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                              isHighlightedRisk ? 'scale-110 shadow-lg' : '',
-                              // Cores do Padrão Detectado 171 conforme documentação - BORDAS BRANCAS OSCILANTES
-                               (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
-                              isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                              !isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                              !isForcedPattern && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : ''
+                              // PRIORIDADE MÁXIMA: Padrão Principal (Detectado) - SEMPRE tem precedência
+                              patternAlert && patternAlert.type === 'race' && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                              patternAlert && patternAlert.type === 'race' && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : 
+                              (patternAlert && patternAlert.type === 'race' && isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
+                              // Padrão Forçado 171 (APENAS quando NÃO há padrão principal ativo)
+                              !patternAlert && isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
+                              !patternAlert && isForcedPattern && isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                              !patternAlert && isForcedPattern && isHighlightedRisk ? 'scale-110 shadow-lg' : '',
+                              !patternAlert && isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : ''
                             )}
                             style={
                               (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? {
@@ -1955,9 +1961,16 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                         {(() => {
                           const num = 10;
                           const isLastSelected = lastSelectedNumber === num;
-                          const isHighlightedBet = highlightedBetNumbers.includes(num);
-                          const isHighlightedRisk = highlightedRiskNumbers.includes(num);
-                          const isHighlightedBase = highlightedBaseNumbers.includes(num);
+                          // Para o padrão principal (race), usar dados diretos do patternAlert
+                          const isHighlightedBet = patternAlert && patternAlert.type === 'race' 
+                            ? patternAlert.betNumbers?.includes(num) || false
+                            : highlightedBetNumbers.includes(num);
+                          const isHighlightedRisk = patternAlert && patternAlert.type === 'race'
+                            ? patternAlert.riskNumbers?.includes(num) || false
+                            : highlightedRiskNumbers.includes(num);
+                          const isHighlightedBase = patternAlert && patternAlert.type === 'race'
+                            ? patternAlert.baseNumbers?.includes(num) || false
+                            : highlightedBaseNumbers.includes(num);
                           
                           // Verificar se é padrão forçado
                           const isForcedPattern = forcedPattern !== null;
@@ -1987,15 +2000,15 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                   : isDetectedBetNumber
                                   ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse'
                                   : 'border-gray-400',
-                                // Cores do Padrão Forçado 171 conforme documentação
-                                isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
-                                isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                                isHighlightedRisk ? 'scale-110 shadow-lg' : '',
-                                // Cores do Padrão Detectado 171 conforme documentação - BORDAS BRANCAS OSCILANTES
-                                 (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
-                                isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                                !isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                                !isForcedPattern && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : ''
+                                // PRIORIDADE MÁXIMA: Padrão Principal (Detectado) - SEMPRE tem precedência
+                                patternAlert && patternAlert.type === 'race' && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                                patternAlert && patternAlert.type === 'race' && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : 
+                                (patternAlert && patternAlert.type === 'race' && isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
+                                // Padrão Forçado 171 (APENAS quando NÃO há padrão principal ativo)
+                                !patternAlert && isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
+                                !patternAlert && isForcedPattern && isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                                !patternAlert && isForcedPattern && isHighlightedRisk ? 'scale-110 shadow-lg' : '',
+                                !patternAlert && isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : ''
                               )}
                               title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                             >
@@ -2013,9 +2026,16 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                         {(() => {
                           const num = 26;
                           const isLastSelected = lastSelectedNumber === num;
-                          const isHighlightedBet = highlightedBetNumbers.includes(num);
-                          const isHighlightedRisk = highlightedRiskNumbers.includes(num);
-                          const isHighlightedBase = highlightedBaseNumbers.includes(num);
+                          // Para o padrão principal (race), usar dados diretos do patternAlert
+                          const isHighlightedBet = patternAlert && patternAlert.type === 'race' 
+                            ? patternAlert.betNumbers?.includes(num) || false
+                            : highlightedBetNumbers.includes(num);
+                          const isHighlightedRisk = patternAlert && patternAlert.type === 'race'
+                            ? patternAlert.riskNumbers?.includes(num) || false
+                            : highlightedRiskNumbers.includes(num);
+                          const isHighlightedBase = patternAlert && patternAlert.type === 'race'
+                            ? patternAlert.baseNumbers?.includes(num) || false
+                            : highlightedBaseNumbers.includes(num);
                           
                           // Verificar se é padrão forçado
                           const isForcedPattern = forcedPattern !== null;
@@ -2045,15 +2065,15 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                   : isDetectedBetNumber
                                   ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse'
                                   : 'border-gray-400',
-                                // Cores do Padrão Forçado 171 conforme documentação
-                                isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
-                                isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                                isHighlightedRisk ? 'scale-110 shadow-lg' : '',
-                                // Cores do Padrão Detectado 171 conforme documentação - BORDAS BRANCAS OSCILANTES
-                                (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
-                                isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                                !isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                                !isForcedPattern && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : ''
+                                // PRIORIDADE MÁXIMA: Padrão Principal (Detectado) - SEMPRE tem precedência
+                                patternAlert && patternAlert.type === 'race' && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                                patternAlert && patternAlert.type === 'race' && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : 
+                                (patternAlert && patternAlert.type === 'race' && isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
+                                // Padrão Forçado 171 (APENAS quando NÃO há padrão principal ativo)
+                                !patternAlert && isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
+                                !patternAlert && isForcedPattern && isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                                !patternAlert && isForcedPattern && isHighlightedRisk ? 'scale-110 shadow-lg' : '',
+                                !patternAlert && isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : ''
                               )}
                               title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                             >
@@ -2068,9 +2088,16 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                     <div className="flex justify-center gap-1 mb-2.5">
                       {[23, 8, 30, 11, 36, 13, 27, 6, 34, 17, 25, 2, 21, 4, 19, 15, 32, 0].map((num, index) => {
                         const isLastSelected = lastSelectedNumber === num;
-                        const isHighlightedBet = highlightedBetNumbers.includes(num);
-                        const isHighlightedRisk = highlightedRiskNumbers.includes(num);
-                        const isHighlightedBase = highlightedBaseNumbers.includes(num);
+                        // Para o padrão principal (race), usar dados diretos do patternAlert
+                        const isHighlightedBet = patternAlert && patternAlert.type === 'race' 
+                          ? patternAlert.betNumbers?.includes(num) || false
+                          : highlightedBetNumbers.includes(num);
+                        const isHighlightedRisk = patternAlert && patternAlert.type === 'race'
+                          ? patternAlert.riskNumbers?.includes(num) || false
+                          : highlightedRiskNumbers.includes(num);
+                        const isHighlightedBase = patternAlert && patternAlert.type === 'race'
+                          ? patternAlert.baseNumbers?.includes(num) || false
+                          : highlightedBaseNumbers.includes(num);
                         
                         // Verificar se é padrão forçado
                         const isForcedPattern = forcedPattern !== null;
@@ -2101,15 +2128,16 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                 : isDetectedBetNumber
                                 ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse'
                                 : 'border-gray-400',
-                              // Cores do Padrão Forçado 171 conforme documentação
-                              isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
-                              isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                              isHighlightedRisk ? 'scale-110 shadow-lg' : '',
-                              // Cores do Padrão Detectado 171 conforme documentação - BORDAS BRANCAS OSCILANTES
-                               (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
-                              isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                              !isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                              !isForcedPattern && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : ''
+                              // Prioridade: Padrão Principal (Detectado) tem prioridade sobre Padrão Forçado
+                              // PRIORIDADE MÁXIMA: Padrão Principal (Detectado) - SEMPRE tem precedência
+                              patternAlert && patternAlert.type === 'race' && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                              patternAlert && patternAlert.type === 'race' && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : 
+                              (patternAlert && patternAlert.type === 'race' && isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
+                              // Padrão Forçado 171 (APENAS quando NÃO há padrão principal ativo)
+                              !patternAlert && isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
+                              !patternAlert && isForcedPattern && isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
+                              !patternAlert && isForcedPattern && isHighlightedRisk ? 'scale-110 shadow-lg' : '',
+                              !patternAlert && isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : ''
                             )}
                             style={
                               (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? {
