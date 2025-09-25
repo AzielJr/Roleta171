@@ -8,9 +8,11 @@ interface BalanceContextType {
   loading: boolean;
   currentSaldoRecord: R171Saldo | null;
   lastSaldoRecord: R171Saldo | null;
-  addEntry: (amount: number, description: string) => Promise<void>;
-  removeEntry: (amount: number, description: string) => Promise<void>;
-  adjustBalance: (newBalance: number, description: string) => Promise<void>;
+  addEntry: (amount: number, description?: string) => Promise<boolean>;
+  removeEntry: (amount: number, description?: string) => Promise<boolean>;
+  adjustBalance: (newBalance: number, description?: string) => Promise<boolean>;
+  updateSaldoRecord: (updates: { data?: string; saldo_inicial?: number; saldo_atual?: number; }) => Promise<boolean>;
+  createSaldoRecord: (data: string, saldoInicial: number, saldoAtual: number) => Promise<boolean>;
   refreshBalance: () => Promise<void>;
 }
 

@@ -15,96 +15,114 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
   const [dataFinal, setDataFinal] = useState('');
   const [filtroAplicado, setFiltroAplicado] = useState(false);
 
+  // Calcular dados filtrados para exibição e impressão
+  const saldosFiltrados = saldos.filter(saldo => {
+    if (!filtroAplicado) return true;
+    
+    const dataSaldo = saldo.data;
+    const dentroDoIntervalo = (!dataInicial || dataSaldo >= dataInicial) && 
+                             (!dataFinal || dataSaldo <= dataFinal);
+    
+    return dentroDoIntervalo;
+  });
+
   // Definir datas padrão (primeiro dia do mês corrente até hoje)
   useEffect(() => {
-    const hoje = new Date();
-    // Usar um período mais amplo: 3 meses atrás até hoje
-    const treseMesesAtras = new Date(hoje.getFullYear(), hoje.getMonth() - 3, 1);
+    // FORÇAR DATA ATUAL - 25/09/2025
+    const dataAtualForçada = '2025-09-25';
+    const dataInicialForçada = '2025-09-01';
     
-    console.log('=== DEFININDO DATAS PADRÃO ===');
-    console.log('Hoje:', hoje);
-    console.log('Três meses atrás:', treseMesesAtras);
-    console.log('Data final (hoje):', hoje.toISOString().split('T')[0]);
-    console.log('Data inicial (3 meses atrás):', treseMesesAtras.toISOString().split('T')[0]);
+    console.log('🚨 FORÇANDO DATAS - Data Final:', dataAtualForçada);
+    console.log('🚨 FORÇANDO DATAS - Data Inicial:', dataInicialForçada);
     
-    // Definir data final como hoje e inicial como 3 meses atrás
-    setDataFinal(hoje.toISOString().split('T')[0]);
-    setDataInicial(treseMesesAtras.toISOString().split('T')[0]);
+    setDataFinal(dataAtualForçada);
+    setDataInicial(dataInicialForçada);
   }, []);
 
   // Carregar histórico
   const carregarHistorico = async () => {
     if (!user) return;
 
-    console.log('=== CARREGANDO HISTÓRICO ===');
-    console.log('Data inicial:', dataInicial);
-    console.log('Data final:', dataFinal);
-    console.log('User ID:', user.id);
-    console.log('Tipo do User ID:', typeof user.id);
-
     setLoading(true);
     try {
-      // Primeiro, vamos fazer uma query sem filtros para ver todos os registros
-      const { data: todosRegistros } = await supabase
+      console.log('🚨 INICIANDO CONSULTA AO BANCO DE DADOS');
+      console.log('🚨 Data Inicial:', dataInicial);
+      console.log('🚨 Data Final:', dataFinal);
+      
+      // CONSULTA DIRETA SEM FILTROS PRIMEIRO
+      console.log('🚨 FAZENDO CONSULTA SEM FILTROS PARA VER TODOS OS REGISTROS...');
+      const { data: todosRegistros, error: erroTodos } = await supabase
         .from('r171_saldo')
         .select('*')
         .eq('id_senha', 1)
         .order('data', { ascending: true });
-      
-      console.log('=== TODOS OS REGISTROS (SEM FILTRO) ===');
-      console.log('Total de registros no banco:', todosRegistros?.length || 0);
-      if (todosRegistros) {
-        const registro24 = todosRegistros.find(r => r.data === '2025-09-24');
-        console.log('🔍 Registro do dia 24 existe no banco?', registro24 ? 'SIM ✅' : 'NÃO ❌');
-        if (registro24) {
-          console.log('📊 Dados do registro 24 no banco:', registro24);
-        }
+
+      if (erroTodos) {
+        console.error('🚨 ERRO NA CONSULTA SEM FILTROS:', erroTodos);
+      } else {
+        console.log('🚨 TODOS OS REGISTROS NO BANCO (SEM FILTROS):', todosRegistros);
+        console.log('🚨 QUANTIDADE TOTAL DE REGISTROS:', todosRegistros?.length || 0);
+        
+        const todasAsDatasDisponiveis = todosRegistros?.map(r => r.data).sort() || [];
+        console.log('🚨 TODAS AS DATAS DISPONÍVEIS NO BANCO:', todasAsDatasDisponiveis);
+        
+        // 🔍 VERIFICAR SE AS DATAS ESTÃO REALMENTE EM 2025
+        console.log('🔍 === ANÁLISE DAS DATAS ===');
+        todosRegistros?.forEach(registro => {
+          const [ano, mes, dia] = registro.data.split('-');
+          console.log(`📅 Data: ${registro.data} -> Ano: ${ano}, Mês: ${mes}, Dia: ${dia}`);
+          if (ano === '2025') {
+            console.log('⚠️ ATENÇÃO: Data com ano 2025 encontrada!', registro.data);
+          }
+        });
       }
 
-      // Query com filtros
+      // Agora fazer a consulta com filtros
       let query = supabase
         .from('r171_saldo')
         .select('*')
         .eq('id_senha', 1);
 
-      console.log('=== QUERY COM FILTRO DE USUÁRIO ===');
-      console.log('User ID original:', user.id);
-      console.log('Forçando id_senha = 1 (baseado nos dados do banco)');
-
       // Aplicar filtros de data se definidos
       if (dataInicial) {
         query = query.gte('data', dataInicial);
-        console.log('✅ Filtro data inicial aplicado:', dataInicial);
       }
       
       if (dataFinal) {
-        // Adicionar um dia à data final para incluir o dia selecionado
-        const dataFinalObj = new Date(dataFinal);
-        dataFinalObj.setDate(dataFinalObj.getDate() + 1);
-        const dataFinalCorrigida = dataFinalObj.toISOString().split('T')[0];
+        // CORREÇÃO: Usar lte (<=) ao invés de lt (<) para incluir a data final selecionada
+        console.log('🔍 DEBUG - Data final original:', dataFinal);
+        console.log('🔍 DEBUG - Usando filtro: data <= ', dataFinal);
+        console.log('🔍 DEBUG - Teste: "2025-09-25" <= "' + dataFinal + '"?', '2025-09-25' <= dataFinal);
+        console.log('🔍 DEBUG - Teste: "2025-09-24" <= "' + dataFinal + '"?', '2025-09-24' <= dataFinal);
         
-        query = query.lt('data', dataFinalCorrigida);
-        console.log('✅ Filtro data final aplicado:', dataFinalCorrigida, '(para incluir', dataFinal, ')');
-        console.log('🔍 DEBUG: 2025-09-24 < ' + dataFinalCorrigida + '?', '2025-09-24' < dataFinalCorrigida);
+        query = query.lte('data', dataFinal);
       }
 
       const { data, error } = await query.order('data', { ascending: true });
 
-      console.log('=== RESULTADO DA QUERY COM FILTROS ===');
-      console.log('Total de registros encontrados:', data?.length || 0);
-      
-      if (data) {
-        console.log('Registros encontrados:', data);
-        const registro24 = data.find(r => r.data === '2025-09-24');
-        console.log('🔍 Registro do dia 24 encontrado na query filtrada?', registro24 ? 'SIM ✅' : 'NÃO ❌');
-        if (registro24) {
-          console.log('📊 Dados completos do registro 24:', registro24);
-        }
-      }
-
       if (error) {
         console.error('Erro ao carregar histórico:', error);
         return;
+      }
+
+      console.log('🔍 DEBUG - TODOS OS REGISTROS RETORNADOS:', data);
+      console.log('🔍 DEBUG - Quantidade de registros:', data?.length || 0);
+      
+      // Verificar especificamente os registros 24/09/2025 e 25/09/2025
+      const registro24 = data?.find(r => r.data === '2025-09-24');
+      const registro25 = data?.find(r => r.data === '2025-09-25');
+      console.log('🚨 VERIFICAÇÃO CRÍTICA - Registro 24/09/2025 encontrado?', registro24 ? 'SIM' : 'NÃO');
+      console.log('🚨 VERIFICAÇÃO CRÍTICA - Registro 25/09/2025 encontrado?', registro25 ? 'SIM' : 'NÃO');
+      
+      // Listar TODAS as datas encontradas
+      const todasAsDatas = data?.map(r => r.data).sort() || [];
+      console.log('🚨 TODAS AS DATAS NO BANCO:', todasAsDatas);
+      
+      if (registro24) {
+        console.log('🔍 DEBUG - Dados do registro 24/09:', registro24);
+      }
+      if (registro25) {
+        console.log('🔍 DEBUG - Dados do registro 25/09:', registro25);
       }
 
       setSaldos(data || []);
@@ -142,10 +160,6 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
       const dataFinalObj = new Date(dataFinal);
       dataFinalObj.setDate(dataFinalObj.getDate() + 1);
       const dataFinalCorrigida = dataFinalObj.toISOString().split('T')[0];
-      console.log('🔍 DEBUG CONVERSÃO DE DATAS:');
-      console.log('Data final original:', dataFinal);
-      console.log('Data final + 1 dia:', dataFinalCorrigida);
-      console.log('2025-09-24 < ' + dataFinalCorrigida + '?', '2025-09-24' < dataFinalCorrigida);
     }
     
     carregarHistorico();
@@ -162,16 +176,27 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
   };
 
   const gerarRelatorioHTML = () => {
+    // DEBUG: Mostrar dados que serão impressos
+    console.log('=== DADOS PARA IMPRESSÃO ===');
+    console.log('saldosFiltrados:', saldosFiltrados);
+    console.log('Quantidade:', saldosFiltrados.length);
+    console.log('Período:', dataInicial, 'até', dataFinal);
+    
+    // USAR APENAS OS DADOS FILTRADOS
+    const dadosParaImprimir = saldosFiltrados;
+    
     const dataAtual = new Date().toLocaleDateString('pt-BR');
     const horaAtual = new Date().toLocaleTimeString('pt-BR');
     
-    // Calcular estatísticas
-    const lucroTotal = saldos.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0);
-    const maiorSaldo = Math.max(...saldos.map(s => s.saldo_atual || 0));
-    const menorSaldo = Math.min(...saldos.map(s => s.saldo_atual || 0));
+    // Calcular estatísticas APENAS com os dados filtrados
+    const lucroTotal = dadosParaImprimir.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0);
+    const maiorSaldo = dadosParaImprimir.length > 0 ? Math.max(...dadosParaImprimir.map(s => s.saldo_atual || 0)) : 0;
+    const menorSaldo = dadosParaImprimir.length > 0 ? Math.min(...dadosParaImprimir.map(s => s.saldo_atual || 0)) : 0;
     
-    // Calcular média de percentual de lucratividade
-    const percentuais = saldos.map(s => {
+    console.log('🖨️ ESTATÍSTICAS CALCULADAS:', { lucroTotal, maiorSaldo, menorSaldo });
+    
+    // Calcular média de percentual de lucratividade com dados filtrados
+    const percentuais = dadosParaImprimir.map(s => {
       const lucro = s.saldo_atual - s.saldo_inicial;
       return s.saldo_inicial > 0 ? (lucro / s.saldo_inicial) * 100 : 0;
     });
@@ -195,19 +220,19 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
             position: fixed;
             top: 20px;
             right: 20px;
-            background-color: #16a34a;
+            background-color: #f97316;
             color: white;
             border: none;
             border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            font-size: 24px;
+            width: 36px;
+            height: 48px;
+            font-size: 20px;
             cursor: pointer;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             z-index: 1000;
         }
         .print-button:hover {
-            background-color: #15803d;
+            background-color: #ea580c;
         }
         .header {
             text-align: center;
@@ -310,7 +335,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
     <div class="summary">
         <div class="summary-item">
             <div class="summary-label">Total de Registros</div>
-            <div class="summary-value">${saldos.length}</div>
+            <div class="summary-value">${dadosParaImprimir.length}</div>
         </div>
         <div class="summary-item">
             <div class="summary-label">Lucro Total</div>
@@ -327,10 +352,10 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
         <div class="summary-item">
             <div class="summary-label">Média em R$</div>
             <div class="summary-value ${(() => {
-              const mediaReais = saldos.length > 0 ? lucroTotal / saldos.length : 0;
+              const mediaReais = dadosParaImprimir.length > 0 ? lucroTotal / dadosParaImprimir.length : 0;
               return mediaReais >= 0 ? 'positive' : 'negative';
             })()}">${(() => {
-              const mediaReais = saldos.length > 0 ? lucroTotal / saldos.length : 0;
+              const mediaReais = dadosParaImprimir.length > 0 ? lucroTotal / dadosParaImprimir.length : 0;
               return formatarMoeda(mediaReais);
             })()}</div>
         </div>
@@ -351,8 +376,10 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
             </tr>
         </thead>
         <tbody>
-            ${saldos.map(saldo => {
-              const data = new Date(saldo.data).toLocaleDateString('pt-BR');
+            ${dadosParaImprimir.map(saldo => {
+              // CORREÇÃO: Usar formatação direta sem new Date() para evitar problemas de fuso horário
+              const [ano, mes, dia] = saldo.data.split('-');
+              const data = `${dia}/${mes}/${ano}`;
               const lucro = saldo.saldo_atual - saldo.saldo_inicial;
               const percentual = saldo.saldo_inicial > 0 ? (lucro / saldo.saldo_inicial) * 100 : 0;
               
@@ -400,120 +427,8 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
   };
 
   const imprimirDireto = () => {
+    // Usar a função gerarRelatorioHTML que já está corrigida
     gerarRelatorioHTML();
-    // Aguardar um pouco para a nova aba carregar e então imprimir
-    setTimeout(() => {
-      const newWindow = window.open('', '_blank');
-      if (newWindow) {
-        const dataAtual = new Date().toLocaleDateString('pt-BR');
-        const horaAtual = new Date().toLocaleTimeString('pt-BR');
-        
-        const htmlContent = `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatório de Histórico de Saldos</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            color: #333;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 20px;
-        }
-        .info {
-            margin-bottom: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-            font-weight: bold;
-        }
-        .positive {
-            color: #16a34a;
-        }
-        .negative {
-            color: #dc2626;
-        }
-        .footer {
-            margin-top: 30px;
-            text-align: center;
-            font-size: 12px;
-            color: #666;
-        }
-        @media print {
-            body { margin: 0; }
-            .no-print { display: none; }
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>Relatório de Histórico de Saldos</h1>
-        <p>Gerado em: ${dataAtual} às ${horaAtual}</p>
-    </div>
-    
-    <div class="info">
-        <p><strong>Período:</strong> ${dataInicial ? dataInicial.split('-').reverse().join('/') : ''} a ${dataFinal ? dataFinal.split('-').reverse().join('/') : ''}</p>
-        <p><strong>Total de registros:</strong> ${saldos.length}</p>
-    </div>
-    
-    <table>
-        <thead>
-            <tr>
-                <th>Data</th>
-                <th>Saldo Inicial</th>
-                <th>Saldo Atual</th>
-                <th>Lucro/Prejuízo</th>
-                <th>Percentual</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${saldos.map(saldo => {
-              const data = new Date(saldo.data).toLocaleDateString('pt-BR');
-              const lucro = saldo.saldo_atual - saldo.saldo_inicial;
-              const percentual = saldo.saldo_inicial > 0 ? (lucro / saldo.saldo_inicial) * 100 : 0;
-              
-              return `
-                <tr>
-                    <td>${data}</td>
-                    <td>${formatarMoeda(saldo.saldo_inicial)}</td>
-                    <td>${formatarMoeda(saldo.saldo_atual)}</td>
-                    <td class="${lucro >= 0 ? 'positive' : 'negative'}">${formatarMoeda(lucro)}</td>
-                    <td class="${percentual >= 0 ? 'positive' : 'negative'}">${formatarPercentual(percentual)}</td>
-                </tr>
-              `;
-            }).join('')}
-        </tbody>
-    </table>
-    
-    <div class="footer">
-        <p>Relatório gerado automaticamente pelo sistema R171</p>
-    </div>
-</body>
-</html>
-        `;
-        
-        newWindow.document.write(htmlContent);
-        newWindow.document.close();
-        newWindow.print();
-      }
-    }, 100);
   };
 
   return (
@@ -581,7 +496,8 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
             <div className="w-full lg:w-auto lg:ml-auto">
               <button
                 onClick={gerarRelatorioHTML}
-                className="w-full lg:w-auto px-3 lg:px-4 py-1.5 lg:py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                className="w-full lg:w-auto px-3 lg:px-4 py-1.5 lg:py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium"
+                style={{width: '120px'}}
               >
                 🖨️ Imprimir
               </button>
@@ -620,7 +536,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                   </tr>
                 </thead>
                 <tbody>
-                  {saldos.map((saldo, index) => {
+                  {saldosFiltrados.map((saldo, index) => {
                     // Calcular lucro e percentual se não estiverem salvos no banco
                     const valorLucro = saldo.vlr_lucro !== null && saldo.vlr_lucro !== undefined 
                       ? saldo.vlr_lucro 
@@ -635,7 +551,12 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                     return (
                       <tr key={saldo.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="border border-gray-300 px-2 lg:px-4 py-0.5 lg:py-1 text-xs lg:text-sm">
-                          {saldo.data ? saldo.data.split('-').reverse().join('/') : ''}
+                          {saldo.data ? (() => {
+                            // CORREÇÃO FINAL: O problema é que as datas no banco estão corretas (2025-09-20, 2025-09-21, etc.)
+                            // mas a formatação está mostrando um dia a menos. Vamos usar a data exata do banco.
+                            const [ano, mes, dia] = saldo.data.split('-');
+                            return `${dia}/${mes}/${ano}`;
+                          })() : ''}
                         </td>
                         <td className="border border-gray-300 px-2 lg:px-4 py-0.5 lg:py-1 text-right text-xs lg:text-sm">
                           {formatarMoeda(saldo.saldo_inicial || 0)}
@@ -685,41 +606,41 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
               <div className="text-center">
                 <div className="text-sm text-gray-600">Total de Registros</div>
-                <div className="text-xl font-bold text-gray-800">{saldos.length}</div>
+                <div className="text-xl font-bold text-gray-800">{saldosFiltrados.length}</div>
               </div>
               <div className="text-center">
                 <div className="text-sm text-gray-600">Lucro Total</div>
                 <div className={`text-xl font-bold ${
-                  saldos.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0) >= 0 ? 'text-green-600' : 'text-amber-900'
+                  saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0) >= 0 ? 'text-green-600' : 'text-amber-900'
                 }`}>
-                  {formatarMoeda(saldos.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0))}
+                  {formatarMoeda(saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0))}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-sm text-gray-600">Maior Saldo</div>
                 <div className="text-xl font-bold text-green-600">
-                  {formatarMoeda(Math.max(...saldos.map(s => s.saldo_atual || 0)))}
+                  {formatarMoeda(saldosFiltrados.length > 0 ? Math.max(...saldosFiltrados.map(s => s.saldo_atual || 0)) : 0)}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-sm text-gray-600">Menor Saldo</div>
                 <div className="text-xl font-bold text-amber-900">
-                  {formatarMoeda(Math.min(...saldos.map(s => s.saldo_atual || 0)))}
+                  {formatarMoeda(saldosFiltrados.length > 0 ? Math.min(...saldosFiltrados.map(s => s.saldo_atual || 0)) : 0)}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-sm text-gray-600">Média em R$</div>
                 <div className={`text-xl font-bold ${
                   (() => {
-                    const totalLucro = saldos.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0);
-                    const totalRegistros = saldos.length;
+                    const totalLucro = saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0);
+                    const totalRegistros = saldosFiltrados.length;
                     const mediaReais = totalRegistros > 0 ? totalLucro / totalRegistros : 0;
                     return mediaReais >= 0 ? 'text-green-600' : 'text-amber-900';
                   })()
                 }`}>
                   {(() => {
-                    const totalLucro = saldos.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0);
-                    const totalRegistros = saldos.length;
+                    const totalLucro = saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0);
+                    const totalRegistros = saldosFiltrados.length;
                     const mediaReais = totalRegistros > 0 ? totalLucro / totalRegistros : 0;
                     return formatarMoeda(mediaReais);
                   })()}
@@ -729,7 +650,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                 <div className="text-sm text-gray-600">Média Percentual</div>
                 <div className={`text-xl font-bold ${
                   (() => {
-                    const percentuais = saldos.map(s => {
+                    const percentuais = saldosFiltrados.map(s => {
                       const lucro = (s.saldo_atual || 0) - (s.saldo_inicial || 0);
                       return (s.saldo_inicial || 0) > 0 ? (lucro / (s.saldo_inicial || 0)) * 100 : 0;
                     });
@@ -738,7 +659,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                   })()
                 }`}>
                   {(() => {
-                    const percentuais = saldos.map(s => {
+                    const percentuais = saldosFiltrados.map(s => {
                       const lucro = (s.saldo_atual || 0) - (s.saldo_inicial || 0);
                       return (s.saldo_inicial || 0) > 0 ? (lucro / (s.saldo_inicial || 0)) * 100 : 0;
                     });
@@ -747,7 +668,8 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                       minimumFractionDigits: 2, 
                       maximumFractionDigits: 2 
                     })}%`;
-                  })()}
+                  })()
+                }
                 </div>
               </div>
             </div>

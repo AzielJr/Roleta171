@@ -78,7 +78,10 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
           </div>
           {currentSaldoRecord && (
             <div className="text-xs text-gray-500">
-              {new Date(currentSaldoRecord.data).toLocaleDateString('pt-BR')}
+              {(() => {
+              const [ano, mes, dia] = currentSaldoRecord.data.split('-');
+              return `${dia}/${mes}/${ano}`;
+            })()}
               {currentSaldoRecord.vlr_lucro !== 0 && (
                 <span className={`ml-2 ${currentSaldoRecord.vlr_lucro >= 0 ? 'text-green-600' : 'text-amber-900'}`}>
                   ({currentSaldoRecord.vlr_lucro >= 0 ? '+' : ''}R$ {currentSaldoRecord.vlr_lucro?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
@@ -96,13 +99,29 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
           <h4 className="font-semibold text-green-800 mb-2">➕ Adicionar Entrada</h4>
           <div className="space-y-2">
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
               value={entryAmount}
-              onChange={(e) => setEntryAmount(e.target.value)}
+              onChange={(e) => {
+                let value = e.target.value.replace(',', '.');
+                // Remove caracteres não numéricos exceto ponto
+                value = value.replace(/[^0-9.]/g, '');
+                // Garante apenas um ponto decimal
+                const parts = value.split('.');
+                if (parts.length > 2) {
+                  value = parts[0] + '.' + parts.slice(1).join('');
+                }
+                setEntryAmount(value);
+              }}
+              onBlur={(e) => {
+                if (e.target.value) {
+                  const value = parseFloat(e.target.value) || 0;
+                  setEntryAmount(value.toFixed(2));
+                }
+              }}
               placeholder="Valor (R$)"
               className="w-full p-2 border border-green-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-              step="0.01"
-              min="0"
             />
             <input
               type="text"
@@ -126,14 +145,29 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
           <h4 className="font-semibold text-red-800 mb-2">➖ Registrar Saída</h4>
           <div className="space-y-2">
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
               value={exitAmount}
-              onChange={(e) => setExitAmount(e.target.value)}
+              onChange={(e) => {
+                let value = e.target.value.replace(',', '.');
+                // Remove caracteres não numéricos exceto ponto
+                value = value.replace(/[^0-9.]/g, '');
+                // Garante apenas um ponto decimal
+                const parts = value.split('.');
+                if (parts.length > 2) {
+                  value = parts[0] + '.' + parts.slice(1).join('');
+                }
+                setExitAmount(value);
+              }}
+              onBlur={(e) => {
+                if (e.target.value) {
+                  const value = parseFloat(e.target.value) || 0;
+                  setExitAmount(value.toFixed(2));
+                }
+              }}
               placeholder="Valor (R$)"
               className="w-full p-2 border border-red-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
-              step="0.01"
-              min="0"
-              max={balance}
             />
             <input
               type="text"
@@ -209,13 +243,29 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
         <h4 className="font-semibold text-blue-800 mb-2">⚙️ Ajuste Manual</h4>
         <div className="flex gap-2">
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
+            pattern="[0-9]*[.,]?[0-9]*"
             value={manualBalance}
-            onChange={(e) => setManualBalance(e.target.value)}
+            onChange={(e) => {
+              let value = e.target.value.replace(',', '.');
+              // Remove caracteres não numéricos exceto ponto
+              value = value.replace(/[^0-9.]/g, '');
+              // Garante apenas um ponto decimal
+              const parts = value.split('.');
+              if (parts.length > 2) {
+                value = parts[0] + '.' + parts.slice(1).join('');
+              }
+              setManualBalance(value);
+            }}
+            onBlur={(e) => {
+              if (e.target.value) {
+                const value = parseFloat(e.target.value) || 0;
+                setManualBalance(value.toFixed(2));
+              }
+            }}
             placeholder="Novo saldo (R$)"
             className="flex-1 p-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            step="0.01"
-            min="0"
           />
           <button
             onClick={handleSetManualBalance}

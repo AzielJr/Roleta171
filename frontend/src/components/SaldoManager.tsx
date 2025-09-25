@@ -308,8 +308,19 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
               pattern="[0-9]*[.,]?[0-9]*"
               value={saldoInicial}
               onChange={(e) => {
-                const value = e.target.value.replace(',', '.');
+                let value = e.target.value.replace(',', '.');
+                // Remove caracteres não numéricos exceto ponto
+                value = value.replace(/[^0-9.]/g, '');
+                // Garante apenas um ponto decimal
+                const parts = value.split('.');
+                if (parts.length > 2) {
+                  value = parts[0] + '.' + parts.slice(1).join('');
+                }
                 setSaldoInicial(value);
+              }}
+              onBlur={(e) => {
+                const value = parseFloat(e.target.value) || 0;
+                setSaldoInicial(value.toFixed(2));
               }}
               className="w-full px-4 py-3 border border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg text-lg font-semibold transition-colors text-right"
               placeholder="0,00"
@@ -327,8 +338,19 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
               pattern="[0-9]*[.,]?[0-9]*"
               value={saldoAtual}
               onChange={(e) => {
-                const value = e.target.value.replace(',', '.');
+                let value = e.target.value.replace(',', '.');
+                // Remove caracteres não numéricos exceto ponto
+                value = value.replace(/[^0-9.]/g, '');
+                // Garante apenas um ponto decimal
+                const parts = value.split('.');
+                if (parts.length > 2) {
+                  value = parts[0] + '.' + parts.slice(1).join('');
+                }
                 setSaldoAtual(value);
+              }}
+              onBlur={(e) => {
+                const value = parseFloat(e.target.value) || 0;
+                setSaldoAtual(value.toFixed(2));
               }}
               className="w-full px-4 py-3 border border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg text-lg font-semibold transition-colors text-right"
               placeholder="0,00"
@@ -442,7 +464,11 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
                 Data
               </label>
               <div className="text-xl font-bold text-gray-800">
-                {currentSaldoRecord?.data ? currentSaldoRecord.data.split('-').reverse().join('/') : new Date().toLocaleDateString('pt-BR')}
+                {currentSaldoRecord?.data ? (() => {
+                  // CORREÇÃO: Usar formatação direta sem new Date() para evitar problemas de fuso horário
+                  const [ano, mes, dia] = currentSaldoRecord.data.split('-');
+                  return `${dia}/${mes}/${ano}`;
+                })() : new Date().toLocaleDateString('pt-BR')}
               </div>
             </div>
 
