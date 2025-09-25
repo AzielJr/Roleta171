@@ -21,6 +21,9 @@ interface PatternAlert {
   numbers: number[];
   positions: number[];
   message: string;
+  type?: string;
+  betNumbers?: number[];
+  riskNumbers?: number[];
 }
 
 interface RouletteProps {
@@ -1448,7 +1451,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       // Converter lastNumbers para o formato esperado pela função checkForRaceCondition
       const history = lastNumbers.map((number, index) => ({
         number,
-        timestamp: Date.now() - (index * 1000) // Simular timestamps
+        color: getNumberColor(number) as 'green' | 'red' | 'black',
+        createdAt: new Date(Date.now() - (index * 1000))
       }));
 
       const raceResult = checkForRaceCondition(history);
