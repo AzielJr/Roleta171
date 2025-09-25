@@ -1161,7 +1161,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     setTotalNumbersWithoutPattern((prev) => prev + numbersWithoutPattern);
     
     // Mostrar informação do padrão aplicado
-    console.log(`Padrão 171 Forçado aplicado baseado no número ${lastNumber}`);
+    console.log(`Padrão 171 Forçado aplicado baseado no número ${targetNumber}`);
     console.log(`Números expostos (7):`, exposedNumbers);
     console.log(`Números para apostar (30):`, remainingNumbers);
     console.log(`Números base (2):`, bestCoverageNumbers);
