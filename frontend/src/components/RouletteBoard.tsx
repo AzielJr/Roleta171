@@ -428,6 +428,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     baseNumbers: number[];
   } | null>(null);
   
+  // Estado para controlar se o modo "Forçar padrão 171" está ativo (persistente)
+  const [isForcePattern171Active, setIsForcePattern171Active] = useState(false);
+  
   // Estados para destacar números na race quando popup aparecer
   const [highlightedBetNumbers, setHighlightedBetNumbers] = useState<number[]>([]);
   const [highlightedRiskNumbers, setHighlightedRiskNumbers] = useState<number[]>([]);
@@ -920,6 +923,11 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     // Adicionar ao histórico para detecção de padrões (COM popup na seleção manual)
     addToHistory(num);
     
+    // Se o modo "Forçar padrão 171" estiver ativo e não há padrão detectado, aplicar o padrão
+    if (isForcePattern171Active && !patternAlert) {
+      applyForcePattern171();
+    }
+    
     setSelected(prev => ({
       ...prev,
       numbers: prev.numbers.includes(num)
@@ -1036,11 +1044,32 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     }));
   };
 
-  // Função para forçar padrão 171
+  // Função para forçar padrão 171 (agora com estado persistente)
   const forcePattern171 = () => {
+    // Toggle do estado ativo
+    const newActiveState = !isForcePattern171Active;
+    setIsForcePattern171Active(newActiveState);
+    
+    if (!newActiveState) {
+      // Se desativando, limpar tudo
+      setForcedPattern(null);
+      setHighlightedRiskNumbers([]);
+      setHighlightedBetNumbers([]);
+      setHighlightedBaseNumbers([]);
+      console.log('Modo "Forçar padrão 171" desativado');
+      return;
+    }
+    
+    // Se ativando, aplicar o padrão
+    applyForcePattern171();
+  };
+  
+  // Função separada para aplicar o padrão 171
+  const applyForcePattern171 = () => {
     // Verificar se há pelo menos um número sorteado
     if (lastNumbers.length === 0) {
       alert('É necessário ter pelo menos um número sorteado para aplicar o Padrão 171.');
+      setIsForcePattern171Active(false);
       return;
     }
 
@@ -1049,6 +1078,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     
     if (position === -1) {
       alert('Erro: número não encontrado na sequência da roleta.');
+      setIsForcePattern171Active(false);
       return;
     }
 
@@ -1663,9 +1693,17 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           </button>
           <button
             onClick={forcePattern171}
-            className="bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
+            className={cn(
+              "text-white text-xs rounded transition-colors font-semibold flex items-center justify-center",
+              isForcePattern171Active 
+                ? "bg-purple-800 ring-2 ring-yellow-400 animate-pulse" 
+                : "bg-purple-600 hover:bg-purple-700"
+            )}
             style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
-            title="Forçar padrão 171: marcar 7 números expostos baseado no último número sorteado"
+            title={isForcePattern171Active 
+              ? "Modo Forçar padrão 171 ATIVO - Clique para desativar" 
+              : "Forçar padrão 171: marcar 7 números expostos baseado no último número sorteado"
+            }
           >
             🎯
           </button>
