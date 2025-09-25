@@ -920,12 +920,16 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     // Adicionar número aos últimos números
     addToLastNumbers(num);
     
-    // Adicionar ao histórico para detecção de padrões (COM popup na seleção manual)
-    addToHistory(num);
-    
-    // Se o modo "Forçar padrão 171" estiver ativo e não há padrão detectado, aplicar o padrão
-    if (isForcePattern171Active && !patternAlert) {
+    // Se o modo "Forçar padrão 171" estiver ativo, aplicar o padrão ANTES de adicionar ao histórico
+    // para que tenha prioridade sobre a detecção automática
+    if (isForcePattern171Active) {
       applyForcePattern171();
+    }
+    
+    // Adicionar ao histórico para detecção de padrões (COM popup na seleção manual)
+    // Só adiciona se o padrão forçado não estiver ativo para evitar conflitos
+    if (!isForcePattern171Active) {
+      addToHistory(num);
     }
     
     setSelected(prev => ({
