@@ -8,6 +8,7 @@ import { getNumberColor as getNumberColorUtil } from '../utils/rouletteConfig';
 import { checkForRaceCondition } from '../utils/alertLogic';
 import { useAuth } from '../contexts/AuthContext';
 import { useBalance } from '../contexts/BalanceContext';
+import { HistoricoSaldos } from './HistoricoSaldos';
 
 interface SelectedNumbers {
   numbers: number[];
@@ -38,7 +39,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Estado para controlar o modal de saldo
   const [showBalanceModal, setShowBalanceModal] = useState(false);
   
-  // Estado para controlar o modal de editar saldo
   const [showEditBalanceModal, setShowEditBalanceModal] = useState(false);
   
   // Estado para controlar o modal de cadastrar saldo
@@ -47,23 +47,37 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Estado para controlar o modal de histórico de saldos
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   
-  // Estados para os filtros do histórico
-  const [filterStartDate, setFilterStartDate] = useState('2025-09-01');
-  const [filterEndDate, setFilterEndDate] = useState('2025-09-24');
-  
-  // Dados completos do histórico (corrigidos conforme dados reais da tabela)
+  // Estados para os filtros do histórico (datas locais)
+  const formatDateLocal = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const todayLocal = formatDateLocal(new Date());
+  const firstDayOfMonthLocal = (() => {
+    const d = new Date();
+    d.setDate(1);
+    return formatDateLocal(d);
+  })();
+  const [filterStartDate, setFilterStartDate] = useState(firstDayOfMonthLocal);
+  const [filterEndDate, setFilterEndDate] = useState(todayLocal);
+
+  // Dados completos do histórico (exemplo local)
   const allHistoryData = [
     { data: '20/09/2025', dataISO: '2025-09-20', saldoInicial: 82.00, saldoAtual: 82.00, valorLucro: 0.00, percentual: 0.00, status: 'Neutro' },
     { data: '21/09/2025', dataISO: '2025-09-21', saldoInicial: 82.00, saldoAtual: 105.35, valorLucro: 23.35, percentual: 28.48, status: 'Lucro' },
     { data: '22/09/2025', dataISO: '2025-09-22', saldoInicial: 105.85, saldoAtual: 140.35, valorLucro: 34.50, percentual: 32.59, status: 'Lucro' },
-    { data: '23/09/2025', dataISO: '2025-09-23', saldoInicial: 141.85, saldoAtual: 162.00, valorLucro: 20.15, percentual: 14.21, status: 'Lucro' }
+    { data: '23/09/2025', dataISO: '2025-09-23', saldoInicial: 141.85, saldoAtual: 162.00, valorLucro: 20.15, percentual: 14.21, status: 'Lucro' },
+    { data: '24/09/2025', dataISO: '2025-09-24', saldoInicial: 162.00, saldoAtual: 19.35, valorLucro: -142.65, percentual: -88.06, status: 'Prejuízo' },
+    { data: '25/09/2025', dataISO: '2025-09-25', saldoInicial: 19.35, saldoAtual: 21.35, valorLucro: 2.00, percentual: 10.34, status: 'Lucro' }
   ];
-  
+
   // Filtrar dados baseado nas datas selecionadas
   const filteredHistoryData = allHistoryData.filter(item => {
     return item.dataISO >= filterStartDate && item.dataISO <= filterEndDate;
   });
-  
+
   // Calcular estatísticas dos dados filtrados
   const totalRegistros = filteredHistoryData.length;
   const lucroTotal = filteredHistoryData.reduce((acc, item) => acc + item.valorLucro, 0);
@@ -74,12 +88,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   
   // Função para gerar template HTML de impressão
   const generatePrintTemplate = () => {
-    const printData = [
-      { data: '20/09/2025', saldoInicial: 82.00, saldoAtual: 82.00, valorLucro: 0.00, percentual: 0.00 },
-      { data: '21/09/2025', saldoInicial: 82.00, saldoAtual: 105.35, valorLucro: 23.35, percentual: 28.48 },
-      { data: '22/09/2025', saldoInicial: 105.85, saldoAtual: 140.35, valorLucro: 34.50, percentual: 32.59 },
-      { data: '23/09/2025', saldoInicial: 141.85, saldoAtual: 162.00, valorLucro: 20.15, percentual: 14.21 }
-    ];
+    const moeda = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const pct = (v: number) => `${v >= 0 ? '+' : ''}${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
     const htmlTemplate = `
 <!DOCTYPE html>
@@ -319,7 +329,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                     </tr>
                 </thead>
                 <tbody>
-                    ${printData.map(row => `
+                    ${filteredHistoryData.map(row => `
                         <tr>
                             <td>${row.data}</td>
                             <td>R$ ${row.saldoInicial.toFixed(2).replace('.', ',')}</td>
@@ -343,9 +353,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   };
   
   // Estados para os campos do modal de editar saldo
-  const [editSaldoInicial, setEditSaldoInicial] = useState(141.85);
-  const [editSaldoAtual, setEditSaldoAtual] = useState(161.35);
-  const [editDataCadastro, setEditDataCadastro] = useState('2025-09-23');
+  const [editSaldoInicial, setEditSaldoInicial] = useState(0);
+  const [editSaldoAtual, setEditSaldoAtual] = useState(0);
+  const [editDataCadastro, setEditDataCadastro] = useState(new Date().toISOString().split('T')[0]);
   
   // Estados para os campos do modal de cadastrar saldo
   const [createDataCadastro, setCreateDataCadastro] = useState(new Date().toISOString().split('T')[0]);
@@ -2246,10 +2256,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           >
         {/* Cabeçalho com título à esquerda e total à direita */}
         <div className="flex justify-between items-center -mt-1.5" style={{marginBottom: '3px'}}>
-          <h3 className="text-white font-bold text-sm">📊 Estatística do Sorteio</h3>
+          <h3 className="text-white font-bold text-sm">📊 Estatística de Rodadas</h3>
           <div className="text-white text-sm">
             <span className="text-gray-300">Total de Números Chamados: </span>
-            <span className="font-bold text-blue-400">{lastNumbers.length}</span>
+            <span className="font-bold text-yellow-300 text-base">{lastNumbers.length}</span>
           </div>
         </div>
         
@@ -2309,6 +2319,40 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 <div className="text-white/80 text-xs mb-1">Percentual do Lucro</div>
                 <div className={`font-bold text-sm ${(currentSaldoRecord?.per_lucro || 0) >= 0 ? 'text-green-200' : 'text-amber-900'}`}>
                   {(currentSaldoRecord?.per_lucro || 0) >= 0 ? '+' : ''}{(currentSaldoRecord?.per_lucro || 0).toFixed(2)}%
+                </div>
+              </div>
+            </div>
+            
+            {/* Linha de Sugestões de % de Lucro */}
+            <div className="mt-4 pt-3 border-t border-green-400/30">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="text-center">
+                  <div className="text-white/60 text-xs mb-1">Sugestão</div>
+                  <div className="text-white/60 text-xs">(% Lucro)</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-yellow-200 text-xs mb-1">2,34%</div>
+                  <div className="text-white font-bold text-xs">
+                    R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0234).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-yellow-200 text-xs mb-1">3,73%</div>
+                  <div className="text-white font-bold text-xs">
+                    R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0373).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-yellow-200 text-xs mb-1">4,73%</div>
+                  <div className="text-white font-bold text-xs">
+                    R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0473).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-yellow-200 text-xs mb-1">10,00%</div>
+                  <div className="text-white font-bold text-xs">
+                    R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
                 </div>
               </div>
             </div>
@@ -2536,24 +2580,23 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         <div className="bg-white rounded-lg shadow-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-gray-800">💰 Saldo Atual</h3>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <div className="text-sm text-gray-600">Data</div>
-                <div className="text-lg font-semibold text-gray-800">
-                  {currentSaldoRecord?.data ? new Date(currentSaldoRecord.data + 'T00:00:00').toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}
-                </div>
-              </div>
-              <button
-                onClick={() => setShowLargeSaldoPanel(false)}
-                className="text-gray-500 hover:text-gray-700 text-lg w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 hover:border-gray-400 transition-colors"
-                title="Fechar"
-              >
-                ×
-              </button>
-            </div>
+            <button
+              onClick={() => setShowLargeSaldoPanel(false)}
+              className="text-gray-500 hover:text-gray-700 text-lg w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 hover:border-gray-400 transition-colors"
+              title="Fechar"
+            >
+              ×
+            </button>
           </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+          {/* Data */}
+          <div className="bg-gray-50 p-4 rounded-lg border text-center">
+            <div className="text-sm text-gray-600 mb-1">Data</div>
+            <div className="text-xl font-bold text-gray-800">
+              {currentSaldoRecord?.data ? new Date(currentSaldoRecord.data + 'T00:00:00').toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}
+            </div>
+          </div>
           {/* Saldo Inicial */}
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-center">
             <div className="text-sm text-blue-600 mb-1">Saldo Inicial</div>
@@ -2647,7 +2690,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             </button>
           </div>
           <button 
-            onClick={() => setShowEditBalanceModal(true)}
+            onClick={() => {
+              // Preencher o modal de edição com o registro atualmente exibido
+              setEditSaldoInicial(currentSaldoRecord?.saldo_inicial || 0);
+              setEditSaldoAtual(currentSaldoRecord?.saldo_atual ?? balance ?? 0);
+              setEditDataCadastro(currentSaldoRecord?.data || new Date().toISOString().split('T')[0]);
+              setShowEditBalanceModal(true);
+            }}
             className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors flex items-center gap-2"
           >
             ✏️ Editar Saldo
@@ -2813,25 +2862,33 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               {/* Sugestão +2.34% */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center cursor-pointer hover:bg-blue-100 transition-colors">
                 <div className="text-blue-600 font-semibold text-lg mb-1">+2.34%</div>
-                <div className="text-blue-800 font-bold text-xl">R$ 145,17</div>
+                <div className="text-blue-800 font-bold text-xl">
+                  {`R$ ${(((editSaldoInicial || 0) * 1.0234)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                </div>
               </div>
 
               {/* Sugestão +3.73% */}
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center cursor-pointer hover:bg-green-100 transition-colors">
                 <div className="text-green-600 font-semibold text-lg mb-1">+3.73%</div>
-                <div className="text-green-800 font-bold text-xl">R$ 147,14</div>
+                <div className="text-green-800 font-bold text-xl">
+                  {`R$ ${(((editSaldoInicial || 0) * 1.0373)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                </div>
               </div>
 
               {/* Sugestão +4.73% */}
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center cursor-pointer hover:bg-purple-100 transition-colors">
                 <div className="text-purple-600 font-semibold text-lg mb-1">+4.73%</div>
-                <div className="text-purple-800 font-bold text-xl">R$ 148,56</div>
+                <div className="text-purple-800 font-bold text-xl">
+                  {`R$ ${(((editSaldoInicial || 0) * 1.0473)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                </div>
               </div>
 
               {/* Sugestão +10% */}
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center cursor-pointer hover:bg-orange-100 transition-colors">
                 <div className="text-orange-600 font-semibold text-lg mb-1">+10%</div>
-                <div className="text-orange-800 font-bold text-xl">R$ 156,04</div>
+                <div className="text-orange-800 font-bold text-xl">
+                  {`R$ ${(((editSaldoInicial || 0) * 1.10)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                </div>
               </div>
             </div>
           </div>
@@ -3048,152 +3105,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       </div>
     )}
 
-    {/* Modal de Histórico de Saldos */}
+    {/* Modal de Histórico de Saldos - reutilizando componente real */}
     {showHistoryModal && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">📊</span>
-              <h2 className="text-2xl font-bold">Histórico de Saldos</h2>
-            </div>
-            <button 
-              onClick={() => setShowHistoryModal(false)}
-              className="text-white hover:text-gray-200 text-2xl font-bold"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Content - Scrollable */}
-          <div className="flex-1 overflow-hidden flex flex-col">
-            {/* Filtros */}
-            <div className="p-6 bg-gray-50 border-b">
-              <div className="flex flex-wrap gap-4 items-end justify-between">
-                <div className="flex gap-4 items-end">
-                  <div className="min-w-[150px] max-w-[200px]">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Data Inicial</label>
-                    <input
-                      type="date"
-                      value={filterStartDate}
-                      onChange={(e) => setFilterStartDate(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div className="min-w-[150px] max-w-[200px]">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Data Final</label>
-                    <input
-                      type="date"
-                      value={filterEndDate}
-                      onChange={(e) => setFilterEndDate(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <button 
-                    onClick={() => {
-                      console.log('Filtrar dados entre:', filterStartDate, 'e', filterEndDate);
-                      // A filtragem agora é automática através do filteredHistoryData
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors flex items-center gap-2"
-                  >
-                    🔍 Filtrar
-                  </button>
-                </div>
-                <div>
-                  <button 
-                    onClick={() => {
-                      const htmlContent = generatePrintTemplate();
-                      const printWindow = window.open('', '_blank');
-                      if (printWindow) {
-                        printWindow.document.write(htmlContent);
-                        printWindow.document.close();
-                      }
-                    }}
-                    className="bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors flex items-center gap-2"
-                  >
-                    🖨️ Imprimir
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Tabela - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-2 text-left text-sm font-semibold text-gray-700 border-b">Data</th>
-                        <th className="px-6 py-2 text-right text-sm font-semibold text-gray-700 border-b">Saldo Inicial</th>
-                        <th className="px-6 py-2 text-right text-sm font-semibold text-gray-700 border-b">Saldo Atual</th>
-                        <th className="px-6 py-2 text-right text-sm font-semibold text-gray-700 border-b">Valor Lucro</th>
-                        <th className="px-6 py-2 text-right text-sm font-semibold text-gray-700 border-b">% Lucro</th>
-                        <th className="px-6 py-2 text-center text-sm font-semibold text-gray-700 border-b">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredHistoryData.map((item, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-6 py-2 text-sm text-gray-900 border-b">{item.data}</td>
-                          <td className="px-6 py-2 text-sm text-gray-900 text-right border-b">R$ {item.saldoInicial.toFixed(2).replace('.', ',')}</td>
-                          <td className="px-6 py-2 text-sm font-semibold text-green-600 text-right border-b">R$ {item.saldoAtual.toFixed(2).replace('.', ',')}</td>
-                          <td className={`px-6 py-2 text-sm font-semibold text-right border-b ${item.valorLucro >= 0 ? 'text-green-600' : 'text-amber-900'}`}>
-                            R$ {item.valorLucro.toFixed(2).replace('.', ',')}
-                          </td>
-                          <td className={`px-6 py-2 text-sm font-semibold text-right border-b ${item.percentual >= 0 ? 'text-green-600' : 'text-amber-900'}`}>
-                            {item.percentual >= 0 ? '+' : ''}{item.percentual.toFixed(2).replace('.', ',')}%
-                          </td>
-                          <td className="px-6 py-2 text-center border-b">
-                            <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                              item.status === 'Lucro' ? 'bg-green-100 text-green-800' : 
-                              item.status === 'Prejuízo' ? 'bg-red-100 text-red-800' : 
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {item.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Estatísticas Fixas no Rodapé */}
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 border-t">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{totalRegistros}</div>
-                <div className="text-sm text-gray-600">Total de Registros</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">R$ {lucroTotal.toFixed(2).replace('.', ',')}</div>
-                <div className="text-sm text-gray-600">Lucro Total</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">R$ {totalRegistros > 0 ? maiorSaldo.toFixed(2).replace('.', ',') : '0,00'}</div>
-                <div className="text-sm text-gray-600">Maior Saldo</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">R$ {totalRegistros > 0 ? menorSaldo.toFixed(2).replace('.', ',') : '0,00'}</div>
-                <div className="text-sm text-gray-600">Menor Saldo</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-indigo-600">R$ {mediaValor.toFixed(2).replace('.', ',')}</div>
-                <div className="text-sm text-gray-600">Média em R$</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-teal-600">{mediaPercentual >= 0 ? '+' : ''}{mediaPercentual.toFixed(2).replace('.', ',')}%</div>
-                <div className="text-sm text-gray-600">Média Percentual</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <HistoricoSaldos onClose={() => setShowHistoryModal(false)} />
     )}
     </>
   );

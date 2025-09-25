@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { R171Saldo } from '../lib/supabase';
-
+ 
 interface HistoricoSaldosProps {
   onClose: () => void;
 }
@@ -18,7 +18,6 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
   // Calcular dados filtrados para exibição e impressão
   const saldosFiltrados = saldos.filter(saldo => {
     if (!filtroAplicado) return true;
-    
     const dataSaldo = saldo.data;
     const dentroDoIntervalo = (!dataInicial || dataSaldo >= dataInicial) && 
                              (!dataFinal || dataSaldo <= dataFinal);
@@ -28,15 +27,16 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
 
   // Definir datas padrão (primeiro dia do mês corrente até hoje)
   useEffect(() => {
-    // FORÇAR DATA ATUAL - 25/09/2025
-    const dataAtualForçada = '2025-09-25';
-    const dataInicialForçada = '2025-09-01';
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
     
-    console.log('🚨 FORÇANDO DATAS - Data Final:', dataAtualForçada);
-    console.log('🚨 FORÇANDO DATAS - Data Inicial:', dataInicialForçada);
+    const dataFinalPadrao = `${ano}-${mes}-${dia}`; // hoje
+    const dataInicialPadrao = `${ano}-${mes}-01`;   // 1º dia do mês atual
     
-    setDataFinal(dataAtualForçada);
-    setDataInicial(dataInicialForçada);
+    setDataFinal(dataFinalPadrao);
+    setDataInicial(dataInicialPadrao);
   }, []);
 
   // Carregar histórico
@@ -46,6 +46,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
     setLoading(true);
     try {
       console.log('🚨 INICIANDO CONSULTA AO BANCO DE DADOS');
+      console.log('👤 user.id:', user?.id);
       console.log('🚨 Data Inicial:', dataInicial);
       console.log('🚨 Data Final:', dataFinal);
       
@@ -54,7 +55,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
       const { data: todosRegistros, error: erroTodos } = await supabase
         .from('r171_saldo')
         .select('*')
-        .eq('id_senha', 1)
+        .eq('id_senha', user.id)
         .order('data', { ascending: true });
 
       if (erroTodos) {
@@ -81,7 +82,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
       let query = supabase
         .from('r171_saldo')
         .select('*')
-        .eq('id_senha', 1);
+        .eq('id_senha', user.id);
 
       // Aplicar filtros de data se definidos
       if (dataInicial) {
@@ -125,7 +126,43 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
         console.log('🔍 DEBUG - Dados do registro 25/09:', registro25);
       }
 
-      setSaldos(data || []);
+      // Normalizar tipos numéricos para evitar divergências (strings vs numbers)
+      const normalizados = (data || []).map((r: any) => {
+        const saldo_inicial = r.saldo_inicial != null ? Number(r.saldo_inicial) : 0;
+        const saldo_atual = r.saldo_atual != null ? Number(r.saldo_atual) : 0;
+        const vlr_lucro = r.vlr_lucro != null ? Number(r.vlr_lucro) : (saldo_atual - saldo_inicial);
+        const per_lucro = r.per_lucro != null ? Number(r.per_lucro) : (saldo_inicial > 0 ? (vlr_lucro / saldo_inicial) * 100 : 0);
+        return {
+          ...r,
+          saldo_inicial,
+          saldo_atual,
+          vlr_lucro,
+          per_lucro
+        } as R171Saldo;
+      });
+
+      // Consolidar por data: manter somente o registro mais recente (maior created_at) de cada dia
+      const porDataMaisRecente = Object.values(
+        normalizados.reduce((acc: Record<string, R171Saldo>, item: any) => {
+          const key = item.data; // 'YYYY-MM-DD'
+          if (!key) return acc;
+          const atual = acc[key];
+          if (!atual) {
+            acc[key] = item;
+          } else {
+            // Comparar created_at para manter o mais recente
+            const caNovo = new Date(item.created_at).getTime();
+            const caAtual = new Date(atual.created_at).getTime();
+            if (caNovo >= caAtual) acc[key] = item;
+          }
+          return acc;
+        }, {})
+      ) as R171Saldo[];
+
+      // Ordenar por data ascendente
+      porDataMaisRecente.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+
+      setSaldos(porDataMaisRecente);
       setFiltroAplicado(true);
     } catch (error) {
       console.error('Erro ao carregar histórico:', error);
@@ -139,6 +176,31 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
     if (user && dataInicial && dataFinal) {
       carregarHistorico();
     }
+  }, [user, dataInicial, dataFinal]);
+
+  // Assinar alterações em tempo real para manter a lista sempre atualizada
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel('historico_saldos_changes')
+      .on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'r171_saldo',
+          filter: `id_senha=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('🟢 Alteração detectada em r171_saldo:', payload.eventType, payload.new || payload.old);
+          // Recarregar mantendo filtros atuais
+          carregarHistorico();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      try { channel.unsubscribe(); } catch {}
+    };
   }, [user, dataInicial, dataFinal]);
 
   const aplicarFiltro = () => {
@@ -167,15 +229,23 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
 
   const limparFiltro = () => {
     const hoje = new Date();
-    // Usar um período mais amplo: 3 meses atrás até hoje
-    const treseMesesAtras = new Date(hoje.getFullYear(), hoje.getMonth() - 3, 1);
-    
-    setDataFinal(hoje.toISOString().split('T')[0]);
-    setDataInicial(treseMesesAtras.toISOString().split('T')[0]);
+    // Sempre voltar para o 1º dia do mês corrente até hoje
+    const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+    const formatDateLocal = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    setDataFinal(formatDateLocal(hoje));
+    setDataInicial(formatDateLocal(primeiroDiaMes));
     setFiltroAplicado(false);
   };
 
   const gerarRelatorioHTML = () => {
+    console.log('🖨️ [HistoricoSaldos] Gerando relatório de impressão...');
     // DEBUG: Mostrar dados que serão impressos
     console.log('=== DADOS PARA IMPRESSÃO ===');
     console.log('saldosFiltrados:', saldosFiltrados);
@@ -189,7 +259,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
     const horaAtual = new Date().toLocaleTimeString('pt-BR');
     
     // Calcular estatísticas APENAS com os dados filtrados
-    const lucroTotal = dadosParaImprimir.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0);
+    const lucroTotal = dadosParaImprimir.reduce((acc, s) => acc + ((s.saldo_atual || 0) - (s.saldo_inicial || 0)), 0);
     const maiorSaldo = dadosParaImprimir.length > 0 ? Math.max(...dadosParaImprimir.map(s => s.saldo_atual || 0)) : 0;
     const menorSaldo = dadosParaImprimir.length > 0 ? Math.min(...dadosParaImprimir.map(s => s.saldo_atual || 0)) : 0;
     
@@ -220,19 +290,21 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
             position: fixed;
             top: 20px;
             right: 20px;
-            background-color: #f97316;
-            color: white;
+            background-color: #f97316; /* laranja */
+            color: #fff;
             border: none;
             border-radius: 50%;
-            width: 36px;
-            height: 48px;
-            font-size: 20px;
+            width: 56px;  /* botão redondo maior */
+            height: 56px; /* botão redondo maior */
+            font-size: 26px; /* ícone maior */
+            line-height: 56px; /* centraliza verticalmente o ícone */
+            text-align: center; /* centraliza horizontalmente o ícone */
             cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 6px 14px rgba(0,0,0,0.25);
             z-index: 1000;
         }
         .print-button:hover {
-            background-color: #ea580c;
+            background-color: #ea580c; /* laranja mais escuro no hover */
         }
         .header {
             text-align: center;
@@ -300,6 +372,13 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
         td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5) {
             text-align: right;
         }
+        /* Zebra (linhas alternadas) */
+        tbody tr:nth-child(odd) {
+            background-color: #fafafa;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #ffffff;
+        }
         .positive {
             color: #16a34a;
         }
@@ -311,6 +390,14 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
             text-align: center;
             font-size: 12px;
             color: #666;
+        }
+        /* Ajustes solicitados de margens no cabeçalho do relatório */
+        .header h1 {
+            margin-top: 60px;
+            margin-bottom: 10px;
+        }
+        .header p {
+            margin-bottom: 12px;
         }
         @media print {
             body { margin: 25px; }
@@ -377,11 +464,11 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
         </thead>
         <tbody>
             ${dadosParaImprimir.map(saldo => {
-              // CORREÇÃO: Usar formatação direta sem new Date() para evitar problemas de fuso horário
+              // Formatar data e calcular lucro/percentual dinamicamente
               const [ano, mes, dia] = saldo.data.split('-');
               const data = `${dia}/${mes}/${ano}`;
-              const lucro = saldo.saldo_atual - saldo.saldo_inicial;
-              const percentual = saldo.saldo_inicial > 0 ? (lucro / saldo.saldo_inicial) * 100 : 0;
+              const lucro = (saldo.saldo_atual || 0) - (saldo.saldo_inicial || 0);
+              const percentual = (saldo.saldo_inicial || 0) > 0 ? (lucro / (saldo.saldo_inicial || 1)) * 100 : 0;
               
               return `
                 <tr>
@@ -403,10 +490,12 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
 </html>
     `;
     
-    const newWindow = window.open('', '_blank');
-    if (newWindow) {
-      newWindow.document.write(htmlContent);
-      newWindow.document.close();
+    // Abrir apenas em nova aba usando Blob URL (sem acionar impressão automática)
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!win) {
+      console.warn('Não foi possível abrir a nova aba. Verifique as permissões de pop-up do navegador.');
     }
   };
 
@@ -435,7 +524,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 lg:p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] lg:max-h-[90vh] overflow-hidden">
         {/* Cabeçalho */}
-        <div className="flex justify-between items-center px-3 lg:px-6 py-3 lg:py-4 border-b border-gray-200">
+        <div className="flex justify-between items-center px-3 lg:px-6 py-1 lg:py-2 border-b border-gray-200">
           <h2 className="text-lg lg:text-2xl font-bold text-gray-800">📊 Histórico de Saldos</h2>
           <button
             onClick={onClose}
@@ -447,7 +536,10 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
 
         {/* Filtros */}
         <div className="px-3 lg:px-6 pt-2 pb-3 lg:pb-4 border-b border-gray-200 bg-gray-50">
-          <div className="flex flex-col lg:flex-row flex-wrap gap-2 lg:gap-4 items-start lg:items-end">
+          <div
+            className="flex flex-col lg:flex-row flex-wrap gap-2 lg:gap-4 items-start lg:items-end"
+            style={{ marginTop: '-1px', marginBottom: '-2px' }}
+          >
             <div className="w-full lg:w-auto">
               <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">
                 Data Inicial
@@ -471,23 +563,6 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
               />
             </div>
             <button
-              onClick={() => {
-                console.log('🔥 BOTÃO FILTRAR CLICADO! 🔥');
-                console.log('=== APLICANDO FILTROS MANUALMENTE ===');
-                console.log('Data inicial input:', dataInicial);
-                console.log('Data final input:', dataFinal);
-                aplicarFiltro();
-              }}
-              className="w-full lg:w-auto px-6 lg:px-8 py-3 lg:py-4 text-lg bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-bold border-4 border-yellow-400 shadow-lg animate-pulse"
-              style={{
-                background: 'linear-gradient(45deg, #dc2626, #ef4444)',
-                boxShadow: '0 0 20px rgba(220, 38, 38, 0.5)',
-                transform: 'scale(1.1)'
-              }}
-            >
-              🔥🔥🔥 FILTRAR HISTÓRICO AQUI 🔥🔥🔥
-            </button>
-            <button
               onClick={limparFiltro}
               className="w-full lg:w-auto px-3 lg:px-4 py-1.5 lg:py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
             >
@@ -503,11 +578,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
               </button>
             </div>
           </div>
-          {filtroAplicado && (
-            <div className="mt-3 text-sm text-gray-600 mb-0">
-              Exibindo {saldos.length} registro(s) entre {dataInicial ? dataInicial.split('-').reverse().join('/') : ''} e {dataFinal ? dataFinal.split('-').reverse().join('/') : ''}
-            </div>
-          )}
+          
         </div>
 
         {/* Conteúdo */}
@@ -537,16 +608,11 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                 </thead>
                 <tbody>
                   {saldosFiltrados.map((saldo, index) => {
-                    // Calcular lucro e percentual se não estiverem salvos no banco
-                    const valorLucro = saldo.vlr_lucro !== null && saldo.vlr_lucro !== undefined 
-                      ? saldo.vlr_lucro 
-                      : (saldo.saldo_atual || 0) - (saldo.saldo_inicial || 0);
-                    
-                    const percentualLucro = saldo.per_lucro !== null && saldo.per_lucro !== undefined 
-                      ? saldo.per_lucro 
-                      : (saldo.saldo_inicial || 0) > 0 
-                        ? (valorLucro / (saldo.saldo_inicial || 1)) * 100 
-                        : 0;
+                    // Calcular lucro e percentual SEMPRE a partir dos saldos (fonte única de verdade)
+                    const valorLucro = (saldo.saldo_atual || 0) - (saldo.saldo_inicial || 0);
+                    const percentualLucro = (saldo.saldo_inicial || 0) > 0 
+                      ? (valorLucro / (saldo.saldo_inicial || 1)) * 100 
+                      : 0;
 
                     return (
                       <tr key={saldo.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
@@ -572,7 +638,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                           {formatarMoeda(valorLucro)}
                         </td>
                         <td className={`border border-gray-300 px-2 lg:px-4 py-0.5 lg:py-1 text-right font-semibold text-xs lg:text-sm ${
-                          percentualLucro >= 0 ? 'text-green-600' : 'text-yellow-100'
+                          percentualLucro >= 0 ? 'text-green-600' : 'text-red-800'
                         }`}>
                           {formatarPercentual(percentualLucro)}
                         </td>
@@ -611,9 +677,9 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
               <div className="text-center">
                 <div className="text-sm text-gray-600">Lucro Total</div>
                 <div className={`text-xl font-bold ${
-                  saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0) >= 0 ? 'text-green-600' : 'text-amber-900'
+                  saldosFiltrados.reduce((acc, s) => acc + ((s.saldo_atual || 0) - (s.saldo_inicial || 0)), 0) >= 0 ? 'text-green-600' : 'text-amber-900'
                 }`}>
-                  {formatarMoeda(saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0))}
+                  {formatarMoeda(saldosFiltrados.reduce((acc, s) => acc + ((s.saldo_atual || 0) - (s.saldo_inicial || 0)), 0))}
                 </div>
               </div>
               <div className="text-center">
@@ -632,14 +698,14 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                 <div className="text-sm text-gray-600">Média em R$</div>
                 <div className={`text-xl font-bold ${
                   (() => {
-                    const totalLucro = saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0);
+                    const totalLucro = saldosFiltrados.reduce((acc, s) => acc + ((s.saldo_atual || 0) - (s.saldo_inicial || 0)), 0);
                     const totalRegistros = saldosFiltrados.length;
                     const mediaReais = totalRegistros > 0 ? totalLucro / totalRegistros : 0;
                     return mediaReais >= 0 ? 'text-green-600' : 'text-amber-900';
                   })()
                 }`}>
                   {(() => {
-                    const totalLucro = saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro || 0), 0);
+                    const totalLucro = saldosFiltrados.reduce((acc, s) => acc + ((s.saldo_atual || 0) - (s.saldo_inicial || 0)), 0);
                     const totalRegistros = saldosFiltrados.length;
                     const mediaReais = totalRegistros > 0 ? totalLucro / totalRegistros : 0;
                     return formatarMoeda(mediaReais);

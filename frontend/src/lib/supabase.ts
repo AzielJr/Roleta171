@@ -41,7 +41,7 @@ export interface R171Senha {
 export interface R171Saldo {
   id: number | string
   created_at: string
-  id_senha: number | null
+  id_senha: number | string | null
   data: string | null
   saldo_inicial: number | null
   saldo_atual: number | null
