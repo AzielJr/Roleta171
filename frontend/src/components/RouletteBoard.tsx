@@ -427,12 +427,12 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   
   // Estados para reconhecimento de voz
   const [isListening, setIsListening] = useState(false);
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  const [recognition, setRecognition] = useState<any | null>(null);
   const [voiceBuffer, setVoiceBuffer] = useState<string>(''); // Buffer para acumular dígitos falados
   
   // Estados para reconhecimento de voz da roleta
   const [isRouletteListening, setIsRouletteListening] = useState(false);
-  const [rouletteRecognition, setRouletteRecognition] = useState<SpeechRecognition | null>(null);
+  const [rouletteRecognition, setRouletteRecognition] = useState<any | null>(null);
   const [rouletteVoiceBuffer, setRouletteVoiceBuffer] = useState<string>(''); // Buffer para acumular dígitos da roleta
   
   // Estados para popup de feedback de voz
@@ -816,7 +816,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
       // Iniciar reconhecimento
       console.log('Iniciando reconhecimento de voz');
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognitionInstance = new SpeechRecognition();
       
       recognitionInstance.continuous = true;
