@@ -3236,43 +3236,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           </div>
         </div>
 
-        {/* Sugestões de Lucro */}
-        <div className="mb-6">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <span className="text-xl">💡</span>
-            <span className="font-semibold text-gray-700 text-lg">Sugestões de Lucro (baseado no saldo inicial):</span>
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-6">
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-center">
-              <div className="text-sm text-blue-600 mb-2 font-semibold">+2.34%</div>
-              <div className="text-base font-bold text-blue-800">
-                R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0234).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </div>
-            
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200 text-center">
-              <div className="text-sm text-green-600 mb-2 font-semibold">+3.73%</div>
-              <div className="text-base font-bold text-green-800">
-                R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0373).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </div>
-            
-            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 text-center">
-              <div className="text-sm text-purple-600 mb-2 font-semibold">+4.73%</div>
-              <div className="text-base font-bold text-purple-800">
-                R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0473).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </div>
-            
-            <div className="bg-orange-50 p-4 rounded-lg border border-orange-200 text-center">
-              <div className="text-sm text-orange-600 mb-2 font-semibold">+10%</div>
-              <div className="text-base font-bold text-orange-800">
-                R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </div>
-          </div>
-        </div>
+
 
         {/* Botões de Ação */}
         <div className="flex gap-4 justify-between">
@@ -3457,47 +3421,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             </div>
           </div>
 
-          {/* Sugestões de Lucro */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-xl">💡</span>
-              <h3 className="text-lg font-semibold text-gray-800">Sugestões de Lucro (baseado no saldo inicial):</h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Sugestão +2.34% */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center cursor-pointer hover:bg-blue-100 transition-colors">
-                <div className="text-blue-600 font-semibold text-lg mb-1">+2.34%</div>
-                <div className="text-blue-800 font-bold text-xl">
-                  {`R$ ${(((editSaldoInicial || 0) * 1.0234)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                </div>
-              </div>
 
-              {/* Sugestão +3.73% */}
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center cursor-pointer hover:bg-green-100 transition-colors">
-                <div className="text-green-600 font-semibold text-lg mb-1">+3.73%</div>
-                <div className="text-green-800 font-bold text-xl">
-                  {`R$ ${(((editSaldoInicial || 0) * 1.0373)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                </div>
-              </div>
-
-              {/* Sugestão +4.73% */}
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center cursor-pointer hover:bg-purple-100 transition-colors">
-                <div className="text-purple-600 font-semibold text-lg mb-1">+4.73%</div>
-                <div className="text-purple-800 font-bold text-xl">
-                  {`R$ ${(((editSaldoInicial || 0) * 1.0473)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                </div>
-              </div>
-
-              {/* Sugestão +10% */}
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center cursor-pointer hover:bg-orange-100 transition-colors">
-                <div className="text-orange-600 font-semibold text-lg mb-1">+10%</div>
-                <div className="text-orange-800 font-bold text-xl">
-                  {`R$ ${(((editSaldoInicial || 0) * 1.10)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Botões */}
           <div className="flex gap-3 justify-end">
@@ -3618,55 +3542,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             </div>
           </div>
 
-          {/* Sugestões de Lucro */}
-          <div className="mb-6">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <span className="text-xl">💡</span>
-              <span className="font-semibold text-gray-700 text-lg">Sugestões de Lucro (baseado no saldo inicial):</span>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-              <div 
-                onClick={() => setCreateSaldoAtual(createSaldoInicial * 1.0234)}
-                className="bg-blue-50 p-4 rounded-lg border border-blue-200 cursor-pointer hover:bg-blue-100 transition-colors text-center"
-              >
-                <div className="text-sm text-blue-600 mb-2 font-semibold">+2.34%</div>
-                <div className="text-base font-bold text-blue-800">
-                  R$ {(createSaldoInicial * 1.0234).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-              </div>
-              
-              <div 
-                onClick={() => setCreateSaldoAtual(createSaldoInicial * 1.0373)}
-                className="bg-green-50 p-4 rounded-lg border border-green-200 cursor-pointer hover:bg-green-100 transition-colors text-center"
-              >
-                <div className="text-sm text-green-600 mb-2 font-semibold">+3.73%</div>
-                <div className="text-base font-bold text-green-800">
-                  R$ {(createSaldoInicial * 1.0373).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-              </div>
-              
-              <div 
-                onClick={() => setCreateSaldoAtual(createSaldoInicial * 1.0473)}
-                className="bg-purple-50 p-4 rounded-lg border border-purple-200 cursor-pointer hover:bg-purple-100 transition-colors text-center"
-              >
-                <div className="text-sm text-purple-600 mb-2 font-semibold">+4.73%</div>
-                <div className="text-base font-bold text-purple-800">
-                  R$ {(createSaldoInicial * 1.0473).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-              </div>
-              
-              <div 
-                onClick={() => setCreateSaldoAtual(createSaldoInicial * 1.10)}
-                className="bg-orange-50 p-4 rounded-lg border border-orange-200 cursor-pointer hover:bg-orange-100 transition-colors text-center"
-              >
-                <div className="text-sm text-orange-600 mb-2 font-semibold">+10%</div>
-                <div className="text-base font-bold text-orange-800">
-                  R$ {(createSaldoInicial * 1.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-              </div>
-            </div>
-          </div>
+
 
           {/* Botões de ação */}
           <div className="flex gap-4 justify-end">

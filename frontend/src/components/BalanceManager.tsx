@@ -186,56 +186,7 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
           </div>
         </div>
 
-        {/* Sugestões de Lucro */}
-        <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
-          <h4 className="font-semibold text-purple-800 mb-2">💡 Sugestões</h4>
-          <div className="space-y-2">
-            {/* Lucro de 3% */}
-            <div className="bg-white p-2 rounded border border-purple-100">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-purple-700">Lucro de 3%</span>
-                <div className="text-right">
-                  <div className="text-xs text-gray-600">
-                    +R$ {(balance * 0.03).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-sm font-bold text-purple-600">
-                    R$ {(balance * 1.03).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            {/* Lucro de 5% */}
-            <div className="bg-white p-2 rounded border border-purple-100">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-purple-700">Lucro de 5%</span>
-                <div className="text-right">
-                  <div className="text-xs text-gray-600">
-                    +R$ {(balance * 0.05).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-sm font-bold text-purple-600">
-                    R$ {(balance * 1.05).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Lucro de 10% */}
-            <div className="bg-white p-2 rounded border border-purple-100">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-purple-700">Lucro de 10%</span>
-                <div className="text-right">
-                  <div className="text-xs text-gray-600">
-                    +R$ {(balance * 0.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-sm font-bold text-purple-600">
-                    R$ {(balance * 1.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Ajuste Manual do Saldo */}

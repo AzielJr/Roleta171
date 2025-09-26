@@ -406,41 +406,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
           </button>
         </div>
 
-        {/* Sugestões de Lucro */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            💡 Sugestões de Lucro (baseado no saldo inicial):
-          </label>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[2.34, 3.73, 4.73, 10.00].map((percentage, index) => {
-              const saldoInicialNum = parseFloat(saldoInicial) || 0;
-              const suggestedValue = saldoInicialNum * (1 + percentage / 100);
-              
-              // Cores diferentes para cada card
-              const colors = [
-                { bg: 'bg-blue-50', border: 'border-blue-200', hover: 'hover:bg-blue-100', textMedium: 'text-blue-700', textBold: 'text-blue-800' },
-                { bg: 'bg-green-50', border: 'border-green-200', hover: 'hover:bg-green-100', textMedium: 'text-green-700', textBold: 'text-green-800' },
-                { bg: 'bg-purple-50', border: 'border-purple-200', hover: 'hover:bg-purple-100', textMedium: 'text-purple-700', textBold: 'text-purple-800' },
-                { bg: 'bg-orange-50', border: 'border-orange-200', hover: 'hover:bg-orange-100', textMedium: 'text-orange-700', textBold: 'text-orange-800' }
-              ];
-              const color = colors[index];
-              
-              return (
-                <div
-                  key={percentage}
-                  className={`p-3 ${color.bg} border ${color.border} rounded-lg transition-colors text-center`}
-                >
-                  <div className={`text-sm font-medium ${color.textMedium}`}>+{percentage}%</div>
-                  <div className={`text-lg font-bold ${color.textBold}`}>
-                    R$ {suggestedValue.toLocaleString('pt-BR', { 
-                      minimumFractionDigits: 2, 
-                      maximumFractionDigits: 2 
-                    })}
-                  </div>
-                </div>
-              );
-            })}</div>
-        </div>
+
 
       </div>
     );
@@ -682,42 +648,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
             </div>
           </div>
 
-          {/* Sugestões de Lucro */}
-          <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            💡 Sugestões de Lucro (baseado no saldo inicial):
-          </label>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[2.34, 3.73, 4.73, 10.00].map((percentage, index) => {
-              const saldoInicialNum = parseFloat(saldoInicial) || 0;
-              const suggestedValue = saldoInicialNum * (1 + percentage / 100);
-              
-              // Cores diferentes para cada card
-              const colors = [
-                { bg: 'bg-blue-50', border: 'border-blue-200', hover: 'hover:bg-blue-100', textMedium: 'text-blue-700', textBold: 'text-blue-800' },
-                { bg: 'bg-green-50', border: 'border-green-200', hover: 'hover:bg-green-100', textMedium: 'text-green-700', textBold: 'text-green-800' },
-                { bg: 'bg-purple-50', border: 'border-purple-200', hover: 'hover:bg-purple-100', textMedium: 'text-purple-700', textBold: 'text-purple-800' },
-                { bg: 'bg-orange-50', border: 'border-orange-200', hover: 'hover:bg-orange-100', textMedium: 'text-orange-700', textBold: 'text-orange-800' }
-              ];
-              const color = colors[index];
-              
-              return (
-                <div
-                  key={percentage}
-                  className={`p-3 ${color.bg} border ${color.border} rounded-lg transition-colors text-center`}
-                >
-                  <div className={`text-sm font-medium ${color.textMedium}`}>+{percentage}%</div>
-                  <div className={`text-lg font-bold ${color.textBold}`}>
-                    R$ {suggestedValue.toLocaleString('pt-BR', { 
-                      minimumFractionDigits: 2, 
-                      maximumFractionDigits: 2 
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+
 
         {/* Botões de Ação no Modo Edição */}
         <div className="flex justify-end space-x-3 mt-6">
