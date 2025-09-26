@@ -2929,7 +2929,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           >
         {/* Cabeçalho com título à esquerda e total à direita */}
         <div className="flex justify-between items-center -mt-1.5" style={{marginBottom: '3px'}}>
-          <h3 className="text-white font-bold text-sm">📊 Estatística de Rodadas</h3>
+          <h3 className="text-white font-bold text-sm">📊 Estatística das Rodadas</h3>
           <div className="text-white text-sm">
             <span className="text-gray-300">Total de Números: </span>
             <span className="font-bold text-yellow-300" style={{fontSize: '17px'}}>{lastNumbers.length}</span>

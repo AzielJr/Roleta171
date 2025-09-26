@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Statistics } from '../types/roulette';
 import { useStatistics } from '../hooks/useStatistics';
 
+// Sequência real da roleta (Race)
+const ROULETTE_SEQUENCE = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+
 interface StatisticsCardsProps {
   statistics: Statistics;
   patternDetectedCount?: number;
@@ -15,9 +18,86 @@ interface StatisticsCardsProps {
     wins: number;
     losses: number;
   };
+  pattern171ForcedStats?: {
+    wins: number;
+    losses: number;
+  };
 }
 
-export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 } }: StatisticsCardsProps) {
+// Função para calcular números expostos no padrão 171 Forçado
+const calculate171ForcedExposedNumbers = (selectedNumber: number): number[] => {
+  const position = ROULETTE_SEQUENCE.indexOf(selectedNumber);
+  if (position === -1) return [];
+  
+  // Voltar 3 posições e pegar 7 números consecutivos
+  const startIndex = (position - 3 + 37) % 37;
+  const exposedNumbers: number[] = [];
+  
+  for (let i = 0; i < 7; i++) {
+    const index = (startIndex + i) % 37;
+    exposedNumbers.push(ROULETTE_SEQUENCE[index]);
+  }
+  
+  return exposedNumbers;
+};
+
+// Função para determinar WIN ou LOSS no padrão 171 Forçado
+const determine171ForcedResult = (selectedNumber: number, nextNumber: number): 'WIN' | 'LOSS' | null => {
+  const exposedNumbers = calculate171ForcedExposedNumbers(selectedNumber);
+  if (exposedNumbers.length === 0) return null;
+  
+  // Os 30 números apostados são todos os outros (não expostos)
+  const betNumbers = ROULETTE_SEQUENCE.filter(num => !exposedNumbers.includes(num));
+  
+  // Primeiro e último dos números expostos (também são WIN)
+  const firstExposed = exposedNumbers[0];
+  const lastExposed = exposedNumbers[6];
+  
+  // Os 5 números do meio dos expostos (são LOSS)
+  const middleExposed = exposedNumbers.slice(1, 6); // índices 1, 2, 3, 4, 5
+  
+  // WIN: próximo número é um dos 30 apostados OU primeiro/último exposto
+  if (betNumbers.includes(nextNumber) || nextNumber === firstExposed || nextNumber === lastExposed) {
+    return 'WIN';
+  }
+  
+  // LOSS: próximo número é um dos 5 números do meio dos expostos
+  if (middleExposed.includes(nextNumber)) {
+    return 'LOSS';
+  }
+  
+  return null;
+};
+
+// Função para calcular estatísticas do 171 Forçado baseado nos últimos números
+const calculate171ForcedStats = (lastNumbers: number[]): { wins: number; losses: number } => {
+  let wins = 0;
+  let losses = 0;
+  
+  // Precisa de pelo menos 2 números para fazer a análise
+  if (lastNumbers.length < 2) {
+    return { wins, losses };
+  }
+  
+  // Analisar cada par de números consecutivos
+  // lastNumbers[0] é o mais recente, lastNumbers[1] é o anterior, etc.
+  for (let i = 1; i < lastNumbers.length; i++) {
+    const currentNumber = lastNumbers[i]; // Número que foi selecionado
+    const nextNumber = lastNumbers[i - 1]; // Próximo número que saiu
+    
+    const result = determine171ForcedResult(currentNumber, nextNumber);
+    
+    if (result === 'WIN') {
+      wins++;
+    } else if (result === 'LOSS') {
+      losses++;
+    }
+  }
+  
+  return { wins, losses };
+};
+
+export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 } }: StatisticsCardsProps) {
   const {
     totalNumbers,
     colorPercentages,
@@ -26,6 +106,11 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     dozensPercentages,
     columnsPercentages
   } = useStatistics(statistics);
+
+  // Calcular estatísticas do 171 Forçado baseado nos últimos números
+  const calculated171ForcedStats = React.useMemo(() => {
+    return calculate171ForcedStats(lastNumbers);
+  }, [lastNumbers]);
 
   // Estados para controlar as animações de cada categoria
   const [animatingColumns, setAnimatingColumns] = useState<Set<number>>(new Set());
@@ -219,8 +304,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 
   return (
     <div className="space-y-3">
-      {/* Grid com todos os 6 cards em uma linha */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
+      {/* Grid com todos os 7 cards em uma linha */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-1 lg:gap-2">
         <StatCard
           title="Cores"
           data={[
@@ -275,10 +360,19 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
         />
 
         <StatCard
+          title="171 Forçado (5)"
+          data={[
+            { label: 'WIN', value: calculated171ForcedStats.wins, percentage: (calculated171ForcedStats.wins + calculated171ForcedStats.losses) > 0 ? Math.round((calculated171ForcedStats.wins / (calculated171ForcedStats.wins + calculated171ForcedStats.losses)) * 100) : 0 },
+            { label: 'LOSS', value: calculated171ForcedStats.losses, percentage: (calculated171ForcedStats.wins + calculated171ForcedStats.losses) > 0 ? Math.round((calculated171ForcedStats.losses / (calculated171ForcedStats.wins + calculated171ForcedStats.losses)) * 100) : 0 }
+          ]}
+          colors={['bg-green-500', 'bg-red-500']}
+        />
+
+        <StatCard
           title={
             <div className="flex justify-between items-center w-full">
               <span>📊 171</span>
-              <span className="font-normal text-xs text-gray-500">Qtd: <span className="font-bold text-white">{numbersWithoutPattern}</span> - Méd: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span></span>
+              <span className="font-normal text-xs text-gray-500">Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span></span>
             </div>
           }
           data={[
