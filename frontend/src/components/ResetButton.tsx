@@ -68,7 +68,7 @@ export function ResetButton({ onReset, disabled = false }: ResetButtonProps) {
         `}
         title={disabled ? 'Nenhum dado para limpar' : 'Limpar todos os dados'}
       >
-        <span className="text-xl">🔄</span>
+        <span className="text-xl">↻</span>
         Limpar Dados
       </button>
       

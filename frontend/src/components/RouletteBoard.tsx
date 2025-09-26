@@ -9,6 +9,7 @@ import { checkForRaceCondition } from '../utils/alertLogic';
 import { useAuth } from '../contexts/AuthContext';
 import { useBalance } from '../contexts/BalanceContext';
 import { HistoricoSaldos } from './HistoricoSaldos';
+import { MonthlyGraphModal } from './MonthlyGraphModal';
 
 interface SelectedNumbers {
   numbers: number[];
@@ -47,6 +48,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   
   // Estado para controlar o modal de histórico de saldos
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  
+  // Estado para controlar o modal de gráfico mensal
+  const [showMonthlyGraphModal, setShowMonthlyGraphModal] = useState(false);
   
   // Estados para os filtros do histórico (datas locais)
   const formatDateLocal = (d: Date) => {
@@ -420,6 +424,22 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Estado para controlar o modal de adicionar números
   const [showAddNumbersModal, setShowAddNumbersModal] = useState(false);
   const [addNumbersInput, setAddNumbersInput] = useState('');
+  
+  // Estados para reconhecimento de voz
+  const [isListening, setIsListening] = useState(false);
+  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  const [voiceBuffer, setVoiceBuffer] = useState<string>(''); // Buffer para acumular dígitos falados
+  
+  // Estados para reconhecimento de voz da roleta
+  const [isRouletteListening, setIsRouletteListening] = useState(false);
+  const [rouletteRecognition, setRouletteRecognition] = useState<SpeechRecognition | null>(null);
+  const [rouletteVoiceBuffer, setRouletteVoiceBuffer] = useState<string>(''); // Buffer para acumular dígitos da roleta
+  
+  // Estados para popup de feedback de voz
+  const [showVoicePopup, setShowVoicePopup] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState<string>('');
+  const [voiceDigits, setVoiceDigits] = useState<string>('');
+  
   const drawnHistoryRef = useRef<number[]>([]);
   
   // Estado para controlar padrão forçado
@@ -515,6 +535,397 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [patternAlert]);
+
+  // useEffect para inicializar o reconhecimento de voz
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const recognitionInstance = new SpeechRecognition();
+      
+      recognitionInstance.continuous = true; // Mudança para contínuo
+      recognitionInstance.interimResults = true; // Permitir resultados intermediários
+      recognitionInstance.lang = 'pt-BR';
+      
+      recognitionInstance.onresult = (event: any) => {
+        let transcript = '';
+        // Processar tanto resultados finais quanto intermediários para tempo real
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            transcript += event.results[i][0].transcript;
+          } else {
+            // Também processar resultados intermediários para tempo real
+            transcript += event.results[i][0].transcript;
+          }
+        }
+        if (transcript) {
+          processVoiceInputContinuous(transcript);
+        }
+      };
+      
+      recognitionInstance.onerror = (event: any) => {
+        console.error('Erro no reconhecimento de voz:', event.error);
+        if (event.error === 'no-speech' || event.error === 'audio-capture') {
+          // Reiniciar automaticamente em caso de erro de captura
+          if (isListening) {
+            setTimeout(() => {
+              recognitionInstance.start();
+            }, 1000);
+          }
+        } else {
+          setIsListening(false);
+        }
+      };
+      
+      recognitionInstance.onend = () => {
+        // Reiniciar automaticamente se ainda estiver no modo listening
+        if (isListening) {
+          setTimeout(() => {
+            recognitionInstance.start();
+          }, 100);
+        }
+      };
+      
+      setRecognition(recognitionInstance);
+    }
+  }, [isListening]);
+
+  // Função para processar entrada de voz contínua em tempo real
+  const processVoiceInputContinuous = (transcript: string) => {
+    // Converter palavras em números
+    const wordToNumber: { [key: string]: string } = {
+      'zero': '0', 'um': '1', 'dois': '2', 'três': '3', 'quatro': '4', 'cinco': '5',
+      'seis': '6', 'sete': '7', 'oito': '8', 'nove': '9', 'dez': '10',
+      'onze': '11', 'doze': '12', 'treze': '13', 'quatorze': '14', 'quinze': '15',
+      'dezesseis': '16', 'dezessete': '17', 'dezoito': '18', 'dezenove': '19',
+      'vinte': '20', 'vinte e um': '21', 'vinte e dois': '22', 'vinte e três': '23',
+      'vinte e quatro': '24', 'vinte e cinco': '25', 'vinte e seis': '26',
+      'vinte e sete': '27', 'vinte e oito': '28', 'vinte e nove': '29',
+      'trinta': '30', 'trinta e um': '31', 'trinta e dois': '32', 'trinta e três': '33',
+      'trinta e quatro': '34', 'trinta e cinco': '35', 'trinta e seis': '36'
+    };
+
+    let processedText = transcript.toLowerCase().trim();
+    
+    // Substituir palavras por números
+    Object.keys(wordToNumber).forEach(word => {
+      const regex = new RegExp(`\\b${word}\\b`, 'g');
+      processedText = processedText.replace(regex, wordToNumber[word]);
+    });
+
+    // Extrair apenas dígitos individuais
+    const digits = processedText.match(/\d/g);
+    
+    if (digits) {
+      // Adicionar cada dígito ao buffer
+      let newBuffer = voiceBuffer;
+      digits.forEach(digit => {
+        newBuffer += digit;
+      });
+      
+      // Processar buffer para formar números de 2 dígitos
+      let formattedNumbers: string[] = [];
+      let currentBuffer = newBuffer;
+      
+      while (currentBuffer.length >= 2) {
+        const twoDigits = currentBuffer.substring(0, 2);
+        const number = parseInt(twoDigits);
+        
+        if (number >= 0 && number <= 36) {
+          formattedNumbers.push(twoDigits);
+          currentBuffer = currentBuffer.substring(2);
+        } else {
+          // Se o número não é válido, tentar com apenas 1 dígito
+          const oneDigit = currentBuffer.substring(0, 1);
+          const singleNumber = parseInt(oneDigit);
+          if (singleNumber >= 0 && singleNumber <= 9) {
+            formattedNumbers.push('0' + oneDigit);
+            currentBuffer = currentBuffer.substring(1);
+          } else {
+            currentBuffer = currentBuffer.substring(1);
+          }
+        }
+      }
+      
+      // Atualizar o buffer com os dígitos restantes
+      setVoiceBuffer(currentBuffer);
+      
+      // Atualizar o campo de texto se temos números formatados - INSERIR NO INÍCIO
+      if (formattedNumbers.length > 0) {
+        const currentInput = addNumbersInput;
+        const newNumbers = formattedNumbers.join(',');
+        // Inserir no INÍCIO do campo (ordem reversa)
+        const newInput = currentInput ? `${newNumbers},${currentInput}` : newNumbers;
+        setAddNumbersInput(newInput);
+      }
+    }
+  };
+
+  // Função para iniciar/parar reconhecimento de voz
+  const toggleVoiceRecognition = () => {
+    if (!recognition) {
+      alert('Reconhecimento de voz não suportado neste navegador');
+      return;
+    }
+    
+    if (isListening) {
+      recognition.stop();
+      setIsListening(false);
+    } else {
+      recognition.start();
+      setIsListening(true);
+    }
+  };
+
+  // Função para processar entrada de voz contínua da roleta (baseada na que funciona)
+  const processRouletteVoiceInputContinuous = (transcript: string) => {
+    console.log('Processando entrada de voz da roleta (contínua):', transcript);
+    
+    // Atualizar popup com o que foi falado
+    setVoiceTranscript(transcript);
+    setShowVoicePopup(true);
+    
+    // Converter palavras em números (mesma lógica da tela principal)
+    const wordToNumber: { [key: string]: string } = {
+      'zero': '0', 'um': '1', 'dois': '2', 'três': '3', 'quatro': '4', 'cinco': '5',
+      'seis': '6', 'sete': '7', 'oito': '8', 'nove': '9', 'dez': '10',
+      'onze': '11', 'doze': '12', 'treze': '13', 'quatorze': '14', 'quinze': '15',
+      'dezesseis': '16', 'dezessete': '17', 'dezoito': '18', 'dezenove': '19',
+      'vinte': '20', 'vinte e um': '21', 'vinte e dois': '22', 'vinte e três': '23',
+      'vinte e quatro': '24', 'vinte e cinco': '25', 'vinte e seis': '26',
+      'vinte e sete': '27', 'vinte e oito': '28', 'vinte e nove': '29',
+      'trinta': '30', 'trinta e um': '31', 'trinta e dois': '32', 'trinta e três': '33',
+      'trinta e quatro': '34', 'trinta e cinco': '35', 'trinta e seis': '36'
+    };
+
+    let processedText = transcript.toLowerCase().trim();
+    
+    // Substituir palavras por números
+    Object.keys(wordToNumber).forEach(word => {
+      const regex = new RegExp(`\\b${word}\\b`, 'g');
+      processedText = processedText.replace(regex, wordToNumber[word]);
+    });
+
+    // Extrair apenas dígitos individuais
+    const digits = processedText.match(/\d/g);
+    
+    if (digits) {
+      console.log('Dígitos extraídos:', digits);
+      
+      // Adicionar cada dígito ao buffer
+      let newBuffer = rouletteVoiceBuffer;
+      digits.forEach(digit => {
+        newBuffer += digit;
+      });
+      
+      console.log('Novo buffer:', newBuffer);
+      
+      // Processar buffer para formar números de 2 dígitos
+      let numbersAdded = false;
+      let currentBuffer = newBuffer;
+      
+      while (currentBuffer.length >= 2) {
+        const twoDigits = currentBuffer.substring(0, 2);
+        const number = parseInt(twoDigits);
+        
+        console.log('Processando par:', twoDigits, 'Número:', number);
+        
+        if (number >= 0 && number <= 36) {
+          console.log(`Adicionando número ${number} aos últimos números via voz`);
+          addToLastNumbers(number);
+          addToHistoryWithoutPopup(number); // Adicionar ao histórico para atualizar estatísticas
+          numbersAdded = true;
+          currentBuffer = currentBuffer.substring(2);
+          
+          // Atualizar popup com o número adicionado
+          setVoiceDigits(`${number.toString().padStart(2, '0')}`);
+        } else {
+          // Se o número não é válido, tentar com apenas 1 dígito
+          const oneDigit = currentBuffer.substring(0, 1);
+          const singleNumber = parseInt(oneDigit);
+          if (singleNumber >= 0 && singleNumber <= 9) {
+            console.log(`Adicionando número 0${singleNumber} aos últimos números via voz`);
+            addToLastNumbers(singleNumber);
+            addToHistoryWithoutPopup(singleNumber); // Adicionar ao histórico para atualizar estatísticas
+            numbersAdded = true;
+            setVoiceDigits(`0${singleNumber}`);
+            currentBuffer = currentBuffer.substring(1);
+          } else {
+            currentBuffer = currentBuffer.substring(1);
+          }
+        }
+      }
+      
+      // Atualizar o buffer com os dígitos restantes
+      setRouletteVoiceBuffer(currentBuffer);
+      console.log('Buffer restante:', currentBuffer);
+      
+      // Se números foram adicionados, fechar popup após delay
+      if (numbersAdded) {
+        setTimeout(() => {
+          setShowVoicePopup(false);
+          setVoiceTranscript('');
+          setVoiceDigits('');
+          setRouletteVoiceBuffer(''); // Limpar buffer após sucesso
+        }, 1500);
+      }
+    }
+  };
+
+  // Função para verificar permissão de microfone
+  const checkMicrophonePermission = async () => {
+    try {
+      console.log('Verificando permissão de microfone...');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('Permissão de microfone concedida');
+      // Parar o stream imediatamente após verificar a permissão
+      stream.getTracks().forEach(track => track.stop());
+      return true;
+    } catch (error) {
+      console.error('Erro ao verificar permissão de microfone:', error);
+      alert('Permissão de microfone negada. Por favor, permita o acesso ao microfone e tente novamente.');
+      return false;
+    }
+  };
+
+  // Função para iniciar/parar reconhecimento de voz da roleta
+  const toggleRouletteVoiceRecognition = async () => {
+    console.log('toggleRouletteVoiceRecognition chamado, isRouletteListening:', isRouletteListening);
+    
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Reconhecimento de voz não suportado neste navegador');
+      return;
+    }
+
+    if (isRouletteListening) {
+      // Parar reconhecimento
+      console.log('Parando reconhecimento de voz');
+      if (rouletteRecognition) {
+        rouletteRecognition.stop();
+      }
+      setIsRouletteListening(false);
+      setRouletteVoiceBuffer(''); // Limpar buffer ao parar
+      setShowVoicePopup(false); // Fechar popup
+      setVoiceTranscript('');
+      setVoiceDigits('');
+    } else {
+      // Verificar permissão de microfone primeiro
+      const hasPermission = await checkMicrophonePermission();
+      if (!hasPermission) {
+        return;
+      }
+
+      // Iniciar reconhecimento
+      console.log('Iniciando reconhecimento de voz');
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognitionInstance = new SpeechRecognition();
+      
+      recognitionInstance.continuous = true;
+      recognitionInstance.interimResults = true;
+      recognitionInstance.lang = 'pt-BR';
+      recognitionInstance.maxAlternatives = 1;
+      
+      console.log('Configuração do reconhecimento:', {
+        continuous: recognitionInstance.continuous,
+        interimResults: recognitionInstance.interimResults,
+        lang: recognitionInstance.lang,
+        maxAlternatives: recognitionInstance.maxAlternatives
+      });
+      
+      recognitionInstance.onstart = () => {
+        console.log('Reconhecimento de voz iniciado com sucesso');
+        setVoiceTranscript('Escutando...');
+      };
+      
+      recognitionInstance.onresult = (event) => {
+        console.log('Evento onresult disparado:', event);
+        console.log('Número de resultados:', event.results.length);
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          const transcript = result[0].transcript.trim();
+          const confidence = result[0].confidence;
+          const isFinal = result.isFinal;
+          
+          console.log('Resultado:', {
+            transcript,
+            confidence,
+            isFinal,
+            resultIndex: i
+          });
+          
+          if (transcript) {
+            setVoiceTranscript(transcript);
+            if (isFinal) {
+              console.log('Processando transcript final:', transcript);
+              processRouletteVoiceInputContinuous(transcript);
+            }
+          }
+        }
+      };
+      
+      recognitionInstance.onerror = (event) => {
+        console.error('Erro no reconhecimento de voz da roleta:', event.error);
+        console.error('Detalhes do erro:', event);
+        
+        let errorMessage = 'Erro no reconhecimento de voz: ';
+        switch (event.error) {
+          case 'not-allowed':
+            errorMessage += 'Permissão negada. Permita o acesso ao microfone.';
+            break;
+          case 'no-speech':
+            errorMessage += 'Nenhuma fala detectada.';
+            break;
+          case 'audio-capture':
+            errorMessage += 'Erro na captura de áudio.';
+            break;
+          case 'network':
+            errorMessage += 'Erro de rede.';
+            break;
+          default:
+            errorMessage += event.error;
+        }
+        
+        setVoiceTranscript(errorMessage);
+        
+        // Parar reconhecimento em caso de erro crítico
+        if (['not-allowed', 'audio-capture'].includes(event.error)) {
+          setIsRouletteListening(false);
+          setShowVoicePopup(false);
+        }
+      };
+      
+      recognitionInstance.onend = () => {
+        console.log('Reconhecimento de voz terminou');
+        if (isRouletteListening) {
+          // Reiniciar automaticamente se ainda estiver ativo
+          setTimeout(() => {
+            if (isRouletteListening) {
+              console.log('Reiniciando reconhecimento automaticamente');
+              try {
+                recognitionInstance.start();
+              } catch (error) {
+                console.error('Erro ao reiniciar reconhecimento:', error);
+                setIsRouletteListening(false);
+                setShowVoicePopup(false);
+              }
+            }
+          }, 100);
+        }
+      };
+      
+      setRouletteRecognition(recognitionInstance);
+      
+      try {
+        recognitionInstance.start();
+        console.log('Comando start() executado');
+        setIsRouletteListening(true);
+        setShowVoicePopup(true); // Mostrar popup
+      } catch (error) {
+        console.error('Erro ao iniciar reconhecimento:', error);
+        alert('Erro ao iniciar reconhecimento de voz: ' + error.message);
+      }
+    }
+  };
 
   // Função para obter vizinhos de um número na sequência da roleta
   const getNeighbors = (number: number, count: number): number[] => {
@@ -1608,28 +2019,74 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 Digite os números separados por vírgula (ex: 01,36,00,16,17)
               </p>
               
-              <textarea
-                ref={(el) => {
-                  if (el && showAddNumbersModal) {
-                    setTimeout(() => el.focus(), 100);
-                  }
-                }}
-                value={addNumbersInput}
-                onChange={(e) => setAddNumbersInput(e.target.value)}
-                placeholder="01,36,00,16,17,00,26..."
-                className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={3}
-              />
+              <div className="relative">
+                <textarea
+                  ref={(el) => {
+                    if (el && showAddNumbersModal) {
+                      setTimeout(() => el.focus(), 100);
+                    }
+                  }}
+                  value={addNumbersInput}
+                  onChange={(e) => setAddNumbersInput(e.target.value)}
+                  placeholder="01,36,00,16,17,00,26..."
+                  className="w-full p-3 pr-12 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                />
+                
+                {/* Botão de microfone */}
+                <button
+                  onClick={toggleVoiceRecognition}
+                  className={`absolute top-3 right-3 p-2 rounded-full transition-all duration-200 ${
+                    isListening 
+                      ? 'bg-red-500 text-white animate-pulse shadow-lg ring-2 ring-red-300' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                  title={isListening ? 'Parar gravação contínua (clique para parar)' : 'Iniciar gravação contínua (fale os números)'}
+                >
+                  {isListening ? (
+                    // Ícone de "parar" quando está gravando
+                    <svg 
+                      width="16" 
+                      height="16" 
+                      viewBox="0 0 24 24" 
+                      fill="currentColor"
+                    >
+                      <rect x="6" y="6" width="12" height="12" rx="2"/>
+                    </svg>
+                  ) : (
+                    // Ícone de microfone quando não está gravando
+                    <svg 
+                      width="16" 
+                      height="16" 
+                      viewBox="0 0 24 24" 
+                      fill="currentColor"
+                    >
+                      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                      <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                    </svg>
+                  )}
+                </button>
+              </div>
               
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={() => {
                     setShowAddNumbersModal(false);
                     setAddNumbersInput('');
+                    setVoiceBuffer(''); // Limpar também o buffer de voz
                   }}
                   className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg transition-colors"
                 >
                   Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    setAddNumbersInput('');
+                    setVoiceBuffer(''); // Limpar também o buffer de voz
+                  }}
+                  className="flex-1 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors"
+                >
+                  Limpar
                 </button>
                 <button
                   onClick={processAddedNumbers}
@@ -1639,6 +2096,49 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Popup de feedback de voz para roleta */}
+      {showVoicePopup && (
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white border-2 border-blue-500 rounded-xl shadow-2xl p-6 z-50 min-w-[450px] max-w-[600px]">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="font-bold text-lg text-gray-800">Reconhecimento de Voz Ativo</span>
+            </div>
+            <button
+              onClick={() => {
+                if (isRouletteListening) {
+                  toggleRouletteVoiceRecognition();
+                }
+                setShowVoicePopup(false);
+                setVoiceTranscript('');
+                setVoiceDigits('');
+              }}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-md hover:shadow-lg"
+            >
+              Fechar
+            </button>
+          </div>
+          
+          <div className="mb-4">
+            <span className="text-sm font-semibold text-gray-700 mb-2 block">Texto Reconhecido:</span>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-base min-h-[50px] flex items-center">
+              <span className="text-gray-800">{voiceTranscript || 'Aguardando sua voz...'}</span>
+            </div>
+          </div>
+          
+          <div>
+            <span className="text-sm font-semibold text-gray-700 mb-2 block">Números Detectados:</span>
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-xl font-bold text-blue-800 min-h-[60px] flex items-center justify-center">
+              {voiceDigits || 'Nenhum número detectado'}
+            </div>
+          </div>
+          
+          <div className="mt-4 text-xs text-gray-500 text-center">
+            💡 Dica: Fale números de 0 a 36 claramente para melhor reconhecimento
           </div>
         </div>
       )}
@@ -1676,23 +2176,31 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           <button
             onClick={() => setShowAddNumbersModal(true)}
             className="bg-yellow-100 hover:bg-yellow-200 text-black text-xs rounded transition-colors font-semibold flex items-center justify-center"
-            style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
             title="Adicionar números já sorteados"
           >
             ➕
           </button>
           <button
+            onClick={() => setShowMonthlyGraphModal(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
+            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+            title="Gráfico Mensal - Visualizar lucros por período"
+          >
+            📊
+          </button>
+          <button
             onClick={() => setShowProfitModal(true)}
             className="bg-amber-800 hover:bg-amber-900 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
-            style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
             title="Calcular lucro com base em parâmetros financeiros"
           >
-            💰
+            📈
           </button>
           <button
             onClick={() => forcePattern171()}
-            className="bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
-            style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+            className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
+            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
             title="Forçar padrão 171: marcar 7 números expostos baseado no último número sorteado"
           >
             🎯
@@ -1702,13 +2210,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             className={cn(
               "text-xs rounded transition-colors font-semibold flex items-center justify-center",
               isAutoPattern171Active 
-                ? "bg-green-500 hover:bg-green-600 text-white ring-2 ring-green-300 animate-pulse" 
-                : "bg-gray-400 hover:bg-gray-500 text-white"
+                ? "bg-red-500 hover:bg-red-600 text-white ring-2 ring-red-300 animate-pulse" 
+                : "bg-red-400 hover:bg-red-500 text-white"
             )}
-            style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
             title={isAutoPattern171Active ? "Toggle ATIVO: Padrão 171 será aplicado automaticamente a cada número selecionado" : "Toggle INATIVO: Clique para ativar aplicação automática do padrão 171"}
           >
-            🔄
+            ↻
           </button>
           <button
             onClick={simulateAutoDrawing}
@@ -1718,7 +2226,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                  ? "bg-red-500 hover:bg-red-600 text-white" 
                  : "bg-gray-400 hover:bg-gray-500"
              )}
-            style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
             title={isSimulating ? "Parar simulação automática" : "Simular sorteio automático dos primeiros 50 números"}
           >
             {isSimulating ? (
@@ -1737,7 +2245,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           <button
             onClick={clearScreen}
             className="bg-white hover:bg-gray-100 text-black text-xs rounded transition-colors border border-gray-300 flex items-center justify-center"
-            style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
             title="Limpar toda a tela e iniciar novo sorteio"
           >
             🗑️
@@ -1746,7 +2254,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             <button
               onClick={onLogout}
               className="bg-orange-500 hover:bg-orange-600 text-white text-xs rounded transition-colors flex items-center justify-center"
-              style={{height: '20px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+              style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
               title="Sair do sistema"
             >
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -1765,9 +2273,24 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
             <button
               onClick={simulateDrawing}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-semibold transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 rounded transition-colors"
+              style={{height: '22px', fontSize: '13px'}}
+              title={isSimulating ? "Parar simulação automática" : "Simular sorteio automático dos primeiros 50 números"}
             >
-              Simular
+              Aleatório
+            </button>
+            
+            <button
+              onClick={toggleRouletteVoiceRecognition}
+              className={`${
+                isRouletteListening 
+                  ? 'bg-red-600 hover:bg-red-700 animate-pulse shadow-lg ring-2 ring-red-300' 
+                  : 'bg-green-600 hover:bg-green-700'
+              } text-white px-3 rounded transition-colors flex items-center justify-center`}
+              style={{height: '22px', fontSize: '13px'}}
+              title={isRouletteListening ? "Parar reconhecimento de voz" : "Iniciar reconhecimento de voz para seleção"}
+            >
+              Falar
             </button>
             
             <button
@@ -1780,7 +2303,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 }
               }}
               disabled={lastNumbers.length === 0}
-              className="bg-red-600 hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white px-3 py-1 rounded text-sm font-semibold transition-colors"
+              className="bg-red-600 hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white px-3 py-1 rounded transition-colors flex items-center justify-center"
+              style={{height: '22px', fontSize: '13px'}}
               title="Apagar Último"
             >
               Apagar
@@ -2328,8 +2852,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         <div className="flex justify-between items-center -mt-1.5" style={{marginBottom: '3px'}}>
           <h3 className="text-white font-bold text-sm">📊 Estatística de Rodadas</h3>
           <div className="text-white text-sm">
-            <span className="text-gray-300">Total de Números Chamados: </span>
-            <span className="font-bold text-yellow-300 text-base">{lastNumbers.length}</span>
+            <span className="text-gray-300">Total de Números: </span>
+            <span className="font-bold text-yellow-300" style={{fontSize: '17px'}}>{lastNumbers.length}</span>
           </div>
         </div>
         
@@ -2397,31 +2921,43 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             <div className="mt-4 pt-3 border-t border-green-400/30">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="text-center">
-                  <div className="text-white/60 text-xs mb-1">Sugestão</div>
-                  <div className="text-white/60 text-xs">(% Lucro)</div>
+                  <div className="text-white/60 text-sm mb-1">Sugestão</div>
+                  <div className="text-white/60 text-sm">(% Lucro)</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-yellow-200 text-xs mb-1">2,34%</div>
-                  <div className="text-white font-bold text-xs">
-                    R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0234).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <div className="text-yellow-200 text-sm mb-1">2,34%</div>
+                  <div className="text-white font-bold text-sm flex items-center justify-center gap-1">
+                    <span>R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0234).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-green-300 text-xs">
+                      ({((currentSaldoRecord?.saldo_inicial || 0) * 0.0234).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                    </span>
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-yellow-200 text-xs mb-1">3,73%</div>
-                  <div className="text-white font-bold text-xs">
-                    R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0373).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <div className="text-yellow-200 text-sm mb-1">3,73%</div>
+                  <div className="text-white font-bold text-sm flex items-center justify-center gap-1">
+                    <span>R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0373).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-green-300 text-xs">
+                      ({((currentSaldoRecord?.saldo_inicial || 0) * 0.0373).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                    </span>
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-yellow-200 text-xs mb-1">4,73%</div>
-                  <div className="text-white font-bold text-xs">
-                    R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0473).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <div className="text-yellow-200 text-sm mb-1">4,73%</div>
+                  <div className="text-white font-bold text-sm flex items-center justify-center gap-1">
+                    <span>R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0473).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-green-300 text-xs">
+                      ({((currentSaldoRecord?.saldo_inicial || 0) * 0.0473).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                    </span>
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-yellow-200 text-xs mb-1">10,00%</div>
-                  <div className="text-white font-bold text-xs">
-                    R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <div className="text-yellow-200 text-sm mb-1">10,00%</div>
+                  <div className="text-white font-bold text-sm flex items-center justify-center gap-1">
+                    <span>R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-green-300 text-xs">
+                      ({((currentSaldoRecord?.saldo_inicial || 0) * 0.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                    </span>
                   </div>
                 </div>
               </div>
@@ -3178,6 +3714,11 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     {/* Modal de Histórico de Saldos - reutilizando componente real */}
     {showHistoryModal && (
       <HistoricoSaldos onClose={() => setShowHistoryModal(false)} />
+    )}
+
+    {/* Modal de Gráfico Mensal */}
+    {showMonthlyGraphModal && (
+      <MonthlyGraphModal onClose={() => setShowMonthlyGraphModal(false)} />
     )}
     </>
   );

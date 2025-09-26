@@ -12,9 +12,9 @@ export interface Transaction {
 
 export const useSupabaseBalance = () => {
   const { user } = useAuth();
-  const [balance, setBalance] = useState<number>(0);
+  const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState<boolean>(true); // Iniciar com true para mostrar loading
+  const [loading, setLoading] = useState(false);
   const [currentSaldoRecord, setCurrentSaldoRecord] = useState<R171Saldo | null>(null);
   const [lastSaldoRecord, setLastSaldoRecord] = useState<R171Saldo | null>(null);
 

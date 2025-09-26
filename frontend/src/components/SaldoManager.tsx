@@ -463,7 +463,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Data
               </label>
-              <div className="text-xl font-bold text-gray-800">
+              <div className="text-3xl font-bold text-gray-800">
                 {currentSaldoRecord?.data ? (() => {
                   // CORREÇÃO: Usar formatação direta sem new Date() para evitar problemas de fuso horário
                   const [ano, mes, dia] = currentSaldoRecord.data.split('-');
@@ -477,7 +477,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
               <label className="block text-sm font-medium text-blue-700 mb-1">
                 Saldo Inicial
               </label>
-              <div className="text-xl font-bold text-blue-800">
+              <div className="text-3xl font-bold text-blue-800">
                 R$ {(currentSaldoRecord.saldo_inicial || 0).toLocaleString('pt-BR', { 
                   minimumFractionDigits: 2, 
                   maximumFractionDigits: 2 
@@ -490,7 +490,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
               <label className="block text-sm font-medium text-green-700 mb-1">
                 Saldo Atual
               </label>
-              <div className={`text-xl font-bold ${(currentSaldoRecord.saldo_atual || 0) >= 0 ? 'text-green-800' : 'text-amber-900'}`}>
+              <div className={`text-3xl font-bold ${(currentSaldoRecord.saldo_atual || 0) >= 0 ? 'text-green-800' : 'text-amber-900'}`}>
                 R$ {(currentSaldoRecord.saldo_atual || 0).toLocaleString('pt-BR', { 
                   minimumFractionDigits: 2, 
                   maximumFractionDigits: 2 
@@ -503,7 +503,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
               <label className="block text-sm font-medium text-yellow-700 mb-1">
                 Valor do Lucro
               </label>
-              <div className={`text-xl font-bold text-right ${(() => {
+              <div className={`text-3xl font-bold text-right ${(() => {
                 const vlrLucroDisplay = currentSaldoRecord.vlr_lucro !== null && currentSaldoRecord.vlr_lucro !== undefined 
                   ? currentSaldoRecord.vlr_lucro 
                   : (currentSaldoRecord.saldo_atual || 0) - (currentSaldoRecord.saldo_inicial || 0);
@@ -526,7 +526,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
               <label className="block text-sm font-medium text-purple-700 mb-1">
                 Percentual do Lucro
               </label>
-              <div className={`text-xl font-bold text-right ${(() => {
+              <div className={`text-3xl font-bold text-right ${(() => {
                 const perLucroDisplay = currentSaldoRecord.per_lucro !== null && currentSaldoRecord.per_lucro !== undefined 
                   ? currentSaldoRecord.per_lucro 
                   : (currentSaldoRecord.saldo_inicial || 0) !== 0 

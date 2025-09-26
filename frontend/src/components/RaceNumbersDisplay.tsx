@@ -26,15 +26,16 @@ const RaceNumbersDisplay: React.FC<RaceNumbersDisplayProps> = ({
 }) => {
   
   const getForceBlueClass = (num: number) => {
+    // Se o número está destacado em amarelo, não aplica classe azul
+    if (isHighlighted(num)) return '';
+    
     // Apenas os números base têm classe force-blue quando padrão é forçado
     if (isPatternActive && baseNumbers.length > 0 && baseNumbers.includes(num)) {
       return 'force-blue-number';
     }
     
-    // Números do card APOSTAR têm classe force-blue apenas quando padrão é detectado (não forçado)
-    if (isPatternActive && baseNumbers.length === 0 && betNumbers.includes(num)) {
-      return 'force-blue-number';
-    }
+    // NÃO aplica classe force-blue nos números do card APOSTAR (amarelos)
+    // Removido: if (isPatternActive && baseNumbers.length === 0 && betNumbers.includes(num))
     
     return '';
   };
@@ -79,15 +80,16 @@ const RaceNumbersDisplay: React.FC<RaceNumbersDisplayProps> = ({
     // Só aplica bordas especiais se o padrão estiver ativo
     if (!isPatternActive) return '';
     
-    // Apenas os números base têm borda branca oscilante quando padrão é forçado
+    // Se o número está destacado em amarelo, não aplica bordas especiais
+    if (isHighlighted(num)) return '';
+    
+    // Apenas os números base têm borda branca oscilante (números azuis)
     if (baseNumbers.length > 0 && baseNumbers.includes(num)) {
       return 'animate-pulse-white-border';
     }
     
-    // Números do card APOSTAR têm borda branca oscilante apenas quando padrão é detectado (não forçado)
-    if (baseNumbers.length === 0 && betNumbers.includes(num)) {
-      return 'animate-pulse-white-border';
-    }
+    // NÃO aplica oscilação nos números do card APOSTAR (amarelos)
+    // Removido: if (baseNumbers.length === 0 && betNumbers.includes(num))
     
     return '';
   };
@@ -96,6 +98,9 @@ const RaceNumbersDisplay: React.FC<RaceNumbersDisplayProps> = ({
   const getSpecialSizeClass = (num: number): string => {
     // Só aplica destaque especial se o padrão estiver ativo
     if (!isPatternActive) return '';
+    
+    // Se o número está destacado em amarelo, não aplica tamanho especial
+    if (isHighlighted(num)) return '';
     
     // Apenas os números base têm tamanho especial quando padrão é forçado
     if (baseNumbers.length > 0 && baseNumbers.includes(num)) {
@@ -115,21 +120,22 @@ const RaceNumbersDisplay: React.FC<RaceNumbersDisplayProps> = ({
     // Só aplica destaque especial se o padrão estiver ativo
     if (!isPatternActive) return '';
     
-    // Apenas os números base têm destaque especial quando padrão é forçado
+    // Se o número está destacado em amarelo, não aplica classes especiais
+    if (isHighlighted(num)) return '';
+    
+    // Apenas os números base têm destaque especial (números azuis)
     if (baseNumbers.length > 0 && baseNumbers.includes(num)) {
       return 'selected-bet-number';
     }
     
-    // Números do card APOSTAR têm destaque especial apenas quando padrão é detectado (não forçado)
-    if (baseNumbers.length === 0 && betNumbers.includes(num)) {
-      return 'selected-bet-number';
-    }
+    // NÃO aplica destaque especial nos números do card APOSTAR (amarelos)
+    // Removido: if (baseNumbers.length === 0 && betNumbers.includes(num))
     
     // Primeiro e último número dos expostos têm borda branca oscilante
     if (riskNumbers.length > 0) {
       const firstExposed = riskNumbers[0];
       const lastExposed = riskNumbers[riskNumbers.length - 1];
-      if (num === firstExposed || num === lastExposed) {
+      if ((num === firstExposed || num === lastExposed) && !isHighlighted(num)) {
         return 'animate-pulse-white-border';
       }
     }
@@ -161,7 +167,7 @@ const RaceNumbersDisplay: React.FC<RaceNumbersDisplayProps> = ({
                 "w-[23px] h-[23px] rounded flex items-center justify-center text-[10px] border",
                   getNumberColor(num),
                   getTextColor(num),
-                  isHighlighted(num) ? "bg-yellow-400 text-black border-yellow-500" : 
+                  isHighlighted(num) ? "bg-yellow-400 text-black" : 
                   isSelectedNumber(num) ? "border-yellow-400 border-2" : "border-gray-600",
                   getSpecialBorderClass(num),
                   getSpecialSizeClass(num),
@@ -169,12 +175,22 @@ const RaceNumbersDisplay: React.FC<RaceNumbersDisplayProps> = ({
                   getForceBlueClass(num)
                 )}
                 style={
+                  // Para números amarelos (padrão detectado ou forçado): sempre amarelo com borda original
+                  isHighlighted(num)
+                    ? { 
+                        backgroundColor: '#fbbf24 !important', // amarelo
+                        color: 'black !important',
+                        border: '1px solid #6b7280 !important', // borda cinza original
+                        borderColor: '#6b7280 !important',
+                        boxShadow: 'none !important',
+                        animation: 'none !important'
+                      }
                   // Para padrão forçado: 30 números em amarelo, 2 base em azul
-                  forcedPattern && betNumbers.includes(num) && !baseNumbers.includes(num)
+                  : forcedPattern && betNumbers.includes(num) && !baseNumbers.includes(num)
                     ? { 
                         backgroundColor: '#fbbf24', // amarelo
                         color: 'black',
-                        border: '1px solid #f59e0b'
+                        border: '1px solid #6b7280' // borda cinza original
                       } 
                     : (forcedPattern || isPatternActive) && baseNumbers.includes(num)
                     ? { 
@@ -212,7 +228,7 @@ const RaceNumbersDisplay: React.FC<RaceNumbersDisplayProps> = ({
                 "w-[23px] h-[23px] rounded flex items-center justify-center text-[10px] border ml-[-10px]",
               getNumberColor(leftNumber),
               getTextColor(leftNumber),
-              isHighlighted(leftNumber) ? "bg-yellow-400 text-black border-yellow-500" : 
+              isHighlighted(leftNumber) ? "bg-yellow-400 text-black" : 
               isSelectedNumber(leftNumber) ? "border-yellow-400 border-2" : "border-gray-600",
               getSpecialBorderClass(leftNumber),
               getSpecialSizeClass(leftNumber),
@@ -220,12 +236,19 @@ const RaceNumbersDisplay: React.FC<RaceNumbersDisplayProps> = ({
               getForceBlueClass(leftNumber)
             )}
             style={
-              // Para padrão forçado: 30 números em amarelo, 2 base em azul
-              forcedPattern && betNumbers.includes(leftNumber) && !baseNumbers.includes(leftNumber)
+              // Para números amarelos (padrão detectado ou forçado): sempre amarelo com borda original
+              isHighlighted(leftNumber)
                 ? { 
                     backgroundColor: '#fbbf24', // amarelo
                     color: 'black',
-                    border: '1px solid #f59e0b'
+                    border: '1px solid #6b7280' // borda cinza original
+                  }
+              // Para padrão forçado: 30 números em amarelo, 2 base em azul
+              : forcedPattern && betNumbers.includes(leftNumber) && !baseNumbers.includes(leftNumber)
+                ? { 
+                    backgroundColor: '#fbbf24', // amarelo
+                    color: 'black',
+                    border: '1px solid #6b7280' // borda cinza original
                   } 
                 : (forcedPattern || isPatternActive) && baseNumbers.includes(leftNumber)
                 ? { 
@@ -258,7 +281,7 @@ const RaceNumbersDisplay: React.FC<RaceNumbersDisplayProps> = ({
                 "w-[23px] h-[23px] rounded flex items-center justify-center text-[10px] border mr-[-10px]",
               getNumberColor(rightNumber),
               getTextColor(rightNumber),
-              isHighlighted(rightNumber) ? "bg-yellow-400 text-black border-yellow-500" : 
+              isHighlighted(rightNumber) ? "bg-yellow-400 text-black" : 
               isSelectedNumber(rightNumber) ? "border-yellow-400 border-2" : "border-gray-600",
               getSpecialBorderClass(rightNumber),
               getSpecialSizeClass(rightNumber),
@@ -266,12 +289,19 @@ const RaceNumbersDisplay: React.FC<RaceNumbersDisplayProps> = ({
               getForceBlueClass(rightNumber)
             )}
             style={
-              // Para padrão forçado: 30 números em amarelo, 2 base em azul
-              forcedPattern && betNumbers.includes(rightNumber) && !baseNumbers.includes(rightNumber)
+              // Para números amarelos (padrão detectado ou forçado): sempre amarelo com borda original
+              isHighlighted(rightNumber)
                 ? { 
                     backgroundColor: '#fbbf24', // amarelo
                     color: 'black',
-                    border: '1px solid #f59e0b'
+                    border: '1px solid #6b7280' // borda cinza original
+                  }
+              // Para padrão forçado: 30 números em amarelo, 2 base em azul
+              : forcedPattern && betNumbers.includes(rightNumber) && !baseNumbers.includes(rightNumber)
+                ? { 
+                    backgroundColor: '#fbbf24', // amarelo
+                    color: 'black',
+                    border: '1px solid #6b7280' // borda cinza original
                   } 
                 : (forcedPattern || isPatternActive) && baseNumbers.includes(rightNumber)
                 ? { 
@@ -309,7 +339,7 @@ const RaceNumbersDisplay: React.FC<RaceNumbersDisplayProps> = ({
                 "w-[23px] h-[23px] rounded flex items-center justify-center text-[10px] border",
                   getNumberColor(num),
                   getTextColor(num),
-                  isHighlighted(num) ? "bg-yellow-400 text-black border-yellow-500" : 
+                  isHighlighted(num) ? "bg-yellow-400 text-black" : 
                   isSelectedNumber(num) ? "border-yellow-400 border-2" : "border-gray-600",
                   getSpecialBorderClass(num),
                   getSpecialSizeClass(num),
@@ -317,12 +347,19 @@ const RaceNumbersDisplay: React.FC<RaceNumbersDisplayProps> = ({
                   getForceBlueClass(num)
                 )}
                 style={
-                  // Para padrão forçado: 30 números em amarelo, 2 base em azul
-                  forcedPattern && betNumbers.includes(num) && !baseNumbers.includes(num)
+                  // Para números amarelos (padrão detectado ou forçado): sempre amarelo com borda original
+                  isHighlighted(num)
                     ? { 
                         backgroundColor: '#fbbf24', // amarelo
                         color: 'black',
-                        border: '1px solid #f59e0b'
+                        border: '1px solid #6b7280' // borda cinza original
+                      }
+                  // Para padrão forçado: 30 números em amarelo, 2 base em azul
+                  : forcedPattern && betNumbers.includes(num) && !baseNumbers.includes(num)
+                    ? { 
+                        backgroundColor: '#fbbf24', // amarelo
+                        color: 'black',
+                        border: '1px solid #6b7280' // borda cinza original
                       } 
                     : (forcedPattern || isPatternActive) && baseNumbers.includes(num)
                     ? { 
