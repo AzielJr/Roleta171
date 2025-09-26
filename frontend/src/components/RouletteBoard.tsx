@@ -498,6 +498,48 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [lastPatternNumbers, setLastPatternNumbers] = useState<{covered: number[], risk: number[]}>({covered: [], risk: []});
   const lastPatternNumbersRef = useRef<{covered: number[], risk: number[]}>({covered: [], risk: []});
 
+  // Estados para edição inline do saldo no header
+  const [isEditingBalance, setIsEditingBalance] = useState<boolean>(false);
+  const [editBalanceValue, setEditBalanceValue] = useState<string>('');
+
+  // Função para iniciar edição do saldo
+  const startEditingBalance = () => {
+    setEditBalanceValue((balance || 0).toFixed(2));
+    setIsEditingBalance(true);
+  };
+
+  // Função para salvar novo saldo
+  const saveBalance = async () => {
+    const newBalance = parseFloat(editBalanceValue);
+    if (isNaN(newBalance)) {
+      alert('Por favor, insira um valor válido');
+      return;
+    }
+
+    const success = await adjustBalance(newBalance, 'Edição rápida via header');
+    if (success) {
+      setIsEditingBalance(false);
+      setEditBalanceValue('');
+    } else {
+      alert('Erro ao atualizar saldo');
+    }
+  };
+
+  // Função para cancelar edição
+  const cancelEditingBalance = () => {
+    setIsEditingBalance(false);
+    setEditBalanceValue('');
+  };
+
+  // Função para lidar com teclas durante edição
+  const handleBalanceKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      saveBalance();
+    } else if (e.key === 'Escape') {
+      cancelEditingBalance();
+    }
+  };
+
   // useEffect para lidar com a tecla ESC e notificação sonora
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -2153,18 +2195,55 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             <div className="text-xs" style={{marginTop: '-10px', marginLeft: '36px'}}>
               <span style={{color: 'white'}}>{user.nome}</span>
               <span style={{color: '#86efac', letterSpacing: '4px'}}> | </span>
-              <span 
-                style={{color: (balance || 0) < 0 ? '#ef4444' : '#86efac', cursor: 'pointer'}}
-                onClick={() => {
-                  setShowLargeSaldoPanel(true);
-                  setTimeout(() => {
-                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                  }, 100);
-                }}
-                title="Clique para ver o saldo atual"
-              >
-                R$ {(balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
+              {isEditingBalance ? (
+                <div className="inline-flex items-center gap-1">
+                  <input
+                    type="number"
+                    value={editBalanceValue}
+                    onChange={(e) => setEditBalanceValue(e.target.value)}
+                    onKeyDown={handleBalanceKeyDown}
+                    className="bg-green-600 text-white border border-green-400 rounded px-1 py-0 text-xs w-20 focus:outline-none focus:ring-1 focus:ring-green-300"
+                    style={{fontSize: '12px', height: '18px'}}
+                    autoFocus
+                  />
+                  <button
+                    onClick={saveBalance}
+                    className="text-green-300 hover:text-green-100 text-xs"
+                    title="Salvar (Enter)"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    onClick={cancelEditingBalance}
+                    className="text-red-300 hover:text-red-100 text-xs"
+                    title="Cancelar (Esc)"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1">
+                  <span 
+                    style={{color: (balance || 0) < 0 ? '#ef4444' : '#86efac', cursor: 'pointer'}}
+                    onClick={() => {
+                      setShowLargeSaldoPanel(true);
+                      setTimeout(() => {
+                        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                      }, 100);
+                    }}
+                    title="Clique para ver o saldo atual"
+                  >
+                    R$ {(balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <button
+                    onClick={startEditingBalance}
+                    className="text-green-300 hover:text-green-100 text-xs ml-1"
+                    title="Editar saldo rapidamente"
+                  >
+                    ✏️
+                  </button>
+                </div>
+              )}
               <span style={{color: '#86efac', letterSpacing: '4px'}}> | </span>
               <span className={(currentSaldoRecord?.per_lucro || 0) < 0 ? 'text-yellow-100' : ''} style={{color: (currentSaldoRecord?.per_lucro || 0) < 0 ? undefined : '#86efac'}}>
                 {currentSaldoRecord?.per_lucro ? `${currentSaldoRecord.per_lucro > 0 ? '+' : ''}${currentSaldoRecord.per_lucro.toFixed(2)}%` : '0,00%'}

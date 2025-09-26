@@ -176,7 +176,7 @@ export const useSupabaseBalance = () => {
 
   // Atualiza o saldo no banco
   const updateBalance = async (newBalance: number) => {
-    if (!currentSaldoRecord) return;
+    if (!currentSaldoRecord) return false;
 
     try {
       const vlrLucro = newBalance - (currentSaldoRecord.saldo_inicial || 0);
@@ -198,6 +198,14 @@ export const useSupabaseBalance = () => {
         return false;
       }
 
+      // Atualizar o estado local com os novos valores
+      setCurrentSaldoRecord({
+        ...currentSaldoRecord,
+        saldo_atual: newBalance,
+        vlr_lucro: vlrLucro,
+        per_lucro: perLucro
+      });
+      
       setBalance(newBalance);
       return true;
     } catch (error) {
