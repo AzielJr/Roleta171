@@ -38,6 +38,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const { user } = useAuth();
   const { balance, currentSaldoRecord, adjustBalance, updateSaldoRecord, createSaldoRecord } = useBalance();
   
+  // Ref para controlar duplicação de detecção P2 WIN
+  const lastProcessedP2Key = useRef<string>('');
+  
   // Estado para controlar o modal de saldo
   const [showBalanceModal, setShowBalanceModal] = useState(false);
   
@@ -488,9 +491,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Estado para contar quantas vezes o popup apareceu (Entrada)
   const [patternDetectedCount, setPatternDetectedCount] = useState<number>(0);
 
-  // Estados para contar WIN e LOSS
+  // Estados para contar WIN e LOSS (Padrão 171)
   const [winCount, setWinCount] = useState<number>(0);
   const [lossCount, setLossCount] = useState<number>(0);
+  
+  // Estados para contar WIN e LOSS P2 (persistentes)
+  const [p2WinCount, setP2WinCount] = useState<number>(0);
+  const [p2LossCount, setP2LossCount] = useState<number>(0);
   
   // Estado para controlar se estamos aguardando a próxima dezena após popup
   const [waitingForNextNumber, setWaitingForNextNumber] = useState<boolean>(false);
@@ -1349,6 +1356,12 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     setPatternDetectedCount(0);
     setWinCount(0);
     setLossCount(0);
+    setP2WinCount(0); // Resetar contadores P2
+    setP2LossCount(0); // Resetar contadores P2
+    
+    // Resetar controle de duplicação P2
+    lastProcessedP2Key.current = '';
+    
     setWaitingForNextNumber(false);
     setLastPatternNumbers({covered: [], risk: []});
     waitingForNextNumberRef.current = false;
@@ -1397,8 +1410,84 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const addToLastNumbers = (num: number) => {
     setLastNumbers(prev => {
       const newList = [num, ...prev];
-      return newList.slice(0, 60); // Manter apenas os últimos 60
+      const updatedList = newList.slice(0, 60); // Manter apenas os últimos 60
+      
+      // Detectar WIN P2 quando um novo número é adicionado
+      if (updatedList.length >= 2) {
+        detectP2Win(updatedList);
+      }
+      
+      return updatedList;
     });
+  };
+
+  // Função para detectar WIN P2 baseado na lógica do calculateP2StatsMode2
+  const detectP2Win = (numbers: number[]) => {
+    const P2_ENTRY_NUMBERS = [3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
+    
+    console.log(`[DEBUG P2 WIN] Analisando sequência (${numbers.length} números):`, numbers);
+    
+    // Verificar se já processamos este WIN para evitar duplicação
+    const sequenceKey = numbers.slice(0, 4).join('-'); // Usar os primeiros 4 números como chave
+    
+    if (lastProcessedP2Key.current === sequenceKey) {
+      console.log(`[DEBUG P2 WIN] Sequência já processada, ignorando: ${sequenceKey}`);
+      console.log(`[DEBUG P2 WIN] RETURN EXECUTADO - SAINDO DA FUNÇÃO`);
+      return;
+    }
+    
+    console.log(`[DEBUG P2 WIN] Sequência nova, processando: ${sequenceKey}`);
+    
+    // MARCAR IMEDIATAMENTE como processada para evitar execuções simultâneas
+    lastProcessedP2Key.current = sequenceKey;
+    
+    // Primeiro, calcular todas as losses na sequência (exceto o primeiro número)
+    const numbersExceptFirst = numbers.slice(1); // Remove o primeiro (mais recente)
+    let totalCurrentNegativeSequence = 0;
+    let i = 0;
+    
+    while (i < numbersExceptFirst.length) {
+      if (P2_ENTRY_NUMBERS.includes(numbersExceptFirst[i])) {
+        let consecutiveCount = 1;
+        let j = i + 1;
+        
+        while (j < numbersExceptFirst.length && P2_ENTRY_NUMBERS.includes(numbersExceptFirst[j])) {
+          consecutiveCount++;
+          j++;
+        }
+        
+        if (consecutiveCount >= 3) {
+          const lossIncrement = consecutiveCount - 2;
+          totalCurrentNegativeSequence += lossIncrement;
+          console.log(`[DEBUG P2 WIN] Sequência de ${consecutiveCount} P2s encontrada, losses: +${lossIncrement}`);
+        }
+        
+        i = j;
+      } else {
+        i++;
+      }
+    }
+    
+    console.log(`[DEBUG P2 WIN] Total losses acumuladas: ${totalCurrentNegativeSequence}`);
+    
+    // Verificar se há WIN: número não-P2 (primeiro da lista) após losses
+    const firstNumber = numbers[0]; // Número mais recente adicionado
+    const isFirstNumberNonP2 = !P2_ENTRY_NUMBERS.includes(firstNumber);
+    
+    console.log(`[DEBUG P2 WIN] Primeiro número: ${firstNumber}, é não-P2: ${isFirstNumberNonP2}`);
+    
+    if (totalCurrentNegativeSequence > 0 && isFirstNumberNonP2) {
+      console.log(`[DEBUG P2 WIN] Condições atendidas - processando WIN`);
+      
+      // Incrementar WIN count
+      setP2WinCount(prev => prev + 1);
+      
+      // Incrementar LOSS count baseado no total calculado
+      setP2LossCount(prev => prev + totalCurrentNegativeSequence);
+      
+      console.log(`[DEBUG P2 WIN] WIN DETECTADO! Número ${firstNumber} quebrou sequência de losses.`);
+      console.log(`[DEBUG P2 WIN] Incrementando losses em: ${totalCurrentNegativeSequence}`);
+    }
   };
 
   // Função para simular sorteio (para teste)
@@ -2345,7 +2434,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       </div>
       
       {/* Box com últimos números sorteados */}
-      <div className="bg-gray-600 rounded-lg p-4" style={{marginBottom: '14px', marginTop: '-6px'}}>
+      <div className="bg-gray-600 rounded-lg p-4" style={{marginBottom: '12px', marginTop: '-6px'}}>
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-white font-semibold">Últimos Números Sorteados:</h3>
           <div className="flex gap-2">
@@ -2923,7 +3012,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           <div 
             className="bg-gray-800 rounded-lg p-3 h-fit transform-gpu transition-all duration-300"
             style={{
-              marginTop: patternAlert ? '-18px' : '-23px',
+              marginTop: patternAlert ? '-21px' : '-26px',
               willChange: 'transform, opacity, filter'
             }}
           >
@@ -2943,6 +3032,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             patternDetectedCount={patternDetectedCount}
             winCount={winCount}
             lossCount={lossCount}
+            p2WinCount={p2WinCount}
+            p2LossCount={p2LossCount}
             numbersWithoutPattern={numbersWithoutPattern}
             totalNumbersWithoutPattern={totalNumbersWithoutPattern}
             lastNumbers={lastNumbers}

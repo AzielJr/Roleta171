@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Statistics } from '../types/roulette';
 import { useStatistics } from '../hooks/useStatistics';
+import { soundGenerator } from '../utils/soundUtils';
 
 // Sequência real da roleta (Race)
 const ROULETTE_SEQUENCE = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
@@ -22,6 +23,9 @@ interface StatisticsCardsProps {
     wins: number;
     losses: number;
   };
+  // Novos props para P2 persistente
+  p2WinCount?: number;
+  p2LossCount?: number;
 }
 
 // Função para calcular números expostos no padrão 171 Forçado
@@ -97,7 +101,207 @@ const calculate171ForcedStats = (lastNumbers: number[]): { wins: number; losses:
   return { wins, losses };
 };
 
-export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 } }: StatisticsCardsProps) {
+// Cores reais da roleta para cada número
+const ROULETTE_COLORS: { [key: number]: 'red' | 'black' | 'green' } = {
+  0: 'green',
+  1: 'red', 2: 'black', 3: 'red', 4: 'black', 5: 'red', 6: 'black', 7: 'red', 8: 'black', 9: 'red', 10: 'black',
+  11: 'black', 12: 'red', 13: 'black', 14: 'red', 15: 'black', 16: 'red', 17: 'black', 18: 'red', 19: 'red', 20: 'black',
+  21: 'red', 22: 'black', 23: 'red', 24: 'black', 25: 'red', 26: 'black', 27: 'red', 28: 'black', 29: 'black', 30: 'red',
+  31: 'black', 32: 'red', 33: 'black', 34: 'red', 35: 'black', 36: 'red'
+};
+
+// Números de entrada para P2
+const P2_ENTRY_NUMBERS = [3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
+
+// Números de LOSS para P2 (mesmos números de entrada)
+const P2_LOSS_NUMBERS = [3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
+
+// Números de WIN para P2
+const P2_WIN_NUMBERS = [0, 1, 2, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 19, 20, 23, 24, 26, 27, 28, 30, 31, 32, 34, 35];
+
+// Função para calcular estatísticas do P2 (modo 1 - original)
+const calculateP2Stats = (lastNumbers: number[]): { 
+  entradas: number; 
+  wins: number; 
+  losses: number; 
+  maxNegativeSequence: number;
+  hasRecentEntry: boolean;
+  hasConsecutiveEntries: boolean;
+} => {
+  if (lastNumbers.length === 0) {
+    return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false };
+  }
+
+  let entradas = 0;
+  let wins = 0;
+  let losses = 0;
+  let maxNegativeSequence = 0;
+  let currentNegativeSequence = 0;
+  let hasRecentEntry = false;
+  let hasConsecutiveEntries = false;
+
+  // Verificar se o número mais recente é uma entrada
+  if (P2_ENTRY_NUMBERS.includes(lastNumbers[0])) {
+    hasRecentEntry = true;
+  }
+
+  // Verificar entradas consecutivas (2 ou mais)
+  let consecutiveEntries = 0;
+  for (let i = 0; i < Math.min(lastNumbers.length, 10); i++) {
+    if (P2_ENTRY_NUMBERS.includes(lastNumbers[i])) {
+      consecutiveEntries++;
+    } else {
+      break;
+    }
+  }
+  hasConsecutiveEntries = consecutiveEntries >= 2;
+
+  // Calcular estatísticas baseadas nos números
+  // WIN/LOSS só é computado APÓS cada ENTRADA específica (padrão P2)
+  // lastNumbers[0] é o mais recente, então vamos percorrer do mais antigo para o mais recente
+  
+  for (let i = lastNumbers.length - 1; i >= 0; i--) { // Percorrer do mais antigo para o mais recente
+    const number = lastNumbers[i];
+    
+    // Se encontrou uma entrada P2, incrementa entradas e verifica o próximo número
+    if (P2_ENTRY_NUMBERS.includes(number)) {
+      entradas++;
+      
+      // Verificar se há um próximo número (mais recente) para determinar WIN/LOSS
+      if (i > 0) { // Se não é o número mais recente
+        const nextNumber = lastNumbers[i - 1]; // Próximo número (mais recente)
+        
+        if (P2_LOSS_NUMBERS.includes(nextNumber)) {
+          // LOSS: Se o próximo número após entrada P2 for um dos números do padrão P2
+          losses++;
+          currentNegativeSequence++;
+          maxNegativeSequence = Math.max(maxNegativeSequence, currentNegativeSequence);
+        } else {
+          // WIN: Se o próximo número após entrada P2 NÃO for um dos números do padrão P2
+          wins++;
+          currentNegativeSequence = 0; // Reset sequência negativa
+        }
+      }
+    }
+  }
+
+  return { entradas, wins, losses, maxNegativeSequence, hasRecentEntry, hasConsecutiveEntries };
+};
+
+// Função para calcular estatísticas P2 no modo 2 (entradas consecutivas)
+const calculateP2StatsMode2 = (lastNumbers: number[]): { 
+  entradas: number; 
+  wins: number; 
+  losses: number; 
+  maxNegativeSequence: number;
+  hasRecentEntry: boolean;
+  hasConsecutiveEntries: boolean;
+} => {
+  if (lastNumbers.length === 0) {
+    return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false };
+  }
+
+  let entradas = 0;
+  let wins = 0;
+  let losses = 0;
+  let maxNegativeSequence = 0;
+  let currentNegativeSequence = 0;
+  let hasRecentEntry = false;
+  let hasConsecutiveEntries = false;
+
+  // Verificar se há entrada recente (último número é P2)
+  if (P2_ENTRY_NUMBERS.includes(lastNumbers[0])) {
+    hasRecentEntry = true;
+  }
+
+  // Verificar se há entradas consecutivas (dois últimos números são P2)
+  if (lastNumbers.length >= 2 && 
+      P2_ENTRY_NUMBERS.includes(lastNumbers[0]) && 
+      P2_ENTRY_NUMBERS.includes(lastNumbers[1])) {
+    hasConsecutiveEntries = true;
+  }
+
+  // NOVA LÓGICA CORRIGIDA: Para cada entrada, verificar se é WIN ou LOSS
+  // Percorrer do mais antigo para o mais recente (reverso)
+  for (let i = lastNumbers.length - 1; i >= 1; i--) {
+    const currentNumber = lastNumbers[i];
+    const nextNumber = lastNumbers[i - 1]; // Próximo número (mais recente)
+    
+    // Se o número atual é P2 e o anterior também é P2 → ENTRADA
+    if (P2_ENTRY_NUMBERS.includes(currentNumber) && P2_ENTRY_NUMBERS.includes(nextNumber)) {
+      entradas++;
+      
+      // Verificar se há um número após o próximo para determinar WIN/LOSS
+      if (i >= 2) {
+        const numberAfterNext = lastNumbers[i - 2];
+        
+        if (P2_ENTRY_NUMBERS.includes(numberAfterNext)) {
+          // Se o número após o próximo também é P2 → LOSS (sequência continua)
+          losses++;
+          currentNegativeSequence++;
+          maxNegativeSequence = Math.max(maxNegativeSequence, currentNegativeSequence);
+        } else {
+          // Se o número após o próximo NÃO é P2 → WIN (sequência para)
+          wins++;
+          currentNegativeSequence = 0; // Reset sequência negativa
+        }
+      } else {
+        // Se não há número suficiente para determinar, considerar como pendente
+        // Para o último par, verificar se a sequência continua ou para
+        if (i === 1) {
+          // Este é o último par da sequência, não há como determinar WIN/LOSS ainda
+          // Deixar como entrada sem WIN/LOSS até que mais números sejam adicionados
+        }
+      }
+    }
+  }
+
+  const result = { 
+    entradas, 
+    wins, 
+    losses, 
+    maxNegativeSequence, 
+    hasRecentEntry, 
+    hasConsecutiveEntries 
+  };
+  
+  console.log(`DEBUG P2 MODE 2: entradas=${entradas}, wins=${wins}, losses=${losses}, maxNegSeq=${maxNegativeSequence}`);
+  
+  return result;
+};
+
+// Função para obter a cor de fundo baseada na cor da roleta
+const getRouletteColor = (number: number): string => {
+  const color = ROULETTE_COLORS[number];
+  switch (color) {
+    case 'red':
+      return 'bg-red-600';
+    case 'black':
+      return 'bg-gray-900';
+    case 'green':
+      return 'bg-green-600';
+    default:
+      return 'bg-gray-600';
+  }
+};
+
+// Componente para renderizar uma bola de número da roleta
+const RouletteBall = ({ number }: { number: number }) => (
+  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-gray-300 ${getRouletteColor(number)}`}>
+    {number.toString().padStart(2, '0')}
+  </div>
+);
+
+export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0 }: StatisticsCardsProps) {
+  const [showP2Modal, setShowP2Modal] = useState(false);
+  const [p2Mode, setP2Mode] = useState<1 | 2>(1); // Estado para controlar o modo do toggle P2
+  const lastP2ConsecutiveState = useRef(false);
+
+  // Calcular estatísticas do P2 baseado nos últimos números
+  const calculatedP2Stats = React.useMemo(() => {
+    return p2Mode === 1 ? calculateP2Stats(lastNumbers) : calculateP2StatsMode2(lastNumbers);
+  }, [lastNumbers, p2Mode]);
+
   const {
     totalNumbers,
     colorPercentages,
@@ -118,6 +322,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
   const [animatingHighLow, setAnimatingHighLow] = useState<Set<number>>(new Set());
   const [animatingEvenOdd, setAnimatingEvenOdd] = useState<Set<number>>(new Set());
   const [animatingColors, setAnimatingColors] = useState<Set<string>>(new Set());
+  const [animatingP2, setAnimatingP2] = useState<'none' | 'green' | 'yellow'>('none');
 
   // Função para detectar 3 ou mais números consecutivos da mesma categoria
   const detectRepeatedCategories = () => {
@@ -245,9 +450,28 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     }
   }, [lastNumbers.join(',')]); // Monitorar todos os números, não apenas os últimos 3
 
+  // Efeito para controlar animações do P2 e tocar som
+  useEffect(() => {
+    if (calculatedP2Stats.hasConsecutiveEntries) {
+      setAnimatingP2('yellow');
+      
+      // Tocar som apenas quando P2 muda para consecutivo (não estava consecutivo antes)
+      if (!lastP2ConsecutiveState.current) {
+        soundGenerator.playBellSound();
+        lastP2ConsecutiveState.current = true;
+      }
+    } else if (calculatedP2Stats.hasRecentEntry) {
+      setAnimatingP2('green');
+      lastP2ConsecutiveState.current = false; // Reset quando não é mais consecutivo
+    } else {
+      setAnimatingP2('none');
+      lastP2ConsecutiveState.current = false; // Reset quando não há entrada
+    }
+  }, [calculatedP2Stats.hasRecentEntry, calculatedP2Stats.hasConsecutiveEntries]);
+
   const StatCard = ({ title, data, colors, cardType = 'default' }: {
     title: string | React.ReactNode;
-    data: Array<{ label: string; value: number; percentage: number }>;
+    data: Array<{ label: string; value: number; percentage: number; hidePercentage?: boolean }>;
     colors: string[];
     cardType?: 'columns' | 'dozens' | 'highLow' | 'evenOdd' | 'colors' | 'default';
   }) => (
@@ -293,7 +517,9 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
                 }`}>
                   {item.value}
                 </div>
-                <div className="text-xs lg:text-xs text-gray-500">{item.percentage}%</div>
+                {!item.hidePercentage && (
+                  <div className="text-xs lg:text-xs text-gray-500">{item.percentage}%</div>
+                )}
               </div>
             </div>
           );
@@ -304,8 +530,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 
   return (
     <div className="space-y-3">
-      {/* Grid com todos os 7 cards em uma linha */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-1 lg:gap-2">
+      {/* Grid com todos os 6 cards distribuídos igualmente */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
         <StatCard
           title="Cores"
           data={[
@@ -315,26 +541,6 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           ]}
           colors={['bg-red-500', 'bg-gray-800', 'bg-green-500']}
           cardType="colors"
-        />
-
-        <StatCard
-          title="Par / Ímpar"
-          data={[
-            { label: 'Par', value: statistics.evenOdd.even, percentage: evenOddPercentages.even },
-            { label: 'Ímpar', value: statistics.evenOdd.odd, percentage: evenOddPercentages.odd }
-          ]}
-          colors={['bg-blue-500', 'bg-purple-500']}
-          cardType="evenOdd"
-        />
-
-        <StatCard
-          title="Alto / Baixo"
-          data={[
-            { label: 'Baixo (1-18)', value: statistics.highLow.low, percentage: highLowPercentages.low },
-            { label: 'Alto (19-36)', value: statistics.highLow.high, percentage: highLowPercentages.high }
-          ]}
-          colors={['bg-yellow-500', 'bg-orange-500']}
-          cardType="highLow"
         />
 
         <StatCard
@@ -357,6 +563,57 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           ]}
           colors={['bg-emerald-500', 'bg-teal-500', 'bg-lime-500']}
           cardType="columns"
+        />
+
+        <StatCard
+          title={
+            <div className={`cursor-pointer transition-all duration-300 flex justify-between items-center ${
+              animatingP2 === 'green' 
+                ? 'animate-pulse-green-border' 
+                : animatingP2 === 'yellow' 
+                ? 'animate-pulse-yellow-border' 
+                : ''
+            }`} onClick={() => setShowP2Modal(true)}>
+              <span>P2</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setP2Mode(1);
+                  }}
+                  title="Com 1 padrão"
+                  className={`rounded transition-all ${
+                    p2Mode === 1 
+                      ? 'px-2 py-1 text-xs bg-blue-500 text-white' 
+                      : 'px-1 py-0.5 text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 opacity-70 scale-90'
+                  }`}
+                >
+                  1
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setP2Mode(2);
+                  }}
+                  title="Com 2 padrões"
+                  className={`rounded transition-all ${
+                    p2Mode === 2 
+                      ? 'px-2 py-1 text-xs bg-blue-500 text-white' 
+                      : 'px-1 py-0.5 text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 opacity-70 scale-90'
+                  }`}
+                >
+                  2
+                </button>
+              </div>
+            </div>
+          }
+          data={[
+            { label: 'Entradas', value: calculatedP2Stats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedP2Stats.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: calculatedP2Stats.wins, percentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.wins / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0 },
+            { label: 'LOSS', value: calculatedP2Stats.losses, percentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.losses / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0 },
+            { label: '> Seq. Negativa', value: calculatedP2Stats.maxNegativeSequence, percentage: calculatedP2Stats.entradas > 0 ? Math.round((calculatedP2Stats.maxNegativeSequence / calculatedP2Stats.entradas) * 100) : 0, hidePercentage: true }
+          ]}
+          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
         />
 
         <StatCard
@@ -383,6 +640,51 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           colors={['bg-gray-500', 'bg-green-500', 'bg-red-500']}
         />
       </div>
+
+      {/* Modal P2 - Números Gatilho */}
+      {showP2Modal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 pt-24" onClick={() => setShowP2Modal(false)}>
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">P2 - NÚMEROS GATILHO</h2>
+              <button 
+                onClick={() => setShowP2Modal(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex justify-center space-x-3">
+                <RouletteBall number={3} />
+                <RouletteBall number={4} />
+                <RouletteBall number={7} />
+                <RouletteBall number={11} />
+              </div>
+              
+              <div className="flex justify-center space-x-3">
+                <RouletteBall number={15} />
+                <RouletteBall number={18} />
+                <RouletteBall number={21} />
+                <RouletteBall number={22} />
+              </div>
+              
+              <div className="flex justify-center space-x-3">
+                <RouletteBall number={25} />
+                <RouletteBall number={29} />
+                <RouletteBall number={33} />
+                <RouletteBall number={36} />
+              </div>
+            </div>
+            
+            <div className="mt-4 text-center text-gray-300 text-sm">
+              <p>Estes números incrementam as <strong>ENTRADAS</strong></p>
+              <p>e são considerados <strong>LOSS</strong> para o P2</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
