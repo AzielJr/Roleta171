@@ -501,10 +501,10 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
       }
       
       // ALTO/BAIXO
-      const firstHighLow = firstNum === 0 ? 0 : (firstNum >= 1 && firstNum <= 18 ? 1 : 2);
-      if (firstHighLow !== 0) {
+      const firstHighLow = firstNum === 0 ? 'green' : (firstNum >= 1 && firstNum <= 18 ? 'low' : 'high');
+      if (firstHighLow !== 'green') {
         const allSameHighLow = sequenceNumbers.every(num => {
-          const highLow = num === 0 ? 0 : (num >= 1 && num <= 18 ? 1 : 2);
+          const highLow = num === 0 ? 'green' : (num >= 1 && num <= 18 ? 'low' : 'high');
           return highLow === firstHighLow;
         });
         if (allSameHighLow) {
@@ -514,10 +514,10 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
       }
       
       // PAR/ÍMPAR
-      const firstEvenOdd = firstNum === 0 ? 0 : (firstNum % 2 === 0 ? 1 : 2);
-      if (firstEvenOdd !== 0) {
+      const firstEvenOdd = firstNum === 0 ? 'green' : (firstNum % 2 === 0 ? 'even' : 'odd');
+      if (firstEvenOdd !== 'green') {
         const allSameEvenOdd = sequenceNumbers.every(num => {
-          const evenOdd = num === 0 ? 0 : (num % 2 === 0 ? 1 : 2);
+          const evenOdd = num === 0 ? 'green' : (num % 2 === 0 ? 'even' : 'odd');
           return evenOdd === firstEvenOdd;
         });
         if (allSameEvenOdd) {
@@ -620,10 +620,10 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
               isRepeated = animatingDozens.has(index + 1);
               break;
             case 'highLow':
-              isRepeated = animatingHighLow.has(index + 1);
+              isRepeated = animatingHighLow.has(index === 0 ? 'low' : 'high');
               break;
             case 'evenOdd':
-              isRepeated = animatingEvenOdd.has(index + 1);
+              isRepeated = animatingEvenOdd.has(index === 0 ? 'even' : 'odd');
               break;
             case 'colors':
               const colorMap = ['red', 'black', 'green'];
