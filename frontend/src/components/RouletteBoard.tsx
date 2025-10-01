@@ -2483,24 +2483,23 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           {lastNumbers.length === 0 ? (
             <span className="text-gray-300 text-sm flex items-center h-full">Nenhum número sorteado ainda</span>
           ) : (
-            lastNumbers.map((num, index) => {
+            lastNumbers.slice().reverse().map((num, index) => {
               const isLastSelected = lastSelectedNumber === num;
               return (
                 <span
-                  key={`${num}-${index}`}
+                  key={`${num}-${lastNumbers.length - 1 - index}`}
                   className={cn(
                     'w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center text-white border-2 border-gray-400',
                     getNumberColor(num),
                     isLastSelected ? 'ring-2 ring-yellow-400 scale-110' : ''
                   )}
-                  title={`Posição: ${index + 1}`}
+                  title={`Posição: ${index + 1} (Último: ${index === 0 ? 'Sim' : 'Não'})`}
                 >
                   {num}
                 </span>
               );
             })
-          )}
-        </div>
+          )}</div>
       </div>
       
       {/* Layout Principal */}
