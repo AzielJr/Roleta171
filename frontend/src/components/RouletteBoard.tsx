@@ -1409,8 +1409,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Função para adicionar número aos últimos sorteados
   const addToLastNumbers = (num: number) => {
     setLastNumbers(prev => {
-      const newList = [num, ...prev];
-      const updatedList = newList.slice(0, 60); // Manter apenas os últimos 60
+      const newList = [...prev, num]; // CORREÇÃO: Adicionar no FINAL - ordem cronológica correta
+      const updatedList = newList.slice(-60); // Manter apenas os últimos 60
       
       // Detectar WIN P2 quando um novo número é adicionado
       if (updatedList.length >= 2) {
@@ -1428,7 +1428,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     console.log(`[DEBUG P2 WIN] Analisando sequência (${numbers.length} números):`, numbers);
     
     // Verificar se já processamos este WIN para evitar duplicação
-    const sequenceKey = numbers.slice(0, 4).join('-'); // Usar os primeiros 4 números como chave
+    const sequenceKey = numbers.slice(0, 4).join('-'); // Usar os primeiros 4 números como chave (mais recentes)
     
     if (lastProcessedP2Key.current === sequenceKey) {
       console.log(`[DEBUG P2 WIN] Sequência já processada, ignorando: ${sequenceKey}`);
@@ -1471,7 +1471,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     console.log(`[DEBUG P2 WIN] Total losses acumuladas: ${totalCurrentNegativeSequence}`);
     
     // Verificar se há WIN: número não-P2 (primeiro da lista) após losses
-    const firstNumber = numbers[0]; // Número mais recente adicionado
+    const firstNumber = numbers[0]; // Número mais recente adicionado (primeiro da lista)
     const isFirstNumberNonP2 = !P2_ENTRY_NUMBERS.includes(firstNumber);
     
     console.log(`[DEBUG P2 WIN] Primeiro número: ${firstNumber}, é não-P2: ${isFirstNumberNonP2}`);

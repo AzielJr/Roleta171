@@ -119,6 +119,117 @@ const P2_LOSS_NUMBERS = [3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
 // Números de WIN para P2
 const P2_WIN_NUMBERS = [0, 1, 2, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 19, 20, 23, 24, 26, 27, 28, 30, 31, 32, 34, 35];
 
+// Números de entrada para Padrão 72
+const PADRAO72_ENTRY_NUMBERS = [2, 12, 22, 32, 7, 17, 27];
+
+// Função para calcular 9 vizinhos de cada lado de um número na sequência da roleta
+const calculateRouletteNeighbors = (centerNumber: number): number[] => {
+  const centerIndex = ROULETTE_SEQUENCE.indexOf(centerNumber);
+  if (centerIndex === -1) return [];
+
+  const neighbors: number[] = [];
+  const totalNumbers = ROULETTE_SEQUENCE.length;
+
+  // NÃO incluir o número central - apenas os vizinhos
+
+  // Adicionar 9 vizinhos de cada lado (18 vizinhos total)
+  for (let i = 1; i <= 9; i++) {
+    // Vizinho à esquerda (sentido anti-horário)
+    const leftIndex = (centerIndex - i + totalNumbers) % totalNumbers;
+    neighbors.push(ROULETTE_SEQUENCE[leftIndex]);
+
+    // Vizinho à direita (sentido horário)
+    const rightIndex = (centerIndex + i) % totalNumbers;
+    neighbors.push(ROULETTE_SEQUENCE[rightIndex]);
+  }
+
+  return neighbors;
+};
+
+// Função para calcular estatísticas do Padrão 72
+const calculatePadrao72Stats = (lastNumbers: number[]): { 
+  entradas: number; 
+  wins: number; 
+  losses: number; 
+  maxNegativeSequence: number;
+  hasRecentEntry: boolean;
+} => {
+  console.log('🔍 [DEBUG PADRÃO 72 FUNCTION] Iniciando cálculo com:', lastNumbers);
+  
+  if (lastNumbers.length === 0) {
+    console.log('🔍 [DEBUG PADRÃO 72 FUNCTION] Histórico vazio, retornando zeros');
+    return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, hasRecentEntry: false };
+  }
+
+  let entradas = 0;
+  let wins = 0;
+  let losses = 0;
+  let maxNegativeSequence = 0;
+  let currentNegativeSequence = 0;
+  let hasRecentEntry = false;
+
+  // Verificar se o ÚLTIMO número é uma entrada (para o alerta laranja)
+  const lastNumber = lastNumbers[lastNumbers.length - 1]; // Último número da lista (mais recente)
+  hasRecentEntry = PADRAO72_ENTRY_NUMBERS.includes(lastNumber);
+  console.log('🔍 [DEBUG PADRÃO 72 FUNCTION] Último número:', lastNumber, 'É entrada?', hasRecentEntry);
+  
+  // Se é uma entrada e é o único número, contar como entrada
+  if (hasRecentEntry && lastNumbers.length === 1) {
+    entradas = 1;
+    console.log('🔍 [DEBUG PADRÃO 72 FUNCTION] Número único é entrada! Total entradas: 1');
+    const result = { entradas, wins, losses, maxNegativeSequence, hasRecentEntry };
+    console.log('🔍 [DEBUG PADRÃO 72 FUNCTION] Resultado final (entrada única):', result);
+    return result;
+  }
+
+  // CORREÇÃO: Agora processar na ordem cronológica correta (do mais antigo para o mais recente)
+  for (let i = 0; i < lastNumbers.length; i++) {
+    const currentNumber = lastNumbers[i];
+    const nextNumber = i < lastNumbers.length - 1 ? lastNumbers[i + 1] : null; // Próximo número na sequência temporal
+    
+    if (nextNumber !== null) {
+      console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] Analisando sequência: ${currentNumber} -> ${nextNumber}`);
+    } else {
+      console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] Analisando: ${currentNumber} (último da sequência)`);
+    }
+
+    // Verificar se o número atual é uma entrada do Padrão 72
+    if (PADRAO72_ENTRY_NUMBERS.includes(currentNumber)) {
+      entradas++;
+      console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] ${currentNumber} é entrada! Total entradas: ${entradas}`);
+      
+      // Só avaliar WIN/LOSS se há um próximo número na sequência temporal
+      if (nextNumber !== null) {
+        // Calcular vizinhos do número atual
+        const neighbors = calculateRouletteNeighbors(currentNumber);
+        console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] Vizinhos de ${currentNumber}:`, neighbors);
+        
+        // Verificar se o próximo número é vizinho
+        if (neighbors.includes(nextNumber)) {
+          wins++;
+          currentNegativeSequence = 0; // Reset da sequência negativa
+          console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] WIN! ${nextNumber} é vizinho de ${currentNumber}. Total wins: ${wins}`);
+        } else {
+          losses++;
+          currentNegativeSequence++;
+          maxNegativeSequence = Math.max(maxNegativeSequence, currentNegativeSequence);
+          console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] LOSS! ${nextNumber} NÃO é vizinho de ${currentNumber}. Total losses: ${losses}, Seq negativa: ${currentNegativeSequence}`);
+        }
+      } else {
+        console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] ${currentNumber} é entrada mas é o último número da sequência`);
+      }
+    } else {
+      // Se não é uma entrada, resetar sequência negativa
+      currentNegativeSequence = 0;
+      console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] ${currentNumber} não é entrada, resetando sequência negativa`);
+    }
+  }
+
+  const result = { entradas, wins, losses, maxNegativeSequence, hasRecentEntry };
+  console.log('🔍 [DEBUG PADRÃO 72 FUNCTION] Resultado final:', result);
+  return result;
+};
+
 // Função para calcular estatísticas do P2 (modo 1 - original)
 const calculateP2Stats = (lastNumbers: number[]): { 
   entradas: number; 
@@ -302,6 +413,14 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     return p2Mode === 1 ? calculateP2Stats(lastNumbers) : calculateP2StatsMode2(lastNumbers);
   }, [lastNumbers, p2Mode]);
 
+  // Calcular estatísticas do Padrão 72 (placeholder - aguardando cálculos)
+  const calculatedPadrao72Stats = React.useMemo(() => {
+    console.log('🔍 [DEBUG PADRÃO 72] Calculando stats com lastNumbers:', lastNumbers);
+    const result = calculatePadrao72Stats(lastNumbers);
+    console.log('🔍 [DEBUG PADRÃO 72] Resultado calculado:', result);
+    return result;
+  }, [lastNumbers]);
+
   const {
     totalNumbers,
     colorPercentages,
@@ -316,13 +435,14 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     return calculate171ForcedStats(lastNumbers);
   }, [lastNumbers]);
 
-  // Estados para controlar as animações de cada categoria
+  // Estados para animações dos cards
   const [animatingColumns, setAnimatingColumns] = useState<Set<number>>(new Set());
   const [animatingDozens, setAnimatingDozens] = useState<Set<number>>(new Set());
-  const [animatingHighLow, setAnimatingHighLow] = useState<Set<number>>(new Set());
-  const [animatingEvenOdd, setAnimatingEvenOdd] = useState<Set<number>>(new Set());
+  const [animatingHighLow, setAnimatingHighLow] = useState<Set<string>>(new Set());
+  const [animatingEvenOdd, setAnimatingEvenOdd] = useState<Set<string>>(new Set());
   const [animatingColors, setAnimatingColors] = useState<Set<string>>(new Set());
   const [animatingP2, setAnimatingP2] = useState<'none' | 'green' | 'yellow'>('none');
+  const [animatingPadrao72, setAnimatingPadrao72] = useState<'none' | 'orange'>('none');
 
   // Função para detectar 3 ou mais números consecutivos da mesma categoria
   const detectRepeatedCategories = () => {
@@ -465,9 +585,19 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
       lastP2ConsecutiveState.current = false; // Reset quando não é mais consecutivo
     } else {
       setAnimatingP2('none');
-      lastP2ConsecutiveState.current = false; // Reset quando não há entrada
+      lastP2ConsecutiveState.current = false;
     }
-  }, [calculatedP2Stats.hasRecentEntry, calculatedP2Stats.hasConsecutiveEntries]);
+  }, [calculatedP2Stats.hasConsecutiveEntries, calculatedP2Stats.hasRecentEntry]);
+
+  // Efeito para controlar animações do Padrão 72 e tocar som
+  useEffect(() => {
+    if (calculatedPadrao72Stats.hasRecentEntry) {
+      setAnimatingPadrao72('orange');
+      soundGenerator.playBellSound();
+    } else {
+      setAnimatingPadrao72('none');
+    }
+  }, [calculatedPadrao72Stats.hasRecentEntry]);
 
   const StatCard = ({ title, data, colors, cardType = 'default' }: {
     title: string | React.ReactNode;
@@ -530,8 +660,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 
   return (
     <div className="space-y-3">
-      {/* Grid com todos os 6 cards distribuídos igualmente */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
+      {/* Grid com todos os 7 cards distribuídos igualmente */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-1 lg:gap-2">
         <StatCard
           title="Cores"
           data={[
@@ -614,6 +744,25 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
             { label: '> Seq. Negativa', value: calculatedP2Stats.maxNegativeSequence, percentage: calculatedP2Stats.entradas > 0 ? Math.round((calculatedP2Stats.maxNegativeSequence / calculatedP2Stats.entradas) * 100) : 0, hidePercentage: true }
           ]}
           colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
+        />
+
+        <StatCard
+          title={
+            <div className={`transition-all duration-300 ${
+              animatingPadrao72 === 'orange' 
+                ? 'animate-pulse-orange-border' 
+                : ''
+            }`}>
+              <span>Padrão 72</span>
+            </div>
+          }
+          data={[
+            { label: 'Entradas', value: calculatedPadrao72Stats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedPadrao72Stats.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: calculatedPadrao72Stats.wins, percentage: (calculatedPadrao72Stats.wins + calculatedPadrao72Stats.losses) > 0 ? Math.round((calculatedPadrao72Stats.wins / (calculatedPadrao72Stats.wins + calculatedPadrao72Stats.losses)) * 100) : 0 },
+            { label: 'LOSS', value: calculatedPadrao72Stats.losses, percentage: (calculatedPadrao72Stats.wins + calculatedPadrao72Stats.losses) > 0 ? Math.round((calculatedPadrao72Stats.losses / (calculatedPadrao72Stats.wins + calculatedPadrao72Stats.losses)) * 100) : 0 },
+            { label: '> Seq. Negativa', value: calculatedPadrao72Stats.maxNegativeSequence, percentage: calculatedPadrao72Stats.entradas > 0 ? Math.round((calculatedPadrao72Stats.maxNegativeSequence / calculatedPadrao72Stats.entradas) * 100) : 0, hidePercentage: true }
+          ]}
+          colors={['bg-purple-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
         />
 
         <StatCard

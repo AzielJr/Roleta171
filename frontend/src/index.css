@@ -265,6 +265,20 @@
   }
 }
 
+/* Animação para o card Padrão 72 */
+@keyframes pulseOrangeBorder {
+  0%, 100% {
+    border-color: #f97316; /* orange-500 */
+    border-width: 2px;
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7);
+  }
+  50% {
+    border-color: #ea580c; /* orange-600 */
+    border-width: 3px;
+    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.3);
+  }
+}
+
 .animate-pulse-green-border {
   animation: pulseGreenBorder 1.5s ease-in-out infinite;
   border-radius: 8px;
@@ -273,6 +287,12 @@
 
 .animate-pulse-yellow-border {
   animation: pulseYellowBorder 1.5s ease-in-out infinite;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.animate-pulse-orange-border {
+  animation: pulseOrangeBorder 1.5s ease-in-out infinite;
   border-radius: 8px;
   padding: 4px;
 }
