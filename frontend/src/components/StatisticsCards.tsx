@@ -459,8 +459,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     // Inicializar com sets vazios (estado padrão = sem alertas)
     const repeatedColumns = new Set<number>();
     const repeatedDozens = new Set<number>();
-    const repeatedHighLow = new Set<number>();
-    const repeatedEvenOdd = new Set<number>();
+    const repeatedHighLow = new Set<string>();
+    const repeatedEvenOdd = new Set<string>();
     const repeatedColors = new Set<string>();
 
     // Verificar se há padrão contínuo a partir dos números mais recentes
@@ -557,16 +557,16 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
       // Manter alertas ativos apenas se há padrões contínuos de 3 ou mais
       setAnimatingColumns(repeated.columns.size > 0 ? repeated.columns : new Set());
       setAnimatingDozens(repeated.dozens.size > 0 ? repeated.dozens : new Set());
-      setAnimatingHighLow(repeated.highLow.size > 0 ? repeated.highLow : new Set());
-      setAnimatingEvenOdd(repeated.evenOdd.size > 0 ? repeated.evenOdd : new Set());
+      setAnimatingHighLow(repeated.highLow.size > 0 ? repeated.highLow as Set<string> : new Set<string>());
+      setAnimatingEvenOdd(repeated.evenOdd.size > 0 ? repeated.evenOdd as Set<string> : new Set<string>());
       setAnimatingColors(repeated.colors.size > 0 ? repeated.colors : new Set());
     } else {
       // Limpar todos os alertas se não há números suficientes
-      setAnimatingColumns(new Set());
-      setAnimatingDozens(new Set());
-      setAnimatingHighLow(new Set());
-      setAnimatingEvenOdd(new Set());
-      setAnimatingColors(new Set());
+      setAnimatingColumns(new Set<number>());
+      setAnimatingDozens(new Set<number>());
+      setAnimatingHighLow(new Set<string>());
+      setAnimatingEvenOdd(new Set<string>());
+      setAnimatingColors(new Set<string>());
     }
   }, [lastNumbers.join(',')]); // Monitorar todos os números, não apenas os últimos 3
 
