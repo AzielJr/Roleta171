@@ -47,8 +47,10 @@ export function useRouletteState() {
       if (pattern171Data.hasPattern) {
         newAlert = {
           type: 'pattern171',
-          hasPattern: true,
-          numbers: pattern171Data.numbers,
+          hasRace: false,
+          raceNumbers: pattern171Data.numbers || [],
+          coveredNumbers: [],
+          riskNumbers: [],
           message: 'Padrão 171 detectado! Estratégia recomendada: Apostar no próximo número.'
         };
       } else if (raceData.hasRace) {
@@ -84,3 +86,4 @@ export function useRouletteState() {
     dismissAlert
   };
 }
+
