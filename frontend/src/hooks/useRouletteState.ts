@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { RouletteState, RouletteEntry, Alert } from '../types/roulette';
 import { getNumberColor, ROULETTE_CONFIG } from '../utils/rouletteConfig';
 import { calculateStatistics } from '../utils/statisticsCalculator';
-import { checkForRaceCondition, generateBettingSuggestion } from '../utils/alertLogic';
+import { checkForRaceCondition, generateBettingSuggestion, checkFor171Pattern } from '../utils/alertLogic';
 
 const initialStatistics = {
   colors: { red: 0, black: 0, green: 0 },
@@ -39,9 +39,19 @@ export function useRouletteState() {
       
       // Verifica condições de alerta
       const raceData = checkForRaceCondition(newHistory);
+      const pattern171Data = checkFor171Pattern(newHistory);
       
       let newAlert: Alert | null = null;
-      if (raceData.hasRace) {
+      
+      // Prioriza o alerta do padrão 171 sobre o alerta de race condition
+      if (pattern171Data.hasPattern) {
+        newAlert = {
+          type: 'pattern171',
+          hasPattern: true,
+          numbers: pattern171Data.numbers,
+          message: 'Padrão 171 detectado! Estratégia recomendada: Apostar no próximo número.'
+        };
+      } else if (raceData.hasRace) {
         newAlert = {
           ...raceData,
           message: generateBettingSuggestion(raceData)

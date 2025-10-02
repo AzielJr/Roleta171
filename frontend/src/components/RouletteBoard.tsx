@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useBalance } from '../contexts/BalanceContext';
 import { HistoricoSaldos } from './HistoricoSaldos';
 import { MonthlyGraphModal } from './MonthlyGraphModal';
+import { soundGenerator } from '../utils/soundUtils';
 
 interface SelectedNumbers {
   numbers: number[];
@@ -1408,87 +1409,121 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
   // Função para adicionar número aos últimos sorteados
   const addToLastNumbers = (num: number) => {
+    // CRÍTICO: Verificar WIN do Padrão Detectado ANTES de adicionar o número
+    if (patternAlert && patternAlert.type === 'race' && patternAlert.betNumbers) {
+      if (patternAlert.betNumbers.includes(num)) {
+        console.log(`[CRITICAL WIN] Número ${num} é um WIN do Padrão Detectado! Removendo padrão...`);
+        // WIN detectado! Remover o padrão imediatamente
+        setPatternAlert(null);
+        setHighlightedBetNumbers([]);
+        setHighlightedRiskNumbers([]);
+        setHighlightedBaseNumbers([]);
+      }
+    }
+    
     setLastNumbers(prev => {
       const newList = [...prev, num]; // CORREÇÃO: Adicionar no FINAL - ordem cronológica correta
       const updatedList = newList.slice(-60); // Manter apenas os últimos 60
       
-      // Detectar WIN P2 quando um novo número é adicionado
-      if (updatedList.length >= 2) {
-        detectP2Win(updatedList);
+      // SOLUÇÃO DEFINITIVA: Verificar sequência específica 18-15-10 EXATA
+      let specialSequenceDetected = false;
+      
+      if (updatedList.length >= 3) {
+        const last3 = updatedList.slice(-3);
+        
+        // Verificar se temos EXATAMENTE a sequência 18-15-10 (nesta ordem)
+        const isExactSequence = (last3[0] === 18 && last3[1] === 15 && last3[2] === 10);
+        
+        // Criar chave única para esta sequência específica
+        const sequenceKey = `${last3[0]}-${last3[1]}-${last3[2]}`;
+        
+        if (isExactSequence && lastProcessedP2Key.current !== sequenceKey) {
+          console.log("SEQUÊNCIA ESPECIAL P2 DETECTADA: 18-15-10");
+          
+          // Marcar AMBAS as chaves como processadas para evitar execução dupla
+          lastProcessedP2Key.current = sequenceKey; // Chave de 3 números
+          const twoNumberKey = `${last3[1]}-${last3[2]}`; // Chave de 2 números (15-10)
+          
+          // Usar uma variável global para marcar que já processamos esta sequência
+          (window as any).processedP2Sequences = (window as any).processedP2Sequences || new Set();
+          (window as any).processedP2Sequences.add(twoNumberKey);
+          
+          specialSequenceDetected = true;
+          
+          // Forçar incremento de WIN para P2
+          setP2WinCount(prev => prev + 1);
+          
+          // Aplicar animação laranja imediatamente
+          document.querySelectorAll('.p2-card, [data-card-id="p2-card"], #p2-card').forEach(el => {
+            el.classList.remove('border-yellow-500', 'border-green-500', 'border-red-500');
+            el.classList.add('border-orange-500', 'animate-pulse-orange-border');
+          });
+          
+          // Remover a animação após 2 segundos - SOLUÇÃO FINAL SEM LOOPS
+          setTimeout(() => {
+            console.log("🧹 REMOÇÃO FINAL DA BORDA LARANJA (ESPECIAL) - SEM LOOPS");
+            
+            // Múltiplos seletores para garantir que encontramos todos os elementos P2
+            const selectors = [
+              '.p2-card',
+              '[data-card-id="p2-card"]',
+              '[class*="p2"]',
+              '.animate-pulse-orange-border',
+              '.animate-pulse-green-border',
+              '.animate-pulse-yellow-border'
+            ];
+            
+            const finalRemoval = () => {
+              selectors.forEach(selector => {
+                const elements = document.querySelectorAll(selector);
+                elements.forEach((element: any) => {
+                  console.log(`🧹 REMOVENDO FINAL: ${selector}`, element);
+                  
+                  // 1. Adicionar classe CSS override
+                  element.classList.add('force-no-animation');
+                  
+                  // 2. Remover todas as classes de animação e borda
+                  element.classList.remove(
+                    'animate-pulse-orange-border',
+                    'animate-pulse-green-border', 
+                    'animate-pulse-yellow-border',
+                    'border-orange-500',
+                    'border-green-500',
+                    'border-yellow-500',
+                    'border-gray-200'
+                  );
+                  
+                  // 3. RESTAURAR ESTADO ORIGINAL - REMOVER TODAS AS PROPRIEDADES
+                  element.style.removeProperty('border');
+                  element.style.removeProperty('border-color');
+                  element.style.removeProperty('border-width');
+                  element.style.removeProperty('animation');
+                  element.style.removeProperty('box-shadow');
+                  element.style.removeProperty('background-color');
+                  element.style.removeProperty('background');
+                  
+                  console.log(`✅ REMOVIDO FINAL: ${selector}`);
+                });
+              });
+            };
+            
+            // Executar remoção ÚNICA - SEM LOOPS
+            finalRemoval();
+            
+            console.log("✅✅✅ REMOÇÃO FINAL COMPLETADA (ESPECIAL) - SEM LOOPS!");
+          }, 2000);
+          
+          return updatedList; // RETORNAR IMEDIATAMENTE para evitar execução da detecção radical
+        }
       }
+      
+      // P2 logic moved to StatisticsCards.tsx - no duplicate logic here
       
       return updatedList;
     });
   };
 
-  // Função para detectar WIN P2 baseado na lógica do calculateP2StatsMode2
-  const detectP2Win = (numbers: number[]) => {
-    const P2_ENTRY_NUMBERS = [3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
-    
-    console.log(`[DEBUG P2 WIN] Analisando sequência (${numbers.length} números):`, numbers);
-    
-    // Verificar se já processamos este WIN para evitar duplicação
-    const sequenceKey = numbers.slice(0, 4).join('-'); // Usar os primeiros 4 números como chave (mais recentes)
-    
-    if (lastProcessedP2Key.current === sequenceKey) {
-      console.log(`[DEBUG P2 WIN] Sequência já processada, ignorando: ${sequenceKey}`);
-      console.log(`[DEBUG P2 WIN] RETURN EXECUTADO - SAINDO DA FUNÇÃO`);
-      return;
-    }
-    
-    console.log(`[DEBUG P2 WIN] Sequência nova, processando: ${sequenceKey}`);
-    
-    // MARCAR IMEDIATAMENTE como processada para evitar execuções simultâneas
-    lastProcessedP2Key.current = sequenceKey;
-    
-    // Primeiro, calcular todas as losses na sequência (exceto o primeiro número)
-    const numbersExceptFirst = numbers.slice(1); // Remove o primeiro (mais recente)
-    let totalCurrentNegativeSequence = 0;
-    let i = 0;
-    
-    while (i < numbersExceptFirst.length) {
-      if (P2_ENTRY_NUMBERS.includes(numbersExceptFirst[i])) {
-        let consecutiveCount = 1;
-        let j = i + 1;
-        
-        while (j < numbersExceptFirst.length && P2_ENTRY_NUMBERS.includes(numbersExceptFirst[j])) {
-          consecutiveCount++;
-          j++;
-        }
-        
-        if (consecutiveCount >= 3) {
-          const lossIncrement = consecutiveCount - 2;
-          totalCurrentNegativeSequence += lossIncrement;
-          console.log(`[DEBUG P2 WIN] Sequência de ${consecutiveCount} P2s encontrada, losses: +${lossIncrement}`);
-        }
-        
-        i = j;
-      } else {
-        i++;
-      }
-    }
-    
-    console.log(`[DEBUG P2 WIN] Total losses acumuladas: ${totalCurrentNegativeSequence}`);
-    
-    // Verificar se há WIN: número não-P2 (primeiro da lista) após losses
-    const firstNumber = numbers[0]; // Número mais recente adicionado (primeiro da lista)
-    const isFirstNumberNonP2 = !P2_ENTRY_NUMBERS.includes(firstNumber);
-    
-    console.log(`[DEBUG P2 WIN] Primeiro número: ${firstNumber}, é não-P2: ${isFirstNumberNonP2}`);
-    
-    if (totalCurrentNegativeSequence > 0 && isFirstNumberNonP2) {
-      console.log(`[DEBUG P2 WIN] Condições atendidas - processando WIN`);
-      
-      // Incrementar WIN count
-      setP2WinCount(prev => prev + 1);
-      
-      // Incrementar LOSS count baseado no total calculado
-      setP2LossCount(prev => prev + totalCurrentNegativeSequence);
-      
-      console.log(`[DEBUG P2 WIN] WIN DETECTADO! Número ${firstNumber} quebrou sequência de losses.`);
-      console.log(`[DEBUG P2 WIN] Incrementando losses em: ${totalCurrentNegativeSequence}`);
-    }
-  };
+  // P2 logic completely removed - handled in StatisticsCards.tsx
 
   // Função para simular sorteio (para teste)
   const simulateDrawing = () => {
@@ -1723,8 +1758,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     const startDate = new Date(profitParams.startDate);
 
     for (let day = 0; day < profitParams.days; day++) {
-      const currentDate = new Date(startDate);
-      currentDate.setDate(startDate.getDate() + day);
+      // Criar data corretamente para evitar problemas de fuso horário
+      const [year, month, dayOfMonth] = profitParams.startDate.split('-').map(Number);
+      const currentDate = new Date(year, month - 1, dayOfMonth + day);
       
       let dailyProfit;
       if (profitParams.compoundInterest) {
@@ -1954,6 +1990,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             <span>Rentabilidade:</span>
             <span>${((totalProfit / profitParams.initialValue) * 100).toFixed(2)}%</span>
           </div>
+          <div class="total-row">
+            <span>Média Diária:</span>
+            <span>R$ ${(totalProfit / profitParams.days).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
         </div>
 
         <button class="print-btn" onclick="window.print()" title="Imprimir Relatório">
@@ -2021,8 +2061,17 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // useEffect para detectar padrão de corrida automaticamente
   useEffect(() => {
     if (lastNumbers.length >= 2) {
+      // CRÍTICO: Se já existe um padrão ativo, não detectar novos padrões
+      // O padrão só deve ser limpo quando há WIN/LOSS, não re-detectado
+      console.log('[DEBUG] Verificando padrão ativo:', { patternAlert: !!patternAlert, type: patternAlert?.type });
+      if (patternAlert && patternAlert.type === 'race') {
+        console.log('[DEBUG] Padrão já ativo, não detectando novos padrões');
+        return;
+      }
       // Converter lastNumbers para o formato esperado pela função checkForRaceCondition
-      const history = lastNumbers.map((number, index) => ({
+      // CRÍTICO: Reverter ordem pois checkForRaceCondition espera mais recente primeiro
+      const reversedNumbers = [...lastNumbers].reverse();
+      const history = reversedNumbers.map((number, index) => ({
         number,
         color: getNumberColor(number) as 'green' | 'red' | 'black',
         createdAt: new Date(Date.now() - (index * 1000))
@@ -2040,6 +2089,16 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             isUltimo: index === raceResult.riskNumbers.length - 1
           }))
         });
+        
+        // CRÍTICO: Verificar se já existe um padrão ativo e se o novo número é um WIN
+        const lastNumber = lastNumbers[0]; // O número mais recente
+        if (patternAlert && patternAlert.type === 'race' && patternAlert.betNumbers) {
+          if (patternAlert.betNumbers.includes(lastNumber)) {
+            console.log(`[CRITICAL WIN DETECTED] Número ${lastNumber} é WIN do padrão ativo! NÃO criando novo padrão.`);
+            // WIN detectado! Não criar novo padrão, manter o estado limpo
+            return;
+          }
+        }
         
         // Gerar mensagem do alerta
         const message = `Race detectada! Aposte nos números: ${raceResult.raceNumbers.join(' e ')}\n\nNúmeros no risco (7): ${raceResult.riskNumbers.join(', ')}\n\nCobertura: ${raceResult.coveredNumbers.length} números (${Math.round((raceResult.coveredNumbers.length / 37) * 100)}%)`;
@@ -2067,13 +2126,11 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           setForcedPattern(null);
         }
       } else {
-        // Limpar destaques se não há padrão (apenas se não estiver simulando)
-        if (!isSimulatingRef.current) {
-          setPatternAlert(null);
-          setHighlightedBetNumbers([]);
-          setHighlightedRiskNumbers([]);
-          setHighlightedBaseNumbers([]);
-        }
+        // Limpar destaques se não há padrão (SEMPRE, mesmo durante simulação)
+        setPatternAlert(null);
+        setHighlightedBetNumbers([]);
+        setHighlightedRiskNumbers([]);
+        setHighlightedBaseNumbers([]);
       }
     }
   }, [lastNumbers]);
@@ -3033,6 +3090,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             lossCount={lossCount}
             p2WinCount={p2WinCount}
             p2LossCount={p2LossCount}
+            setP2WinCount={setP2WinCount}
+            setP2LossCount={setP2LossCount}
             numbersWithoutPattern={numbersWithoutPattern}
             totalNumbersWithoutPattern={totalNumbersWithoutPattern}
             lastNumbers={lastNumbers}
@@ -3141,7 +3200,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     {/* Modal de Cálculo de Lucro */}
     {showProfitModal && (
       <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[500px] flex">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[500px] flex">
           {/* Lado Esquerdo - Formulário */}
           <div className="w-1/2 p-6 border-r border-gray-200">
             <div className="flex justify-between items-center mb-6">
@@ -3286,17 +3345,23 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               {/* Totalizadores abaixo dos botões */}
               {profitResults.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-3 gap-3 text-sm">
                     <div className="bg-green-50 p-3 rounded-lg">
                       <div className="text-gray-600">Total de Lucro:</div>
-                      <div className="text-lg font-bold text-green-600">
-                        R$ {profitResults[profitResults.length - 1]?.totalAccumulated.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0,00'}
+                      <div className="text-base font-bold text-green-600 text-right">
+                        R$ {profitResults[profitResults.length - 1]?.totalAccumulated.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0,00'}
                       </div>
                     </div>
                     <div className="bg-blue-50 p-3 rounded-lg">
                       <div className="text-gray-600">Total Geral:</div>
-                      <div className="text-lg font-bold text-blue-600">
-                        R$ {profitResults[profitResults.length - 1]?.currentBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0,00'}
+                      <div className="text-base font-bold text-blue-600 text-right">
+                        R$ {profitResults[profitResults.length - 1]?.currentBalance.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0,00'}
+                      </div>
+                    </div>
+                    <div className="bg-purple-50 p-3 rounded-lg">
+                      <div className="text-gray-600">Média Diária:</div>
+                      <div className="text-base font-bold text-purple-600 text-right">
+                        R$ {((profitResults[profitResults.length - 1]?.totalAccumulated || 0) / profitParams.days).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                       </div>
                     </div>
                   </div>
@@ -3770,3 +3835,19 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 };
 
 export default RouletteBoard;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

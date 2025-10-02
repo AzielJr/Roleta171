@@ -1,5 +1,27 @@
 import { RouletteEntry } from '../types/roulette';
 
+// Função para detectar o padrão 171
+export function checkFor171Pattern(history: RouletteEntry[]): { hasPattern: boolean, numbers: number[] } {
+  // Precisamos de pelo menos 3 números para verificar o padrão
+  if (history.length < 3) {
+    return { hasPattern: false, numbers: [] };
+  }
+  
+  // Pegamos os últimos 3 números
+  const lastThree = history.slice(-3).map(entry => entry.number);
+  
+  // Verificamos se os números formam o padrão 171
+  // Padrão 171: primeiro número é 1, segundo é 7, terceiro é 1
+  if (lastThree[0] === 1 && lastThree[1] === 7 && lastThree[2] === 1) {
+    return { 
+      hasPattern: true, 
+      numbers: lastThree 
+    };
+  }
+  
+  return { hasPattern: false, numbers: [] };
+}
+
 // Ordem física dos números na roda da roleta
 const WHEEL_ORDER = [
   0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26

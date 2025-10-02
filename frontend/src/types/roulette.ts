@@ -37,6 +37,7 @@ export interface Alert {
   coveredNumbers: number[];
   riskNumbers: number[];
   message: string;
+  type?: string; // Propriedade opcional para tipo de alerta
 }
 
 export interface RouletteEntry {

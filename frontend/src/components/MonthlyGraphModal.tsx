@@ -568,3 +568,5 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
     </div>
   );
 };
+
+export default MonthlyGraphModal;

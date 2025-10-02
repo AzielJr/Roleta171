@@ -26,6 +26,8 @@ interface StatisticsCardsProps {
   // Novos props para P2 persistente
   p2WinCount?: number;
   p2LossCount?: number;
+  setP2WinCount?: (value: number | ((prev: number) => number)) => void;
+  setP2LossCount?: (value: number | ((prev: number) => number)) => void;
 }
 
 // Função para calcular números expostos no padrão 171 Forçado
@@ -239,6 +241,8 @@ const calculateP2Stats = (lastNumbers: number[]): {
   hasRecentEntry: boolean;
   hasConsecutiveEntries: boolean;
 } => {
+  console.log('🔍 P2 MODE 1 CALC - Input:', lastNumbers.slice(-10)); // Mostrar apenas os últimos 10
+  
   if (lastNumbers.length === 0) {
     return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false };
   }
@@ -251,14 +255,14 @@ const calculateP2Stats = (lastNumbers: number[]): {
   let hasRecentEntry = false;
   let hasConsecutiveEntries = false;
 
-  // Verificar se o número mais recente é uma entrada
-  if (P2_ENTRY_NUMBERS.includes(lastNumbers[0])) {
+  // Verificar se o número mais recente é uma entrada (CORREÇÃO: último do array)
+  if (lastNumbers.length > 0 && P2_ENTRY_NUMBERS.includes(lastNumbers[lastNumbers.length - 1])) {
     hasRecentEntry = true;
   }
 
-  // Verificar entradas consecutivas (2 ou mais)
+  // Verificar entradas consecutivas (2 ou mais) - CORREÇÃO: começar do final do array
   let consecutiveEntries = 0;
-  for (let i = 0; i < Math.min(lastNumbers.length, 10); i++) {
+  for (let i = lastNumbers.length - 1; i >= 0 && consecutiveEntries < 10; i--) {
     if (P2_ENTRY_NUMBERS.includes(lastNumbers[i])) {
       consecutiveEntries++;
     } else {
@@ -269,9 +273,9 @@ const calculateP2Stats = (lastNumbers: number[]): {
 
   // Calcular estatísticas baseadas nos números
   // WIN/LOSS só é computado APÓS cada ENTRADA específica (padrão P2)
-  // lastNumbers[0] é o mais recente, então vamos percorrer do mais antigo para o mais recente
+  // lastNumbers[length-1] é o mais recente, percorrer do mais antigo para o mais recente
   
-  for (let i = lastNumbers.length - 1; i >= 0; i--) { // Percorrer do mais antigo para o mais recente
+  for (let i = 0; i < lastNumbers.length; i++) { // Percorrer do mais antigo para o mais recente
     const number = lastNumbers[i];
     
     // Se encontrou uma entrada P2, incrementa entradas e verifica o próximo número
@@ -279,16 +283,16 @@ const calculateP2Stats = (lastNumbers: number[]): {
       entradas++;
       
       // Verificar se há um próximo número (mais recente) para determinar WIN/LOSS
-      if (i > 0) { // Se não é o número mais recente
-        const nextNumber = lastNumbers[i - 1]; // Próximo número (mais recente)
+      if (i < lastNumbers.length - 1) { // Se não é o número mais recente
+        const nextNumber = lastNumbers[i + 1]; // Próximo número (mais recente)
         
-        if (P2_LOSS_NUMBERS.includes(nextNumber)) {
-          // LOSS: Se o próximo número após entrada P2 for um dos números do padrão P2
+        if (P2_ENTRY_NUMBERS.includes(nextNumber)) {
+          // LOSS: Se o próximo número após entrada P2 for outro número P2 (consecutivo)
           losses++;
           currentNegativeSequence++;
           maxNegativeSequence = Math.max(maxNegativeSequence, currentNegativeSequence);
         } else {
-          // WIN: Se o próximo número após entrada P2 NÃO for um dos números do padrão P2
+          // WIN: Se o próximo número após entrada P2 NÃO for um número P2
           wins++;
           currentNegativeSequence = 0; // Reset sequência negativa
         }
@@ -296,7 +300,9 @@ const calculateP2Stats = (lastNumbers: number[]): {
     }
   }
 
-  return { entradas, wins, losses, maxNegativeSequence, hasRecentEntry, hasConsecutiveEntries };
+  const result = { entradas, wins, losses, maxNegativeSequence, hasRecentEntry, hasConsecutiveEntries };
+  console.log('📊 P2 MODE 1 RESULT:', result);
+  return result;
 };
 
 // Função para calcular estatísticas P2 no modo 2 (entradas consecutivas)
@@ -308,6 +314,8 @@ const calculateP2StatsMode2 = (lastNumbers: number[]): {
   hasRecentEntry: boolean;
   hasConsecutiveEntries: boolean;
 } => {
+  console.log('🔍 P2 MODE 2 CALC - Input:', lastNumbers.slice(-10)); // Mostrar apenas os últimos 10
+  
   if (lastNumbers.length === 0) {
     return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false };
   }
@@ -320,48 +328,51 @@ const calculateP2StatsMode2 = (lastNumbers: number[]): {
   let hasRecentEntry = false;
   let hasConsecutiveEntries = false;
 
-  // Verificar se há entrada recente (último número é P2)
-  if (P2_ENTRY_NUMBERS.includes(lastNumbers[0])) {
+  // Verificar se há entrada recente (último número é P2) - CORREÇÃO: último do array
+  if (lastNumbers.length > 0 && P2_ENTRY_NUMBERS.includes(lastNumbers[lastNumbers.length - 1])) {
     hasRecentEntry = true;
   }
 
-  // Verificar se há entradas consecutivas (dois últimos números são P2)
-  if (lastNumbers.length >= 2 && 
-      P2_ENTRY_NUMBERS.includes(lastNumbers[0]) && 
-      P2_ENTRY_NUMBERS.includes(lastNumbers[1])) {
-    hasConsecutiveEntries = true;
+  // Verificar se há entradas consecutivas (2 ou mais P2 consecutivos do final)
+  let consecutiveEntries = 0;
+  for (let i = lastNumbers.length - 1; i >= 0 && consecutiveEntries < 10; i--) {
+    if (P2_ENTRY_NUMBERS.includes(lastNumbers[i])) {
+      consecutiveEntries++;
+    } else {
+      break;
+    }
   }
+  hasConsecutiveEntries = consecutiveEntries >= 2;
 
-  // NOVA LÓGICA CORRIGIDA: Para cada entrada, verificar se é WIN ou LOSS
-  // Percorrer do mais antigo para o mais recente (reverso)
-  for (let i = lastNumbers.length - 1; i >= 1; i--) {
-    const currentNumber = lastNumbers[i];
-    const nextNumber = lastNumbers[i - 1]; // Próximo número (mais recente)
+  // LÓGICA MODO 2: Só incrementa ENTRADAS a partir do 2º número consecutivo P2
+  // Percorrer do mais antigo para o mais recente
+  for (let i = 0; i < lastNumbers.length; i++) {
+    const number = lastNumbers[i];
     
-    // Se o número atual é P2 e o anterior também é P2 → ENTRADA
-    if (P2_ENTRY_NUMBERS.includes(currentNumber) && P2_ENTRY_NUMBERS.includes(nextNumber)) {
-      entradas++;
+    // Se encontrou uma entrada P2
+    if (P2_ENTRY_NUMBERS.includes(number)) {
       
-      // Verificar se há um número após o próximo para determinar WIN/LOSS
-      if (i >= 2) {
-        const numberAfterNext = lastNumbers[i - 2];
+      // DIFERENÇA DO MODO 2: Só incrementa ENTRADAS se o número ANTERIOR também for P2
+      // (ou seja, a partir do 2º número de uma sequência consecutiva)
+      let isValidEntry = (i > 0 && P2_ENTRY_NUMBERS.includes(lastNumbers[i - 1]));
+      
+      if (isValidEntry) {
+        entradas++;
         
-        if (P2_ENTRY_NUMBERS.includes(numberAfterNext)) {
-          // Se o número após o próximo também é P2 → LOSS (sequência continua)
-          losses++;
-          currentNegativeSequence++;
-          maxNegativeSequence = Math.max(maxNegativeSequence, currentNegativeSequence);
-        } else {
-          // Se o número após o próximo NÃO é P2 → WIN (sequência para)
-          wins++;
-          currentNegativeSequence = 0; // Reset sequência negativa
-        }
-      } else {
-        // Se não há número suficiente para determinar, considerar como pendente
-        // Para o último par, verificar se a sequência continua ou para
-        if (i === 1) {
-          // Este é o último par da sequência, não há como determinar WIN/LOSS ainda
-          // Deixar como entrada sem WIN/LOSS até que mais números sejam adicionados
+        // WIN/LOSS só é computado para entradas válidas no modo 2
+        if (i < lastNumbers.length - 1) {
+          const nextNumber = lastNumbers[i + 1];
+          
+          if (P2_ENTRY_NUMBERS.includes(nextNumber)) {
+            // LOSS: Se o próximo número após entrada P2 for outro número P2 (consecutivo)
+            losses++;
+            currentNegativeSequence++;
+            maxNegativeSequence = Math.max(maxNegativeSequence, currentNegativeSequence);
+          } else {
+            // WIN: Se o próximo número após entrada P2 NÃO for um número P2
+            wins++;
+            currentNegativeSequence = 0;
+          }
         }
       }
     }
@@ -375,9 +386,7 @@ const calculateP2StatsMode2 = (lastNumbers: number[]): {
     hasRecentEntry, 
     hasConsecutiveEntries 
   };
-  
-  console.log(`DEBUG P2 MODE 2: entradas=${entradas}, wins=${wins}, losses=${losses}, maxNegSeq=${maxNegativeSequence}`);
-  
+  console.log('📊 P2 MODE 2 RESULT:', result);
   return result;
 };
 
@@ -403,7 +412,7 @@ const RouletteBall = ({ number }: { number: number }) => (
   </div>
 );
 
-export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0 }: StatisticsCardsProps) {
+export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount }: StatisticsCardsProps) {
   const [showP2Modal, setShowP2Modal] = useState(false);
   const [p2Mode, setP2Mode] = useState<1 | 2>(1); // Estado para controlar o modo do toggle P2
   const lastP2ConsecutiveState = useRef(false);
@@ -570,18 +579,21 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     }
   }, [lastNumbers.join(',')]); // Monitorar todos os números, não apenas os últimos 3
 
+  // CORREÇÃO: Usar diretamente os valores calculados ao invés de contadores persistentes
+  // Os contadores persistentes estavam causando acumulação incorreta
+  
   // Efeito para controlar animações do P2 e tocar som
   useEffect(() => {
     if (calculatedP2Stats.hasConsecutiveEntries) {
-      setAnimatingP2('yellow');
+      setAnimatingP2('yellow'); // Borda laranja para P2 consecutivos (LOSS)
       
-      // Tocar som apenas quando P2 muda para consecutivo (não estava consecutivo antes)
+      // Tocar som APENAS quando P2 muda para consecutivo (borda laranja)
       if (!lastP2ConsecutiveState.current) {
         soundGenerator.playBellSound();
         lastP2ConsecutiveState.current = true;
       }
     } else if (calculatedP2Stats.hasRecentEntry) {
-      setAnimatingP2('green');
+      setAnimatingP2('green'); // Borda verde para primeira entrada P2 (SEM SOM)
       lastP2ConsecutiveState.current = false; // Reset quando não é mais consecutivo
     } else {
       setAnimatingP2('none');
