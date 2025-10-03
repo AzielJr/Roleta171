@@ -509,11 +509,19 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Estados para edição inline do saldo no header
   const [isEditingBalance, setIsEditingBalance] = useState<boolean>(false);
   const [editBalanceValue, setEditBalanceValue] = useState<string>('');
+  const editBalanceInputRef = useRef<HTMLInputElement>(null);
 
   // Função para iniciar edição do saldo
   const startEditingBalance = () => {
     setEditBalanceValue((balance || 0).toFixed(2));
     setIsEditingBalance(true);
+    // Usar setTimeout para garantir que o input seja renderizado antes de focar
+    setTimeout(() => {
+      if (editBalanceInputRef.current) {
+        editBalanceInputRef.current.focus();
+        editBalanceInputRef.current.select(); // Seleciona todo o texto
+      }
+    }, 0);
   };
 
   // Função para salvar novo saldo
@@ -2344,13 +2352,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               {isEditingBalance ? (
                 <div className="inline-flex items-center gap-1">
                   <input
+                    ref={editBalanceInputRef}
                     type="number"
                     value={editBalanceValue}
                     onChange={(e) => setEditBalanceValue(e.target.value)}
                     onKeyDown={handleBalanceKeyDown}
                     className="bg-green-600 text-white border border-green-400 rounded px-1 py-0 text-xs w-20 focus:outline-none focus:ring-1 focus:ring-green-300"
                     style={{fontSize: '12px', height: '18px'}}
-                    autoFocus
                   />
                   <button
                     onClick={saveBalance}

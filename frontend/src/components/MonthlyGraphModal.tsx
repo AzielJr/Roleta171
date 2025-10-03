@@ -132,15 +132,31 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         borderWidth: 2,
-        fill: true,
+        fill: false,
         tension: 0.4,
-        pointBackgroundColor: data.map(record => 
-          (record.vlr_lucro || 0) > 0 ? '#10b981' : (record.vlr_lucro || 0) < 0 ? '#ef4444' : '#6b7280'
-        ),
+        pointBackgroundColor: 'rgb(59, 130, 246)',
         pointBorderColor: '#ffffff',
         pointBorderWidth: 2,
         pointRadius: 6,
-        pointHoverRadius: 8
+        pointHoverRadius: 8,
+        yAxisID: 'y'
+      },
+      {
+        label: 'Saldo Atual (R$)',
+        data: data.map(record => {
+          return record.saldo_atual || 0;
+        }),
+        borderColor: 'rgb(16, 185, 129)',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.4,
+        pointBackgroundColor: 'rgb(16, 185, 129)',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        yAxisID: 'y1'
       }
     ]
   };
@@ -148,13 +164,25 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
   const chartOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
     plugins: {
       legend: {
-        display: false // Remove a legenda
+        display: true,
+        position: 'top',
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          font: {
+            size: 12
+          }
+        }
       },
       title: {
         display: true,
-        text: `Gráfico de Lucros - ${months.find(m => m.value === selectedMonth)?.label} ${selectedYear}`,
+        text: `Gráfico de Lucros e Saldos - ${months.find(m => m.value === selectedMonth)?.label} ${selectedYear}`,
         font: {
           size: 18,
           weight: 'bold'
@@ -168,16 +196,20 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
               style: 'currency',
               currency: 'BRL'
             }).format(value);
-            return `Lucro: ${formatted}`;
+            const label = context.dataset.label || '';
+            return `${label}: ${formatted}`;
           }
         }
       }
     },
     scales: {
       y: {
+        type: 'linear',
+        display: true,
+        position: 'left',
         beginAtZero: true,
         grid: {
-          color: 'rgba(0, 0, 0, 0.1)'
+          color: 'rgba(59, 130, 246, 0.1)'
         },
         ticks: {
           callback: function(value) {
@@ -186,6 +218,44 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
               currency: 'BRL',
               minimumFractionDigits: 0
             }).format(value as number);
+          },
+          color: 'rgb(59, 130, 246)'
+        },
+        title: {
+          display: true,
+          text: 'Valor do Lucro (R$)',
+          color: 'rgb(59, 130, 246)',
+          font: {
+            size: 12,
+            weight: 'bold'
+          }
+        }
+      },
+      y1: {
+        type: 'linear',
+        display: true,
+        position: 'right',
+        grid: {
+          drawOnChartArea: false,
+          color: 'rgba(16, 185, 129, 0.1)'
+        },
+        ticks: {
+          callback: function(value) {
+            return new Intl.NumberFormat('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+              minimumFractionDigits: 0
+            }).format(value as number);
+          },
+          color: 'rgb(16, 185, 129)'
+        },
+        title: {
+          display: true,
+          text: 'Saldo Atual (R$)',
+          color: 'rgb(16, 185, 129)',
+          font: {
+            size: 12,
+            weight: 'bold'
           }
         }
       },
@@ -295,7 +365,7 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
         </head>
         <body>
           <div class="header">
-            <h1>📊 Relatório de Lucros</h1>
+            <h1>📊 Relatório de Lucros e Saldos</h1>
             <h2>${months.find(m => m.value === selectedMonth)?.label} ${selectedYear}</h2>
             <p>Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
           </div>
@@ -328,8 +398,8 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
           </div>
           
           <div class="chart-container">
-            <h3>Gráfico de Lucros</h3>
-            ${chartImageData ? `<img src="${chartImageData}" alt="Gráfico de Lucros" class="chart-image" />` : '<p><em>Gráfico não disponível para impressão.</em></p>'}
+            <h3>Gráfico de Lucros e Saldos</h3>
+            ${chartImageData ? `<img src="${chartImageData}" alt="Gráfico de Lucros e Saldos" class="chart-image" />` : '<p><em>Gráfico não disponível para impressão.</em></p>'}
             <div class="visual-summary">
               <strong>Resumo Visual:</strong> 
               Período: ${data.length > 0 ? `${String(new Date(data[0].data + 'T00:00:00').getDate()).padStart(2, '0')} a ${String(new Date(data[data.length - 1].data + 'T00:00:00').getDate()).padStart(2, '0')}` : 'N/A'} | 
@@ -338,28 +408,46 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
             </div>
           </div>
           
-          <h3>Valores de Lucro por Dia:</h3>
+          <h3>Valores por Dia (Saldo e Lucro):</h3>
           <div class="values-grid">
             ${data.map(record => {
-              const value = record.vlr_lucro || 0;
-              const isPositive = value > 0;
-              const isNegative = value < 0;
-              const className = isPositive ? 'positive' : isNegative ? 'negative' : 'neutral';
+              const lucroValue = record.vlr_lucro || 0;
+              const saldoValue = record.saldo_atual || 0;
+              const isLucroPositive = lucroValue > 0;
+              const isLucroNegative = lucroValue < 0;
+              const lucroClassName = isLucroPositive ? 'positive' : isLucroNegative ? 'negative' : 'neutral';
               const dateObj = new Date(record.data + 'T00:00:00');
               const day = String(dateObj.getDate()).padStart(2, '0');
               const dayName = dateObj.toLocaleDateString('pt-BR', { weekday: 'long' });
               const dayNameCapitalized = dayName.charAt(0).toUpperCase() + dayName.slice(1);
-              const formattedValue = new Intl.NumberFormat('pt-BR', {
+              
+              const formattedLucro = new Intl.NumberFormat('pt-BR', {
                 style: 'currency',
                 currency: 'BRL',
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
-              }).format(Math.abs(value));
+              }).format(Math.abs(lucroValue));
+              
+              const formattedSaldo = new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              }).format(saldoValue);
               
               return `
-                <div class="value-card ${className}">
+                <div class="value-card">
                   <div class="day-title">Dia ${day} - ${dayNameCapitalized}</div>
-                  <div class="value">${isNegative ? '-' : ''}${formattedValue}</div>
+                  <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 4px;">
+                    <div style="flex: 1; text-align: center; padding: 4px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px;">
+                      <div style="font-size: 9px; color: #6b7280;">Saldo</div>
+                      <div style="font-weight: bold; font-size: 10px; color: #059669;">${formattedSaldo}</div>
+                    </div>
+                    <div class="${lucroClassName}" style="flex: 1; text-align: center; padding: 4px; border-radius: 4px;">
+                      <div style="font-size: 9px; color: #6b7280;">Lucro</div>
+                      <div style="font-weight: bold; font-size: 10px;">${isLucroNegative ? '-' : ''}${formattedLucro}</div>
+                    </div>
+                  </div>
                 </div>
               `;
             }).join('')}
@@ -496,21 +584,28 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
               
               {/* Valores próximos aos pontos - SEMPRE VISÍVEL */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Valores de Lucro por Dia:</h3>
-                <div className="grid grid-cols-6 gap-3">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Valores por Dia:</h3>
+                <div className="grid grid-cols-4 gap-3">
                   {data.map((record, index) => {
-                    const value = record.vlr_lucro || 0;
-                    const isPositive = value > 0;
-                    const isNegative = value < 0;
-                    const color = isPositive ? 'text-blue-600' : isNegative ? 'text-red-600' : 'text-gray-600';
-                    const bgColor = isPositive ? 'bg-blue-50' : isNegative ? 'bg-red-50' : 'bg-gray-50';
-                    const borderColor = isPositive ? 'border-blue-200' : isNegative ? 'border-red-200' : 'border-gray-200';
-                    const formattedValue = new Intl.NumberFormat('pt-BR', {
+                    const lucroValue = record.vlr_lucro || 0;
+                    const saldoValue = record.saldo_atual || 0;
+                    const isLucroPositive = lucroValue > 0;
+                    const isLucroNegative = lucroValue < 0;
+                    const lucroColor = isLucroPositive ? 'text-blue-600' : isLucroNegative ? 'text-red-600' : 'text-gray-600';
+                    
+                    const formattedLucro = new Intl.NumberFormat('pt-BR', {
                        style: 'currency',
                        currency: 'BRL',
                        minimumFractionDigits: 2,
                        maximumFractionDigits: 2
-                     }).format(Math.abs(value));
+                     }).format(Math.abs(lucroValue));
+                     
+                    const formattedSaldo = new Intl.NumberFormat('pt-BR', {
+                       style: 'currency',
+                       currency: 'BRL',
+                       minimumFractionDigits: 2,
+                       maximumFractionDigits: 2
+                     }).format(saldoValue);
                     
                     // Processamento correto da data
                     const dateObj = new Date(record.data + 'T00:00:00'); // Força timezone local
@@ -518,14 +613,25 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
                     const dayName = dateObj.toLocaleDateString('pt-BR', { weekday: 'long' });
                     const dayNameCapitalized = dayName.charAt(0).toUpperCase() + dayName.slice(1);
                      
-                     // Debug temporário
-                     // console.log(`Seção Valores - Index ${index}: Data=${record.data}, Dia=${day}, Lucro=${value}, Formatted=${formattedValue}`);
-                     
                      return (
                        <div key={`${record.data}-${index}`} className="text-center">
-                         <div className={`${color} ${bgColor} ${borderColor} px-3 py-2 rounded-lg shadow-sm border-2 font-bold text-xs`}>
-                           <div className="text-gray-500 text-xs mb-1">Dia {day} - {dayNameCapitalized}</div>
-                           <div>{isNegative ? '-' : ''}{formattedValue}</div>
+                         <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+                           <div className="text-gray-500 text-xs mb-2 font-medium">Dia {day} - {dayNameCapitalized}</div>
+                           
+                           {/* Saldo e Lucro no mesmo card */}
+                           <div className="flex justify-between gap-2">
+                             {/* Saldo (Esquerda) */}
+                             <div className="flex-1 text-green-600 bg-green-50 border-green-200 px-2 py-1 rounded border">
+                               <div className="text-xs text-gray-600">Saldo</div>
+                               <div className="font-bold text-xs">{formattedSaldo}</div>
+                             </div>
+                             
+                             {/* Lucro (Direita) */}
+                             <div className={`flex-1 ${lucroColor} bg-blue-50 border-blue-200 px-2 py-1 rounded border`}>
+                               <div className="text-xs text-gray-600">Lucro</div>
+                               <div className="font-bold text-xs">{isLucroNegative ? '-' : ''}{formattedLucro}</div>
+                             </div>
+                           </div>
                          </div>
                        </div>
                      );
