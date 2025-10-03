@@ -30,7 +30,7 @@ interface StatisticsCardsProps {
   setP2LossCount?: (value: number | ((prev: number) => number)) => void;
   // Props para configurações do sistema
   avisosSonorosAtivos?: boolean;
-  mostrarpadrao5x3Race?: boolean;
+  mostrarPadrao5x3Race?: boolean;
 }
 
 // Função para calcular números expostos no padrão 171 Forçado
@@ -398,7 +398,7 @@ const RouletteBall = ({ number }: { number: number }) => (
   </div>
 );
 
-export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount, avisosSonorosAtivos = true, mostrarpadrao5x3Race = false }: StatisticsCardsProps) {
+export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount, avisosSonorosAtivos = true, mostrarPadrao5x3Race = false }: StatisticsCardsProps) {
   const [showP2Modal, setShowP2Modal] = useState(false);
   const [p2Mode, setP2Mode] = useState<1 | 2>(1); // Estado para controlar o modo do toggle P2
   const lastP2ConsecutiveState = useRef(false);
@@ -833,6 +833,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 }
 
 export default StatisticsCards;
+
 
 
 
