@@ -28,6 +28,9 @@ interface StatisticsCardsProps {
   p2LossCount?: number;
   setP2WinCount?: (value: number | ((prev: number) => number)) => void;
   setP2LossCount?: (value: number | ((prev: number) => number)) => void;
+  // Props para configurações do sistema
+  avisosSonorosAtivos?: boolean;
+  mostrarpadrao5x3Race?: boolean;
 }
 
 // Função para calcular números expostos no padrão 171 Forçado
@@ -121,115 +124,98 @@ const P2_LOSS_NUMBERS = [3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
 // Números de WIN para P2
 const P2_WIN_NUMBERS = [0, 1, 2, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 19, 20, 23, 24, 26, 27, 28, 30, 31, 32, 34, 35];
 
-// Números de entrada para Padrão 72
-const PADRAO72_ENTRY_NUMBERS = [2, 12, 22, 32, 7, 17, 27];
-
-// Função para calcular 9 vizinhos de cada lado de um número na sequência da roleta
-const calculateRouletteNeighbors = (centerNumber: number): number[] => {
-  const centerIndex = ROULETTE_SEQUENCE.indexOf(centerNumber);
-  if (centerIndex === -1) return [];
-
-  const neighbors: number[] = [];
-  const totalNumbers = ROULETTE_SEQUENCE.length;
-
-  // NÃO incluir o número central - apenas os vizinhos
-
-  // Adicionar 9 vizinhos de cada lado (18 vizinhos total)
-  for (let i = 1; i <= 9; i++) {
-    // Vizinho à esquerda (sentido anti-horário)
-    const leftIndex = (centerIndex - i + totalNumbers) % totalNumbers;
-    neighbors.push(ROULETTE_SEQUENCE[leftIndex]);
-
-    // Vizinho à direita (sentido horário)
-    const rightIndex = (centerIndex + i) % totalNumbers;
-    neighbors.push(ROULETTE_SEQUENCE[rightIndex]);
-  }
-
-  return neighbors;
+// Função para calcular números sugeridos do 5x3
+const calculatepadrao5x3Numbers = (lastNumber: number): { first: number; second: number; third: number } => {
+  const lastIndex = ROULETTE_SEQUENCE.indexOf(lastNumber);
+  if (lastIndex === -1) return { first: 0, second: 0, third: 0 };
+  
+  // Primeiro número: +6 índices à frente (sentido horário)
+  const firstIndex = (lastIndex + 6) % ROULETTE_SEQUENCE.length;
+  const first = ROULETTE_SEQUENCE[firstIndex];
+  
+  // Segundo número: +18 índices à frente (sentido horário)
+  const secondIndex = (lastIndex + 18) % ROULETTE_SEQUENCE.length;
+  const second = ROULETTE_SEQUENCE[secondIndex];
+  
+  // Terceiro número: +30 índices à frente (sentido horário)
+  const thirdIndex = (lastIndex + 30) % ROULETTE_SEQUENCE.length;
+  const third = ROULETTE_SEQUENCE[thirdIndex];
+  
+  return { first, second, third };
 };
 
-// Função para calcular estatísticas do Padrão 72
-const calculatePadrao72Stats = (lastNumbers: number[]): { 
+// Função para calcular números expostos (LOSS) do 5x3
+const calculatepadrao5x3LossNumbers = (baseNumber: number): number[] => {
+  const baseIndex = ROULETTE_SEQUENCE.indexOf(baseNumber);
+  if (baseIndex === -1) return [];
+  
+  // Os 4 números expostos são os índices: 0, 12, 24, 36
+  const exposedIndices = [0, 12, 24, 36];
+  const exposedNumbers: number[] = [];
+  
+  exposedIndices.forEach(offset => {
+    const targetIndex = (baseIndex + offset) % ROULETTE_SEQUENCE.length;
+    exposedNumbers.push(ROULETTE_SEQUENCE[targetIndex]);
+  });
+  
+  return exposedNumbers;
+};
+
+// Função para calcular estatísticas do 5x3
+const calculatepadrao5x3Stats = (lastNumbers: number[]): { 
   entradas: number; 
   wins: number; 
-  losses: number; 
-  maxNegativeSequence: number;
-  hasRecentEntry: boolean;
+  losses: number;
+  maxPositiveSequence: number;
+  suggestedNumbers: { first: number; second: number; third: number };
 } => {
-  console.log('🔍 [DEBUG PADRÃO 72 FUNCTION] Iniciando cálculo com:', lastNumbers);
-  
   if (lastNumbers.length === 0) {
-    console.log('🔍 [DEBUG PADRÃO 72 FUNCTION] Histórico vazio, retornando zeros');
-    return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, hasRecentEntry: false };
+    return { entradas: 0, wins: 0, losses: 0, maxPositiveSequence: 0, suggestedNumbers: { first: 0, second: 0, third: 0 } };
   }
 
   let entradas = 0;
   let wins = 0;
   let losses = 0;
-  let maxNegativeSequence = 0;
-  let currentNegativeSequence = 0;
-  let hasRecentEntry = false;
-
-  // Verificar se o ÚLTIMO número é uma entrada (para o alerta laranja)
-  const lastNumber = lastNumbers[lastNumbers.length - 1]; // Último número da lista (mais recente)
-  hasRecentEntry = PADRAO72_ENTRY_NUMBERS.includes(lastNumber);
-  console.log('🔍 [DEBUG PADRÃO 72 FUNCTION] Último número:', lastNumber, 'É entrada?', hasRecentEntry);
+  let maxPositiveSequence = 0;
+  let currentPositiveSequence = 0;
   
-  // Se é uma entrada e é o único número, contar como entrada
-  if (hasRecentEntry && lastNumbers.length === 1) {
-    entradas = 1;
-    console.log('🔍 [DEBUG PADRÃO 72 FUNCTION] Número único é entrada! Total entradas: 1');
-    const result = { entradas, wins, losses, maxNegativeSequence, hasRecentEntry };
-    console.log('🔍 [DEBUG PADRÃO 72 FUNCTION] Resultado final (entrada única):', result);
-    return result;
-  }
+  // Calcular números sugeridos baseado no último número
+  const lastNumber = lastNumbers[lastNumbers.length - 1];
+  const suggestedNumbers = calculatepadrao5x3Numbers(lastNumber);
 
-  // CORREÇÃO: Agora processar na ordem cronológica correta (do mais antigo para o mais recente)
-  for (let i = 0; i < lastNumbers.length; i++) {
+  // Analisar todos os números para calcular estatísticas
+  // Cada número é uma "entrada" no 5x3
+  for (let i = 0; i < lastNumbers.length - 1; i++) {
     const currentNumber = lastNumbers[i];
-    const nextNumber = i < lastNumbers.length - 1 ? lastNumbers[i + 1] : null; // Próximo número na sequência temporal
+    const nextNumber = lastNumbers[i + 1];
     
-    if (nextNumber !== null) {
-      console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] Analisando sequência: ${currentNumber} -> ${nextNumber}`);
+    entradas++;
+    
+    // Calcular números de LOSS para o número atual
+    const lossNumbers = calculatepadrao5x3LossNumbers(currentNumber);
+    
+    // Verificar se o próximo número é LOSS ou WIN
+    if (lossNumbers.includes(nextNumber)) {
+      losses++;
+      // LOSS: resetar sequência positiva atual
+      currentPositiveSequence = 0;
     } else {
-      console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] Analisando: ${currentNumber} (último da sequência)`);
-    }
-
-    // Verificar se o número atual é uma entrada do Padrão 72
-    if (PADRAO72_ENTRY_NUMBERS.includes(currentNumber)) {
-      entradas++;
-      console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] ${currentNumber} é entrada! Total entradas: ${entradas}`);
-      
-      // Só avaliar WIN/LOSS se há um próximo número na sequência temporal
-      if (nextNumber !== null) {
-        // Calcular vizinhos do número atual
-        const neighbors = calculateRouletteNeighbors(currentNumber);
-        console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] Vizinhos de ${currentNumber}:`, neighbors);
-        
-        // Verificar se o próximo número é vizinho
-        if (neighbors.includes(nextNumber)) {
-          wins++;
-          currentNegativeSequence = 0; // Reset da sequência negativa
-          console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] WIN! ${nextNumber} é vizinho de ${currentNumber}. Total wins: ${wins}`);
-        } else {
-          losses++;
-          currentNegativeSequence++;
-          maxNegativeSequence = Math.max(maxNegativeSequence, currentNegativeSequence);
-          console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] LOSS! ${nextNumber} NÃO é vizinho de ${currentNumber}. Total losses: ${losses}, Seq negativa: ${currentNegativeSequence}`);
-        }
-      } else {
-        console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] ${currentNumber} é entrada mas é o último número da sequência`);
+      wins++;
+      // WIN: incrementar sequência positiva atual
+      currentPositiveSequence++;
+      // Atualizar maior sequência se necessário
+      if (currentPositiveSequence > maxPositiveSequence) {
+        maxPositiveSequence = currentPositiveSequence;
       }
-    } else {
-      // Se não é uma entrada, resetar sequência negativa
-      currentNegativeSequence = 0;
-      console.log(`🔍 [DEBUG PADRÃO 72 FUNCTION] ${currentNumber} não é entrada, resetando sequência negativa`);
     }
   }
+  
+  // Se há pelo menos um número, contar como entrada (para o último número)
+  if (lastNumbers.length > 0) {
+    entradas++;
+  }
 
-  const result = { entradas, wins, losses, maxNegativeSequence, hasRecentEntry };
-  console.log('🔍 [DEBUG PADRÃO 72 FUNCTION] Resultado final:', result);
-  return result;
+  return { entradas, wins, losses, maxPositiveSequence, suggestedNumbers };
 };
 
 // Função para calcular estatísticas do P2 (modo 1 - original)
@@ -412,7 +398,7 @@ const RouletteBall = ({ number }: { number: number }) => (
   </div>
 );
 
-export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount }: StatisticsCardsProps) {
+export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount, avisosSonorosAtivos = true, mostrarpadrao5x3Race = false }: StatisticsCardsProps) {
   const [showP2Modal, setShowP2Modal] = useState(false);
   const [p2Mode, setP2Mode] = useState<1 | 2>(1); // Estado para controlar o modo do toggle P2
   const lastP2ConsecutiveState = useRef(false);
@@ -422,12 +408,9 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     return p2Mode === 1 ? calculateP2Stats(lastNumbers) : calculateP2StatsMode2(lastNumbers);
   }, [lastNumbers, p2Mode]);
 
-  // Calcular estatísticas do Padrão 72 (placeholder - aguardando cálculos)
-  const calculatedPadrao72Stats = React.useMemo(() => {
-    console.log('🔍 [DEBUG PADRÃO 72] Calculando stats com lastNumbers:', lastNumbers);
-    const result = calculatePadrao72Stats(lastNumbers);
-    console.log('🔍 [DEBUG PADRÃO 72] Resultado calculado:', result);
-    return result;
+  // Calcular estatísticas do 5x3
+  const calculatedpadrao5x3Stats = React.useMemo(() => {
+    return calculatepadrao5x3Stats(lastNumbers);
   }, [lastNumbers]);
 
   const {
@@ -451,7 +434,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
   const [animatingEvenOdd, setAnimatingEvenOdd] = useState<Set<string>>(new Set());
   const [animatingColors, setAnimatingColors] = useState<Set<string>>(new Set());
   const [animatingP2, setAnimatingP2] = useState<'none' | 'green' | 'yellow'>('none');
-  const [animatingPadrao72, setAnimatingPadrao72] = useState<'none' | 'orange'>('none');
+  // Remover animações do Padrão 72 (não há alertas sonoros no 7x7)
 
   // Função para detectar 3 ou mais números consecutivos da mesma categoria
   const detectRepeatedCategories = () => {
@@ -587,8 +570,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     if (calculatedP2Stats.hasConsecutiveEntries) {
       setAnimatingP2('yellow'); // Borda laranja para P2 consecutivos (LOSS)
       
-      // Tocar som APENAS quando P2 muda para consecutivo (borda laranja)
-      if (!lastP2ConsecutiveState.current) {
+      // Tocar som APENAS quando P2 muda para consecutivo (borda laranja) E avisos sonoros estão ativos
+      if (!lastP2ConsecutiveState.current && avisosSonorosAtivos) {
         soundGenerator.playBellSound();
         lastP2ConsecutiveState.current = true;
       }
@@ -601,15 +584,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     }
   }, [calculatedP2Stats.hasConsecutiveEntries, calculatedP2Stats.hasRecentEntry]);
 
-  // Efeito para controlar animações do Padrão 72 e tocar som
-  useEffect(() => {
-    if (calculatedPadrao72Stats.hasRecentEntry) {
-      setAnimatingPadrao72('orange');
-      soundGenerator.playBellSound();
-    } else {
-      setAnimatingPadrao72('none');
-    }
-  }, [calculatedPadrao72Stats.hasRecentEntry]);
+  // 5x3 não tem alertas sonoros ou animações
 
   const StatCard = ({ title, data, colors, cardType = 'default' }: {
     title: string | React.ReactNode;
@@ -760,21 +735,28 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 
         <StatCard
           title={
-            <div className={`transition-all duration-300 ${
-              animatingPadrao72 === 'orange' 
-                ? 'animate-pulse-orange-border' 
-                : ''
-            }`}>
-              <span>Padrão 72</span>
+            <div className="flex justify-between items-center w-full">
+              <span>5x3</span>
+              <div className="flex items-center gap-1 text-xs">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs ${getRouletteColor(calculatedpadrao5x3Stats.suggestedNumbers.first)}`}>
+                  {calculatedpadrao5x3Stats.suggestedNumbers.first.toString().padStart(2, '0')}
+                </div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs ${getRouletteColor(calculatedpadrao5x3Stats.suggestedNumbers.second)}`}>
+                  {calculatedpadrao5x3Stats.suggestedNumbers.second.toString().padStart(2, '0')}
+                </div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs ${getRouletteColor(calculatedpadrao5x3Stats.suggestedNumbers.third)}`}>
+                  {calculatedpadrao5x3Stats.suggestedNumbers.third.toString().padStart(2, '0')}
+                </div>
+              </div>
             </div>
           }
           data={[
-            { label: 'Entradas', value: calculatedPadrao72Stats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedPadrao72Stats.entradas / totalNumbers) * 100) : 0 },
-            { label: 'WIN', value: calculatedPadrao72Stats.wins, percentage: (calculatedPadrao72Stats.wins + calculatedPadrao72Stats.losses) > 0 ? Math.round((calculatedPadrao72Stats.wins / (calculatedPadrao72Stats.wins + calculatedPadrao72Stats.losses)) * 100) : 0 },
-            { label: 'LOSS', value: calculatedPadrao72Stats.losses, percentage: (calculatedPadrao72Stats.wins + calculatedPadrao72Stats.losses) > 0 ? Math.round((calculatedPadrao72Stats.losses / (calculatedPadrao72Stats.wins + calculatedPadrao72Stats.losses)) * 100) : 0 },
-            { label: '> Seq. Negativa', value: calculatedPadrao72Stats.maxNegativeSequence, percentage: calculatedPadrao72Stats.entradas > 0 ? Math.round((calculatedPadrao72Stats.maxNegativeSequence / calculatedPadrao72Stats.entradas) * 100) : 0, hidePercentage: true }
+            { label: 'Entradas', value: calculatedpadrao5x3Stats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedpadrao5x3Stats.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: calculatedpadrao5x3Stats.wins, percentage: (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses) > 0 ? Math.round((calculatedpadrao5x3Stats.wins / (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses)) * 100) : 0 },
+            { label: 'LOSS', value: calculatedpadrao5x3Stats.losses, percentage: (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses) > 0 ? Math.round((calculatedpadrao5x3Stats.losses / (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses)) * 100) : 0 },
+            { label: '> Seq Positiva', value: calculatedpadrao5x3Stats.maxPositiveSequence, percentage: calculatedpadrao5x3Stats.entradas > 0 ? Math.round((calculatedpadrao5x3Stats.maxPositiveSequence / calculatedpadrao5x3Stats.entradas) * 100) : 0, hidePercentage: true }
           ]}
-          colors={['bg-purple-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
+          colors={['bg-purple-500', 'bg-green-500', 'bg-red-500', 'bg-blue-500']}
         />
 
         <StatCard
@@ -851,3 +833,10 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 }
 
 export default StatisticsCards;
+
+
+
+
+
+
+

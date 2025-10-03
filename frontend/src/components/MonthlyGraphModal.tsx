@@ -295,19 +295,19 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
             .header p { font-size: 10px; margin: 0; }
             .summary { 
               display: grid; 
-              grid-template-columns: repeat(3, 1fr); 
-              gap: 8px; 
+              grid-template-columns: repeat(4, 1fr); 
+              gap: 6px; 
               margin: 10px 0; 
             }
             .summary-item { 
               text-align: center; 
-              padding: 6px; 
+              padding: 4px; 
               border: 1px solid #ddd; 
               border-radius: 4px; 
-              font-size: 11px;
+              font-size: 10px;
             }
-            .summary-item h3 { font-size: 11px; margin: 0 0 3px 0; }
-            .summary-item p { margin: 0; font-size: 12px; }
+            .summary-item h3 { font-size: 10px; margin: 0 0 2px 0; }
+            .summary-item p { margin: 0; font-size: 11px; }
             .values-grid { 
               display: grid; 
               grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); 
@@ -351,8 +351,10 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
             }
             @media print { 
               body { margin: 8mm; padding: 4mm; font-size: 11px; } 
-              .summary { grid-template-columns: repeat(3, 1fr); gap: 4px; }
-              .summary-item { padding: 4px; font-size: 10px; }
+              .summary { grid-template-columns: repeat(4, 1fr); gap: 3px; }
+              .summary-item { padding: 3px; font-size: 9px; }
+              .summary-item h3 { font-size: 9px; margin: 0 0 1px 0; }
+              .summary-item p { font-size: 10px; }
               .values-grid { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 4px; }
               .value-card { padding: 4px; font-size: 9px; }
               .chart-image { max-height: 280px; page-break-inside: avoid; }
@@ -394,6 +396,14 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
             <div class="summary-item">
               <h3 style="color: ${saldoAtual >= 0 ? '#2563eb' : '#dc2626'};">Saldo Atual</h3>
               <p><strong style="color: ${saldoAtual >= 0 ? '#2563eb' : '#dc2626'};">${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(saldoAtual)}</strong></p>
+            </div>
+            <div class="summary-item">
+              <h3 style="color: ${mediaLucroDiaria >= 0 ? '#2563eb' : '#dc2626'};">Média Lucro Diária</h3>
+              <p><strong style="color: ${mediaLucroDiaria >= 0 ? '#2563eb' : '#dc2626'};">${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(mediaLucroDiaria)}</strong></p>
+            </div>
+            <div class="summary-item">
+              <h3 style="color: ${mediaPorcentagemDiaria >= 0 ? '#059669' : '#dc2626'};">Média % Diária</h3>
+              <p><strong style="color: ${mediaPorcentagemDiaria >= 0 ? '#059669' : '#dc2626'};">${mediaPorcentagemDiaria.toFixed(2)}%</strong></p>
             </div>
           </div>
           
@@ -472,6 +482,10 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
   // Calcular saldo inicial e atual
   const saldoInicial = data.length > 0 ? data[0].saldo_inicial : 0;
   const saldoAtual = data.length > 0 ? data[data.length - 1].saldo_atual : 0;
+  
+  // Calcular médias
+  const mediaLucroDiaria = data.length > 0 ? totalLucro / data.length : 0;
+  const mediaPorcentagemDiaria = data.length > 0 ? data.reduce((sum, record) => sum + (record.per_lucro || 0), 0) / data.length : 0;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -532,7 +546,7 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
             </div>
 
             {/* Estatísticas na mesma linha */}
-            <div className="flex gap-6">
+            <div className="flex gap-4">
               <div className="text-center">
                 <div className={`text-lg font-bold ${totalLucro >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                   {new Intl.NumberFormat('pt-BR', {
@@ -567,6 +581,21 @@ export const MonthlyGraphModal: React.FC<MonthlyGraphModalProps> = ({ onClose })
                   }).format(saldoAtual)}
                 </div>
                 <div className="text-xs text-gray-600">Saldo Atual</div>
+              </div>
+              <div className="text-center">
+                <div className={`text-lg font-bold ${mediaLucroDiaria >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                  {new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL'
+                  }).format(mediaLucroDiaria)}
+                </div>
+                <div className="text-xs text-gray-600">Média Lucro Diária</div>
+              </div>
+              <div className="text-center">
+                <div className={`text-lg font-bold ${mediaPorcentagemDiaria >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {mediaPorcentagemDiaria.toFixed(2)}%
+                </div>
+                <div className="text-xs text-gray-600">Média % Diária</div>
               </div>
             </div>
           </div>
