@@ -98,11 +98,7 @@ const calculate171ForcedStats = (lastNumbers: number[]): { wins: number; losses:
     
     const result = determine171ForcedResult(currentNumber, nextNumber);
     
-    if (result === 'WIN') {
-      wins++;
-    } else if (result === 'LOSS') {
-      losses++;
-    }
+    if (result === 'WIN') {`r`n      wins++;`r`n      currentPositiveSequence++;`r`n      if (currentPositiveSequence > maxPositiveSequence) {`r`n        maxPositiveSequence = currentPositiveSequence;`r`n      }`r`n    } else if (result === 'LOSS') {`r`n      losses++;`r`n      currentPositiveSequence = 0;`r`n    }
   }
   
   return { wins, losses, maxPositiveSequence, currentPositiveSequence };
@@ -854,6 +850,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 }
 
 export default StatisticsCards;
+
 
 
 
