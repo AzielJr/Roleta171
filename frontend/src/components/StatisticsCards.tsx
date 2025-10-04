@@ -818,7 +818,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
         </div>
         <StatCard
           title={
-            <div className="flex justify-between items-center w-full">`r`n                <span>📊 171</span>`r`n                <span className="font-normal text-xs text-gray-500">Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span></span>
+            <div className="flex justify-between items-center w-full">                <span>📊 171</span>                <span className="font-normal text-xs text-gray-500">Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span></span>
             </div>
           }
           data={[
@@ -879,6 +879,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 }
 
 export default StatisticsCards;
+
 
 
 
