@@ -786,8 +786,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
             { label: 'WIN', value: calculated171ForcedStats.wins, percentage: (calculated171ForcedStats.wins + calculated171ForcedStats.losses) > 0 ? Math.round((calculated171ForcedStats.wins / (calculated171ForcedStats.wins + calculated171ForcedStats.losses)) * 100) : 0 },
             { label: "LOSS", value: calculated171ForcedStats.losses, percentage: (calculated171ForcedStats.wins + calculated171ForcedStats.losses) > 0 ? Math.round((calculated171ForcedStats.losses / (calculated171ForcedStats.wins + calculated171ForcedStats.losses)) * 100) : 0 },
             { label: "Seq Positiva", value: calculated171ForcedStats.maxPositiveSequence, customValue: `${calculated171ForcedStats.currentPositiveSequence}/${calculated171ForcedStats.maxPositiveSequence}`, percentage: 0, hidePercentage: true }
-          colors={['bg-green-500', 'bg-red-500']}
-        />
+          ]}
+          colors=['bg-green-500', 'bg-red-500', 'bg-orange-500']
 
         <StatCard
           title={
