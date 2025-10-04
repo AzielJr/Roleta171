@@ -747,7 +747,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
             { label: 'LOSS', value: calculatedP2Stats.losses, percentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.losses / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0 },
             { label: '> Seq. Negativa', value: calculatedP2Stats.maxNegativeSequence, percentage: calculatedP2Stats.entradas > 0 ? Math.round((calculatedP2Stats.maxNegativeSequence / calculatedP2Stats.entradas) * 100) : 0, hidePercentage: true }
           ]}
-          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
+          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', '0']}
         />
 
         <StatCard
@@ -776,7 +776,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           colors={['bg-purple-500', 'bg-green-500', 'bg-red-500', 'bg-blue-500']}
         />
 
-        <StatCard
+        {/* Card 171 Forçado (5) customizado */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">171 Forçado (5)</h3>
           <div className="space-y-1 lg:space-y-2">
             {/* WIN */}
@@ -804,9 +805,9 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           </div>
           {/* Footer - Seq Positiva */}
           <div className="mt-3 pt-2 border-t border-gray-200">
-            <div className="flex justify-between items-center p-1 lg:p-2 rounded bg-orange-50">
+            <div className="flex justify-between items-center p-1 lg:p-2 rounded ">
               <div className="flex items-center space-x-1 lg:space-x-2">
-                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-orange-500"></div>
+                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full 0"></div>
                 <span className="text-xs lg:text-xs text-gray-600 truncate">Seq Positiva</span>
               </div>
               <div className="text-right">
@@ -879,6 +880,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 }
 
 export default StatisticsCards;
+
 
 
 
