@@ -79,13 +79,15 @@ const determine171ForcedResult = (selectedNumber: number, nextNumber: number): '
 };
 
 // Função para calcular estatísticas do 171 Forçado baseado nos últimos números
-const calculate171ForcedStats = (lastNumbers: number[]): { wins: number; losses: number } => {
+const calculate171ForcedStats = (lastNumbers: number[]): { wins: number; losses: number; maxPositiveSequence: number; currentPositiveSequence: number } => {
   let wins = 0;
   let losses = 0;
+  let maxPositiveSequence = 0;
+  let currentPositiveSequence = 0;
   
   // Precisa de pelo menos 2 números para fazer a análise
   if (lastNumbers.length < 2) {
-    return { wins, losses };
+    return { wins, losses, maxPositiveSequence, currentPositiveSequence };
   }
   
   // Analisar cada par de números consecutivos
@@ -103,7 +105,7 @@ const calculate171ForcedStats = (lastNumbers: number[]): { wins: number; losses:
     }
   }
   
-  return { wins, losses };
+  return { wins, losses, maxPositiveSequence, currentPositiveSequence };
 };
 
 // Cores reais da roleta para cada número
@@ -171,7 +173,7 @@ const calculatepadrao5x3Stats = (lastNumbers: number[]): {
   suggestedNumbers: { first: number; second: number; third: number };
 } => {
   if (lastNumbers.length === 0) {
-    return { entradas: 0, wins: 0, losses: 0, maxPositiveSequence: 0, currentPositiveSequence: 0, suggestedNumbers: { first: 0, second: 0, third: 0 } };
+    return { entradas: 0, wins: 0, losses: 0, maxPositiveSequence: 0, currentPositiveSequence: 0, suggestedNumbers: { first: 0, second: 0, third: 0 } { first: 0, second: 0, third: 0 } };
   }
 
   let entradas = 0;
@@ -179,37 +181,7 @@ const calculatepadrao5x3Stats = (lastNumbers: number[]): {
   let losses = 0;
   let maxPositiveSequence = 0;
   let currentPositiveSequence = 0;
-  
-  // Calcular números sugeridos baseado no último número
-  const lastNumber = lastNumbers[lastNumbers.length - 1];
-  const suggestedNumbers = calculatepadrao5x3Numbers(lastNumber);
-
-  // Analisar todos os números para calcular estatísticas
-  // Cada número é uma "entrada" no 5x3
-  for (let i = 0; i < lastNumbers.length - 1; i++) {
-    const currentNumber = lastNumbers[i];
-    const nextNumber = lastNumbers[i + 1];
-    
-    entradas++;
-    
-    // Calcular números de LOSS para o número atual
-    const lossNumbers = calculatepadrao5x3LossNumbers(currentNumber);
-    
-    // Verificar se o próximo número é LOSS ou WIN
-    if (lossNumbers.includes(nextNumber)) {
-      losses++;
-      // LOSS: resetar sequência positiva atual
-      currentPositiveSequence = 0;
-    } else {
-      wins++;
-      // WIN: incrementar sequência positiva atual
-      currentPositiveSequence++;
-      // Atualizar maior sequência se necessário
-      if (currentPositiveSequence > maxPositiveSequence) {
-        maxPositiveSequence = currentPositiveSequence;
-      }
-    }
-  }
+  // Calcular números sugeridos baseado no último número`r`n  const lastNumber = lastNumbers[lastNumbers.length - 1];`r`n  const suggestedNumbers = calculatepadrao5x3Numbers(lastNumber);`r`n  const lastNumber = lastNumbers[lastNumbers.length - 1];`r`n  const suggestedNumbers = calculatepadrao5x3Numbers(lastNumber);`r`n`r`n  // Analisar todos os números para calcular estatísticas`r`n  // Cada número é uma "entrada" no 5x3`r`n  for (let i = 0; i < lastNumbers.length - 1; i++) {`r`n    const currentNumber = lastNumbers[i];`r`n    const nextNumber = lastNumbers[i + 1];`r`n    `r`n    entradas++;`r`n    `r`n    // Calcular números de LOSS para o número atual`r`n    const lossNumbers = calculatepadrao5x3LossNumbers(currentNumber);`r`n    `r`n    // Verificar se o próximo número é LOSS ou WIN`r`n    if (lossNumbers.includes(nextNumber)) {`r`n      losses++;`r`n      // LOSS: resetar sequência positiva atual`r`n      currentPositiveSequence = 0;`r`n    } else {`r`n      wins++;`r`n      // WIN: incrementar sequência positiva atual`r`n      currentPositiveSequence++;`r`n      // Atualizar maior sequência se necessário`r`n      if (currentPositiveSequence > maxPositiveSequence) {`r`n        maxPositiveSequence = currentPositiveSequence;`r`n      }`r`n    }`r`n  }
   
   // Se há pelo menos um número, contar como entrada (para o último número)
   if (lastNumbers.length > 0) {
@@ -263,6 +235,8 @@ const calculateP2Stats = (lastNumbers: number[]): {
   let entradas = 0;
   let wins = 0;
   let losses = 0;
+  let maxPositiveSequence = 0;
+  let currentPositiveSequence = 0;
   let maxNegativeSequence = 0;
   let currentNegativeSequence = 0;
   let hasRecentEntry = false;
@@ -336,6 +310,8 @@ const calculateP2StatsMode2 = (lastNumbers: number[]): {
   let entradas = 0;
   let wins = 0;
   let losses = 0;
+  let maxPositiveSequence = 0;
+  let currentPositiveSequence = 0;
   let maxNegativeSequence = 0;
   let currentNegativeSequence = 0;
   let hasRecentEntry = false;
@@ -847,6 +823,14 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 }
 
 export default StatisticsCards;
+
+
+
+
+
+
+
+
 
 
 
