@@ -244,7 +244,6 @@ const calculatepadrao5x3Stats = (lastNumbers: number[]): {
 
 
   // Calcular números sugeridos baseado no último número
-  const suggestedNumbers = calculatepadrao5x3Numbers(lastNumber);
 
   return { entradas, wins, losses, maxPositiveSequence, currentPositiveSequence, suggestedNumbers };
 };
