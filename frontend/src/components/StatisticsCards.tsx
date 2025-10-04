@@ -646,7 +646,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
                     ? 'animate-pulse-color-size' 
                     : ''
                 }`}>
-                  {item.value}
+                  {item.customValue !== undefined ? item.customValue : item.value}
                 </div>
                 {!item.hidePercentage && (
                   <div className="text-xs lg:text-xs text-gray-500">{item.percentage}%</div>
@@ -847,6 +847,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 }
 
 export default StatisticsCards;
+
 
 
 
