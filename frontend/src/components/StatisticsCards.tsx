@@ -788,8 +788,9 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
             { label: "Seq Positiva", value: calculated171ForcedStats.maxPositiveSequence, customValue: `${calculated171ForcedStats.currentPositiveSequence}/${calculated171ForcedStats.maxPositiveSequence}`, percentage: 0, hidePercentage: true }
           ]}
           colors=['bg-green-500', 'bg-red-500', 'bg-orange-500']
+          colors={['bg-green-500', 'bg-red-500', 'bg-orange-500']}
+        />
 
-        <StatCard
           title={
             <div className="flex justify-between items-center w-full">
               <span>📊 171</span>
