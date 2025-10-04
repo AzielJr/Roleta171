@@ -804,7 +804,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
             </div>
           </div>
           {/* Footer - Seq Positiva */}
-          <div className="mt-3 pt-2 border-t border-gray-200">
+          <div className="mt-1 pt-1 border-t border-gray-200">
             <div className="flex justify-between items-center p-1 lg:p-2 rounded ">
               <div className="flex items-center space-x-1 lg:space-x-2">
                 <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full 0"></div>
@@ -880,6 +880,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 }
 
 export default StatisticsCards;
+
 
 
 
