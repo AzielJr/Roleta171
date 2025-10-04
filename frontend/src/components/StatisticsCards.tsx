@@ -779,7 +779,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
         {/* Card 171 Forçado (5) customizado */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">171 Forçado (5)</h3>
-          <div className="space-y-1 lg:space-y-2">
+          <div className="space-y-0.5">
             {/* WIN */}
             <div className="flex justify-between items-center p-1 lg:p-2 rounded">
               <div className="flex items-center space-x-1 lg:space-x-2">
@@ -880,6 +880,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 }
 
 export default StatisticsCards;
+
 
 
 
