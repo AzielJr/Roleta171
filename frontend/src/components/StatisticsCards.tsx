@@ -776,13 +776,13 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           colors={['bg-purple-500', 'bg-green-500', 'bg-red-500', 'bg-blue-500']}
         />
 
-        {/* Card 📊 171 customizado */}
+        {/* Card 171 Forçado (5) customizado */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
-          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">📊 171</h3>
+          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">171 Forçado (5)</h3>
           <div className="space-y-0.5">
             {/* WIN */}
-            <div className="flex justify-between items-center p-1 lg:p-2 rounded">
-              <div className="flex items-center space-x-1 lg:space-x-2">
+            <div className="flex justify-between items-center px-0 py-1 rounded">
+              <div className="flex items-center space-x-1">
                 <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-green-500"></div>
                 <span className="text-xs lg:text-xs text-gray-600 truncate">WIN</span>
               </div>
@@ -792,8 +792,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
               </div>
             </div>
             {/* LOSS */}
-            <div className="flex justify-between items-center p-1 lg:p-2 rounded">
-              <div className="flex items-center space-x-1 lg:space-x-2">
+            <div className="flex justify-between items-center px-0 py-1 rounded">
+              <div className="flex items-center space-x-1">
                 <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-red-500"></div>
                 <span className="text-xs lg:text-xs text-gray-600 truncate">LOSS</span>
               </div>
@@ -805,8 +805,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           </div>
           {/* Footer - Seq Positiva */}
           <div className="mt-0 pt-0">
-            <div className="flex justify-between items-center p-1 lg:p-2 rounded ">
-              <div className="flex items-center space-x-1 lg:space-x-2">
+            <div className="flex justify-between items-center px-0 py-1 rounded ">
+              <div className="flex items-center space-x-1">
                 <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-orange-500"></div>
                 <span className="text-xs lg:text-xs text-gray-600 truncate">Seq Positiva</span>
               </div>
@@ -818,8 +818,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
         </div>
         <StatCard
           title={
-            <div className="flex justify-between items-center w-full">
-              <span className="font-normal text-xs text-gray-500">Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span></span>
+            <div className="flex justify-between items-center w-full">`r`n                <span>📊 171</span>`r`n                <span className="font-normal text-xs text-gray-500">Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span></span>
             </div>
           }
           data={[
@@ -880,6 +879,10 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 }
 
 export default StatisticsCards;
+
+
+
+
 
 
 
