@@ -167,10 +167,11 @@ const calculatepadrao5x3Stats = (lastNumbers: number[]): {
   wins: number; 
   losses: number;
   maxPositiveSequence: number;
+  currentPositiveSequence: number;
   suggestedNumbers: { first: number; second: number; third: number };
 } => {
   if (lastNumbers.length === 0) {
-    return { entradas: 0, wins: 0, losses: 0, maxPositiveSequence: 0, suggestedNumbers: { first: 0, second: 0, third: 0 } };
+    return { entradas: 0, wins: 0, losses: 0, maxPositiveSequence: 0, currentPositiveSequence: 0, suggestedNumbers: { first: 0, second: 0, third: 0 } };
   }
 
   let entradas = 0;
@@ -215,7 +216,33 @@ const calculatepadrao5x3Stats = (lastNumbers: number[]): {
     entradas++;
   }
 
-  return { entradas, wins, losses, maxPositiveSequence, suggestedNumbers };
+  // Manter sequência atual se terminou com WIN
+
+  if (lastNumbers.length > 1) {
+
+    const lastNumber = lastNumbers[lastNumbers.length - 2];
+
+    const nextNumber = lastNumbers[lastNumbers.length - 1];
+
+    const lossNumbers = calculatepadrao5x3LossNumbers(lastNumber);
+
+    if (!lossNumbers.includes(nextNumber)) {
+
+      // Último foi WIN, manter currentPositiveSequence
+
+    } else {
+
+      // Último foi LOSS, resetar
+
+      currentPositiveSequence = 0;
+
+    }
+
+  }
+
+  
+
+  return { entradas, wins, losses, maxPositiveSequence, currentPositiveSequence, suggestedNumbers };
 };
 
 // Função para calcular estatísticas do P2 (modo 1 - original)
@@ -461,7 +488,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     
     // Encontrar a maior sequência contínua possível
     for (let len = 3; len <= lastNumbers.length; len++) {
-      const sequenceNumbers = lastNumbers.slice(0, len);
+      const sequenceNumbers = lastNumbers.slice(-len);
       
       // Verificar se todos os números da sequência são da mesma categoria
       const firstNum = sequenceNumbers[0];
@@ -588,7 +615,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 
   const StatCard = ({ title, data, colors, cardType = 'default' }: {
     title: string | React.ReactNode;
-    data: Array<{ label: string; value: number; percentage: number; hidePercentage?: boolean }>;
+    data: Array<{ label: string; value: number; percentage: number; hidePercentage?: boolean; customValue?: string }>;
     colors: string[];
     cardType?: 'columns' | 'dozens' | 'highLow' | 'evenOdd' | 'colors' | 'default';
   }) => (
@@ -601,20 +628,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           
           switch (cardType) {
             case 'columns':
-              isRepeated = animatingColumns.has(index + 1);
-              break;
-            case 'dozens':
-              isRepeated = animatingDozens.has(index + 1);
-              break;
-            case 'highLow':
-              isRepeated = animatingHighLow.has(index === 0 ? 'low' : 'high');
-              break;
-            case 'evenOdd':
-              isRepeated = animatingEvenOdd.has(index === 0 ? 'even' : 'odd');
-              break;
-            case 'colors':
-              const colorMap = ['red', 'black', 'green'];
-              isRepeated = animatingColors.has(colorMap[index]);
+              isRepeated = animatingColumns.has(index === 0 ? 3 : index === 1 ? 2 : 1);
               break;
             default:
               isRepeated = false;
@@ -674,9 +688,9 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
         <StatCard
           title="Colunas"
           data={[
-            { label: '1ª Coluna', value: statistics.columns.first, percentage: columnsPercentages.first },
+            { label: '3ª Coluna', value: statistics.columns.third, percentage: columnsPercentages.third },
             { label: '2ª Coluna', value: statistics.columns.second, percentage: columnsPercentages.second },
-            { label: '3ª Coluna', value: statistics.columns.third, percentage: columnsPercentages.third }
+            { label: '1ª Coluna', value: statistics.columns.first, percentage: columnsPercentages.first }
           ]}
           colors={['bg-emerald-500', 'bg-teal-500', 'bg-lime-500']}
           cardType="columns"
@@ -754,7 +768,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
             { label: 'Entradas', value: calculatedpadrao5x3Stats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedpadrao5x3Stats.entradas / totalNumbers) * 100) : 0 },
             { label: 'WIN', value: calculatedpadrao5x3Stats.wins, percentage: (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses) > 0 ? Math.round((calculatedpadrao5x3Stats.wins / (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses)) * 100) : 0 },
             { label: 'LOSS', value: calculatedpadrao5x3Stats.losses, percentage: (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses) > 0 ? Math.round((calculatedpadrao5x3Stats.losses / (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses)) * 100) : 0 },
-            { label: '> Seq Positiva', value: calculatedpadrao5x3Stats.maxPositiveSequence, percentage: calculatedpadrao5x3Stats.entradas > 0 ? Math.round((calculatedpadrao5x3Stats.maxPositiveSequence / calculatedpadrao5x3Stats.entradas) * 100) : 0, hidePercentage: true }
+            { label: 'Seq Positiva', value: calculatedpadrao5x3Stats.maxPositiveSequence, customValue: `${calculatedpadrao5x3Stats.currentPositiveSequence}/${calculatedpadrao5x3Stats.maxPositiveSequence}`, percentage: calculatedpadrao5x3Stats.entradas > 0 ? Math.round((calculatedpadrao5x3Stats.maxPositiveSequence / calculatedpadrao5x3Stats.entradas) * 100) : 0, hidePercentage: true }
           ]}
           colors={['bg-purple-500', 'bg-green-500', 'bg-red-500', 'bg-blue-500']}
         />
@@ -833,6 +847,22 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 }
 
 export default StatisticsCards;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
