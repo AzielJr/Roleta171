@@ -777,7 +777,6 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
         />
 
         <StatCard
-        {/* Card 171 Forçado (5) customizado com footer */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">171 Forçado (5)</h3>
           <div className="space-y-1 lg:space-y-2">
