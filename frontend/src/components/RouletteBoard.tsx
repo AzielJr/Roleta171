@@ -2576,10 +2576,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             <button
               onClick={() => {
                 if (lastNumbers.length > 0) {
-                  const newNumbers = lastNumbers.slice(1);
+                  const newNumbers = lastNumbers.slice(0, -1);
                   setLastNumbers(newNumbers);
                   // Marcar o novo número mais recente na race
-                  setLastSelectedNumber(newNumbers.length > 0 ? newNumbers[0] : null);
+                  setLastSelectedNumber(newNumbers.length > 0 ? newNumbers[newNumbers.length - 1] : null);
                 }
               }}
               disabled={lastNumbers.length === 0}
