@@ -31,6 +31,11 @@ interface StatisticsCardsProps {
   // Props para configurações do sistema
   avisosSonorosAtivos?: boolean;
   mostrarPadrao5x3Race?: boolean;
+  // Novos props para Torre
+  torreWinCount?: number;
+  torreLossCount?: number;
+  setTorreWinCount?: (value: number | ((prev: number) => number)) => void;
+  setTorreLossCount?: (value: number | ((prev: number) => number)) => void;
 }
 
 // Função para calcular números expostos no padrão 171 Forçado
@@ -121,6 +126,15 @@ const P2_LOSS_NUMBERS = [3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
 
 // Números de WIN para P2
 const P2_WIN_NUMBERS = [0, 1, 2, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 19, 20, 23, 24, 26, 27, 28, 30, 31, 32, 34, 35];
+
+// Números de entrada para Torre (conforme especificado pelo usuário)
+const TORRE_ENTRY_NUMBERS = [1, 2, 3, 34, 35, 36];
+
+// Números de LOSS para Torre (entrada + zero)
+const TORRE_LOSS_NUMBERS = [0, 1, 2, 3, 34, 35, 36];
+
+// Números de WIN para Torre (todos os outros números)
+const TORRE_WIN_NUMBERS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33];
 
 // Função para calcular números sugeridos do 5x3
 const calculatepadrao5x3Numbers = (lastNumber: number): { first: number; second: number; third: number } => {
@@ -242,6 +256,89 @@ const calculatepadrao5x3Stats = (lastNumbers: number[]): {
   // Calcular números sugeridos baseado no último número
 
   return { entradas, wins, losses, maxPositiveSequence, currentPositiveSequence, suggestedNumbers };
+};
+
+// Função para calcular estatísticas do Torre
+const calculateTorreStats = (lastNumbers: number[]): { 
+  entradas: number; 
+  wins: number; 
+  losses: number; 
+  maxPositiveSequence: number;
+  currentPositiveSequence: number;
+  hasRecentEntry: boolean;
+  hasConsecutiveEntries: boolean;
+} => {
+  console.log('🔍 TORRE CALC - Input:', lastNumbers.slice(-10)); // Mostrar apenas os últimos 10
+  
+  if (lastNumbers.length === 0) {
+    return { entradas: 0, wins: 0, losses: 0, maxPositiveSequence: 0, currentPositiveSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false };
+  }
+
+  let entradas = 0;
+  let wins = 0;
+  let losses = 0;
+  let maxPositiveSequence = 0;
+  let currentPositiveSequence = 0;
+  let hasRecentEntry = false;
+  let hasConsecutiveEntries = false;
+
+  // Verificar se o número mais recente é uma entrada (último do array)
+  if (lastNumbers.length > 0 && TORRE_ENTRY_NUMBERS.includes(lastNumbers[lastNumbers.length - 1])) {
+    hasRecentEntry = true;
+  }
+
+  // Verificar entradas consecutivas (2 ou mais) - começar do final do array
+  let consecutiveEntries = 0;
+  for (let i = lastNumbers.length - 1; i >= 0 && consecutiveEntries < 10; i--) {
+    if (TORRE_ENTRY_NUMBERS.includes(lastNumbers[i])) {
+      consecutiveEntries++;
+    } else {
+      break;
+    }
+  }
+  hasConsecutiveEntries = consecutiveEntries >= 2;
+
+  // Calcular estatísticas baseadas nos números
+  // WIN/LOSS só é computado APÓS cada ENTRADA específica (padrão Torre)
+  // lastNumbers[length-1] é o mais recente, percorrer do mais antigo para o mais recente
+  
+  for (let i = 0; i < lastNumbers.length; i++) { // Percorrer do mais antigo para o mais recente
+    const number = lastNumbers[i];
+    
+    // Se encontrou uma entrada Torre, incrementa entradas e verifica o próximo número
+    if (TORRE_ENTRY_NUMBERS.includes(number)) {
+      entradas++;
+      // SEMPRE zera a sequência positiva quando sai um número do padrão Torre
+      currentPositiveSequence = 0;
+      
+      // Verificar se há um próximo número (mais recente) para determinar WIN/LOSS
+      if (i < lastNumbers.length - 1) { // Se não é o número mais recente
+        const nextNumber = lastNumbers[i + 1]; // Próximo número (mais recente)
+        
+        if (TORRE_LOSS_NUMBERS.includes(nextNumber)) {
+          // LOSS: Se o próximo número após entrada Torre for um dos números de LOSS (01,02,03,34,35,36,0)
+          losses++;
+        } else if (TORRE_WIN_NUMBERS.includes(nextNumber)) {
+          // WIN: Se o próximo número após entrada Torre for qualquer outro número
+          wins++;
+        }
+      }
+    } else {
+      // Se não é um número de entrada Torre, verifica se deve incrementar ou zerar sequência positiva
+      if (TORRE_WIN_NUMBERS.includes(number)) {
+        // Se é um número de WIN (não é Torre nem LOSS), incrementa sequência positiva
+        currentPositiveSequence++;
+        maxPositiveSequence = Math.max(maxPositiveSequence, currentPositiveSequence);
+      } else if (TORRE_LOSS_NUMBERS.includes(number)) {
+        // Se é um número de LOSS (0), zera sequência positiva
+        currentPositiveSequence = 0;
+      }
+    }
+  }
+
+  const result = { entradas, wins, losses, maxPositiveSequence, currentPositiveSequence, hasRecentEntry, hasConsecutiveEntries };
+  console.log('📊 TORRE RESULT:', result);
+  return result;
 };
 
 // Função para calcular estatísticas do P2 (modo 1 - original)
@@ -428,8 +525,9 @@ const RouletteBall = ({ number }: { number: number }) => (
   </div>
 );
 
-export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount, avisosSonorosAtivos = true, mostrarPadrao5x3Race = false }: StatisticsCardsProps) {
+export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount, avisosSonorosAtivos = true, mostrarPadrao5x3Race = false, torreWinCount = 0, torreLossCount = 0, setTorreWinCount, setTorreLossCount }: StatisticsCardsProps) {
   const [showP2Modal, setShowP2Modal] = useState(false);
+  const [showTorreModal, setShowTorreModal] = useState(false);
   const [p2Mode, setP2Mode] = useState<1 | 2>(1); // Estado para controlar o modo do toggle P2
   const lastP2ConsecutiveState = useRef(false);
 
@@ -441,6 +539,11 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
   // Calcular estatísticas do 5x3
   const calculatedpadrao5x3Stats = React.useMemo(() => {
     return calculatepadrao5x3Stats(lastNumbers);
+  }, [lastNumbers]);
+
+  // Calcular estatísticas do Torre baseado nos últimos números
+  const calculatedTorreStats = React.useMemo(() => {
+    return calculateTorreStats(lastNumbers);
   }, [lastNumbers]);
 
   const {
@@ -464,6 +567,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
   const [animatingEvenOdd, setAnimatingEvenOdd] = useState<Set<string>>(new Set());
   const [animatingColors, setAnimatingColors] = useState<Set<string>>(new Set());
   const [animatingP2, setAnimatingP2] = useState<'none' | 'green' | 'yellow'>('none');
+  const [animatingTorre, setAnimatingTorre] = useState<'none' | 'green' | 'yellow'>('none');
+  const lastTorreConsecutiveState = useRef(false);
   // Remover animações do Padrão 72 (não há alertas sonoros no 7x7)
 
   // Função para detectar 3 ou mais números consecutivos da mesma categoria
@@ -616,6 +721,25 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 
   // 5x3 não tem alertas sonoros ou animações
 
+  // Efeito para controlar animações do Torre e tocar som
+  useEffect(() => {
+    if (calculatedTorreStats.hasConsecutiveEntries) {
+      setAnimatingTorre('yellow'); // Borda laranja para Torre consecutivos (LOSS)
+      
+      // Tocar som APENAS quando Torre muda para consecutivo (borda laranja) E avisos sonoros estão ativos
+      if (!lastTorreConsecutiveState.current && avisosSonorosAtivos) {
+        soundGenerator.playBellSound();
+        lastTorreConsecutiveState.current = true;
+      }
+    } else if (calculatedTorreStats.hasRecentEntry) {
+      setAnimatingTorre('green'); // Borda verde para primeira entrada Torre (SEM SOM)
+      lastTorreConsecutiveState.current = false; // Reset quando não é mais consecutivo
+    } else {
+      setAnimatingTorre('none');
+      lastTorreConsecutiveState.current = false;
+    }
+  }, [calculatedTorreStats.hasConsecutiveEntries, calculatedTorreStats.hasRecentEntry]);
+
   const StatCard = ({ title, data, colors, cardType = 'default' }: {
     title: string | React.ReactNode;
     data: Array<{ label: string; value: number; percentage: number; hidePercentage?: boolean; customValue?: string }>;
@@ -632,6 +756,21 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           switch (cardType) {
             case 'columns':
               isRepeated = animatingColumns.has(index === 0 ? 3 : index === 1 ? 2 : 1);
+              break;
+            case 'dozens':
+              isRepeated = animatingDozens.has(index + 1);
+              break;
+            case 'highLow':
+              const highLowKey = index === 0 ? 'high' : index === 1 ? 'low' : 'green';
+              isRepeated = animatingHighLow.has(highLowKey);
+              break;
+            case 'evenOdd':
+              const evenOddKey = index === 0 ? 'even' : index === 1 ? 'odd' : 'green';
+              isRepeated = animatingEvenOdd.has(evenOddKey);
+              break;
+            case 'colors':
+              const colorKey = index === 0 ? 'red' : index === 1 ? 'black' : 'green';
+              isRepeated = animatingColors.has(colorKey);
               break;
             default:
               isRepeated = false;
@@ -664,17 +803,27 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 
   return (
     <div className="space-y-3">
-      {/* Grid com todos os 7 cards distribuídos igualmente */}
+      {/* Primeira linha - 7 cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-1 lg:gap-2">
         <StatCard
-          title="Cores"
+          title={
+            <div className={`cursor-pointer transition-all duration-300 flex justify-between items-center ${
+              animatingTorre === 'green' 
+                ? 'animate-pulse-green-border' 
+                : animatingTorre === 'yellow' 
+                ? 'animate-pulse-yellow-border' 
+                : ''
+            }`} onClick={() => setShowTorreModal(true)}>
+              <span>Torre</span>
+            </div>
+          }
           data={[
-            { label: 'Vermelho', value: statistics.colors.red, percentage: colorPercentages.red },
-            { label: 'Preto', value: statistics.colors.black, percentage: colorPercentages.black },
-            { label: 'Verde (0)', value: statistics.colors.green, percentage: colorPercentages.green }
+            { label: 'Entradas', value: calculatedTorreStats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedTorreStats.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: calculatedTorreStats.wins, percentage: (calculatedTorreStats.wins + calculatedTorreStats.losses) > 0 ? Math.round((calculatedTorreStats.wins / (calculatedTorreStats.wins + calculatedTorreStats.losses)) * 100) : 0 },
+            { label: 'LOSS', value: calculatedTorreStats.losses, percentage: (calculatedTorreStats.wins + calculatedTorreStats.losses) > 0 ? Math.round((calculatedTorreStats.losses / (calculatedTorreStats.wins + calculatedTorreStats.losses)) * 100) : 0 },
+            { label: 'Seq Positiva', value: calculatedTorreStats.maxPositiveSequence, customValue: `${calculatedTorreStats.currentPositiveSequence}/${calculatedTorreStats.maxPositiveSequence}`, percentage: calculatedTorreStats.entradas > 0 ? Math.round((calculatedTorreStats.maxPositiveSequence / calculatedTorreStats.entradas) * 100) : 0, hidePercentage: true }
           ]}
-          colors={['bg-red-500', 'bg-gray-800', 'bg-green-500']}
-          cardType="colors"
+          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
         />
 
         <StatCard
@@ -816,6 +965,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
             </div>
           </div>
         </div>
+
         <StatCard
           title={
             <div className="flex justify-between items-center w-full">                <span>171</span>                <span className="font-normal text-xs text-gray-500">Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span></span>
@@ -828,6 +978,94 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           ]}
           colors={['bg-gray-500', 'bg-green-500', 'bg-red-500']}
         />
+      </div>
+
+      {/* Segunda linha - 7 cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-1 lg:gap-2">
+        <StatCard
+          title="Cores"
+          data={[
+            { label: 'Vermelho', value: statistics.colors.red, percentage: colorPercentages.red },
+            { label: 'Preto', value: statistics.colors.black, percentage: colorPercentages.black },
+            { label: 'Verde (0)', value: statistics.colors.green, percentage: colorPercentages.green }
+          ]}
+          colors={['bg-red-500', 'bg-gray-800', 'bg-green-500']}
+          cardType="colors"
+        />
+
+        <StatCard
+          title="Par/Ímpar"
+          data={[
+            { label: 'Par', value: statistics.evenOdd.even, percentage: evenOddPercentages.even },
+            { label: 'Ímpar', value: statistics.evenOdd.odd, percentage: evenOddPercentages.odd },
+            { label: 'Zero', value: statistics.colors.green, percentage: evenOddPercentages.zero }
+          ]}
+          colors={['bg-blue-500', 'bg-orange-500', 'bg-green-500']}
+          cardType="evenOdd"
+        />
+
+        <StatCard
+          title="Alto/Baixo"
+          data={[
+            { label: 'Alto (19-36)', value: statistics.highLow.high, percentage: highLowPercentages.high },
+            { label: 'Baixo (1-18)', value: statistics.highLow.low, percentage: highLowPercentages.low },
+            { label: 'Zero', value: statistics.colors.green, percentage: highLowPercentages.zero }
+          ]}
+          colors={['bg-purple-500', 'bg-yellow-500', 'bg-green-500']}
+          cardType="highLow"
+        />
+
+        {/* Card com lista de números ordenada por ocorrências */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
+          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Números (Max 50)</h3>
+          <div className="max-h-32 overflow-y-auto">
+            <div className="space-y-0.5">
+              {React.useMemo(() => {
+                // Contar ocorrências de cada número
+                const numberCounts: { [key: number]: number } = {};
+                lastNumbers.forEach(num => {
+                  numberCounts[num] = (numberCounts[num] || 0) + 1;
+                });
+
+                // Converter para array e ordenar por ocorrências (maior para menor)
+                const sortedNumbers = Object.entries(numberCounts)
+                  .map(([num, count]) => ({ number: parseInt(num), count }))
+                  .sort((a, b) => b.count - a.count)
+                  .slice(0, 50); // Máximo 50 números
+
+                return sortedNumbers.map(({ number, count }) => {
+                  const percentage = totalNumbers > 0 ? Math.round((count / totalNumbers) * 100) : 0;
+                  return (
+                    <div key={number} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
+                      <div className="flex items-center space-x-1">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs ${getRouletteColor(number)}`}>
+                          {number.toString().padStart(2, '0')}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-gray-800 text-xs">{count}</div>
+                        <div className="text-xs text-gray-500">{percentage}%</div>
+                      </div>
+                    </div>
+                  );
+                });
+              }, [lastNumbers, totalNumbers])}
+            </div>
+          </div>
+        </div>
+
+        {/* Espaços vazios para os próximos 3 cards */}
+        <div className="bg-gray-100 rounded-lg shadow-md p-2 lg:p-3 flex items-center justify-center">
+          <span className="text-gray-400 text-xs">Card 5</span>
+        </div>
+
+        <div className="bg-gray-100 rounded-lg shadow-md p-2 lg:p-3 flex items-center justify-center">
+          <span className="text-gray-400 text-xs">Card 6</span>
+        </div>
+
+        <div className="bg-gray-100 rounded-lg shadow-md p-2 lg:p-3 flex items-center justify-center">
+          <span className="text-gray-400 text-xs">Card 7</span>
+        </div>
       </div>
 
       {/* Modal P2 - Números Gatilho */}
@@ -874,71 +1112,66 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           </div>
         </div>
       )}
+
+      {/* Modal Torre - Números Gatilho */}
+      {showTorreModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 pt-24" onClick={() => setShowTorreModal(false)}>
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">TORRE - NÚMEROS GATILHO</h2>
+              <button 
+                onClick={() => setShowTorreModal(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex justify-center space-x-3">
+                <RouletteBall number={2} />
+                <RouletteBall number={4} />
+                <RouletteBall number={6} />
+                <RouletteBall number={8} />
+              </div>
+              
+              <div className="flex justify-center space-x-3">
+                <RouletteBall number={10} />
+                <RouletteBall number={11} />
+                <RouletteBall number={13} />
+                <RouletteBall number={15} />
+              </div>
+              
+              <div className="flex justify-center space-x-3">
+                <RouletteBall number={17} />
+                <RouletteBall number={20} />
+                <RouletteBall number={22} />
+                <RouletteBall number={24} />
+              </div>
+
+              <div className="flex justify-center space-x-3">
+                <RouletteBall number={26} />
+                <RouletteBall number={28} />
+                <RouletteBall number={29} />
+                <RouletteBall number={31} />
+              </div>
+
+              <div className="flex justify-center space-x-2">
+                <RouletteBall number={33} />
+                <RouletteBall number={35} />
+              </div>
+            </div>
+            
+            <div className="mt-4 text-center text-gray-300 text-sm">
+              <p>Números <strong>PRETOS</strong> incrementam as <strong>ENTRADAS</strong></p>
+              <p>WIN: Próximo número <strong>VERMELHO</strong> ou <strong>0</strong></p>
+              <p>LOSS: Próximo número <strong>PRETO</strong></p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default StatisticsCards;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

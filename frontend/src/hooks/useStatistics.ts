@@ -18,24 +18,26 @@ export function useStatistics(statistics: Statistics) {
   }, [statistics, totalNumbers]);
 
   const evenOddPercentages = useMemo(() => {
-    if (!statistics || !statistics.evenOdd) return { even: 0, odd: 0 };
-    const total = (statistics.evenOdd.even || 0) + (statistics.evenOdd.odd || 0);
-    if (total === 0) return { even: 0, odd: 0 };
+    if (!statistics || !statistics.evenOdd) return { even: 0, odd: 0, zero: 0 };
+    const total = (statistics.evenOdd.even || 0) + (statistics.evenOdd.odd || 0) + (statistics.colors?.green || 0);
+    if (total === 0) return { even: 0, odd: 0, zero: 0 };
     
     return {
       even: Math.round(((statistics.evenOdd.even || 0) / total) * 100),
-      odd: Math.round(((statistics.evenOdd.odd || 0) / total) * 100)
+      odd: Math.round(((statistics.evenOdd.odd || 0) / total) * 100),
+      zero: Math.round(((statistics.colors?.green || 0) / total) * 100)
     };
   }, [statistics]);
 
   const highLowPercentages = useMemo(() => {
-    if (!statistics || !statistics.highLow) return { high: 0, low: 0 };
-    const total = (statistics.highLow.high || 0) + (statistics.highLow.low || 0);
-    if (total === 0) return { high: 0, low: 0 };
+    if (!statistics || !statistics.highLow) return { high: 0, low: 0, zero: 0 };
+    const total = (statistics.highLow.high || 0) + (statistics.highLow.low || 0) + (statistics.colors?.green || 0);
+    if (total === 0) return { high: 0, low: 0, zero: 0 };
     
     return {
       high: Math.round(((statistics.highLow.high || 0) / total) * 100),
-      low: Math.round(((statistics.highLow.low || 0) / total) * 100)
+      low: Math.round(((statistics.highLow.low || 0) / total) * 100),
+      zero: Math.round(((statistics.colors?.green || 0) / total) * 100)
     };
   }, [statistics]);
 

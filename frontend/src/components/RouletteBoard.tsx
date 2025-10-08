@@ -551,6 +551,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [p2WinCount, setP2WinCount] = useState<number>(0);
   const [p2LossCount, setP2LossCount] = useState<number>(0);
   
+  // Estados para contar WIN e LOSS Torre (persistentes)
+  const [torreWinCount, setTorreWinCount] = useState<number>(0);
+  const [torreLossCount, setTorreLossCount] = useState<number>(0);
+  
   // Estado para controlar se estamos aguardando a próxima dezena após popup
   const [waitingForNextNumber, setWaitingForNextNumber] = useState<boolean>(false);
   const waitingForNextNumberRef = useRef<boolean>(false);
@@ -1418,6 +1422,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     setLossCount(0);
     setP2WinCount(0); // Resetar contadores P2
     setP2LossCount(0); // Resetar contadores P2
+    setTorreWinCount(0); // Resetar contadores Torre
+    setTorreLossCount(0); // Resetar contadores Torre
     
     // Resetar controle de duplicação P2
     lastProcessedP2Key.current = '';
@@ -3190,6 +3196,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             p2LossCount={p2LossCount}
             setP2WinCount={setP2WinCount}
             setP2LossCount={setP2LossCount}
+            torreWinCount={torreWinCount}
+            torreLossCount={torreLossCount}
+            setTorreWinCount={setTorreWinCount}
+            setTorreLossCount={setTorreLossCount}
             numbersWithoutPattern={numbersWithoutPattern}
             totalNumbersWithoutPattern={totalNumbersWithoutPattern}
             lastNumbers={lastNumbers}
