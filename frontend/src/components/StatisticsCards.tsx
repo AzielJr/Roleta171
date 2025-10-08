@@ -528,6 +528,7 @@ const RouletteBall = ({ number }: { number: number }) => (
 export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount, avisosSonorosAtivos = true, mostrarPadrao5x3Race = false, torreWinCount = 0, torreLossCount = 0, setTorreWinCount, setTorreLossCount }: StatisticsCardsProps) {
   const [showP2Modal, setShowP2Modal] = useState(false);
   const [showTorreModal, setShowTorreModal] = useState(false);
+  const [showRaceTrackModal, setShowRaceTrackModal] = useState(false);
   const [p2Mode, setP2Mode] = useState<1 | 2>(1); // Estado para controlar o modo do toggle P2
   const lastP2ConsecutiveState = useRef(false);
 
@@ -843,6 +844,32 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
   }, [lastNumbers]);
 
   // Função para calcular ranking das estratégias por WINs
+  // Função para calcular estatísticas das seções da Race Track
+  const calculateRaceTrackStats = React.useMemo(() => {
+    const last50Numbers = lastNumbers.slice(-50);
+    
+    // Definição das seções da race track
+    const sections = {
+      'Voisins': [22, 18, 29, 7, 28, 12, 35, 3, 26, 0, 32, 15, 19, 4, 21, 2, 25],
+      'Tiers': [27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33],
+      'Orphelins': [1, 20, 14, 31, 9, 17, 34, 6],
+      'Zero': [12, 35, 3, 26, 0, 32, 15]
+    };
+    
+    const stats = Object.entries(sections).map(([name, sectionNumbers]) => {
+      const count = last50Numbers.filter(num => sectionNumbers.includes(num)).length;
+      const percentage = last50Numbers.length > 0 ? Math.round((count / last50Numbers.length) * 100) : 0;
+      
+      return {
+        name,
+        count,
+        percentage
+      };
+    });
+    
+    return stats.sort((a, b) => b.count - a.count);
+  }, [lastNumbers]);
+
   const calculateStrategiesRanking = React.useMemo(() => {
     const strategies = [
       {
@@ -1154,8 +1181,35 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           </div>
         </div>
 
-        <div className="bg-gray-100 rounded-lg shadow-md p-2 lg:p-3 flex items-center justify-center">
-          <span className="text-gray-400 text-xs">Card 6</span>
+        {/* Card 6 - Race Track */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
+          <h3 
+            className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2 cursor-pointer hover:text-blue-600 transition-colors"
+            onClick={() => setShowRaceTrackModal(true)}
+            title="Clique para ver os números de cada seção da Race Track"
+          >
+            Race Track
+          </h3>
+          <div className="max-h-32 overflow-y-auto">
+            <div className="space-y-0.5">
+              {calculateRaceTrackStats.map((section, index) => (
+                <div key={section.name} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
+                  <div className="flex items-center space-x-1">
+                    <div className="w-4 h-4 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-xs">
+                      {index + 1}
+                    </div>
+                    <span className="text-xs text-gray-600 truncate font-medium">
+                      {section.name}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-gray-800 text-xs">{section.count}</div>
+                    <div className="text-xs text-gray-500">{section.percentage}%</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Card 7 - Ranking das Estratégias */}
@@ -1281,6 +1335,82 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
               <p>Números <strong>PRETOS</strong> incrementam as <strong>ENTRADAS</strong></p>
               <p>WIN: Próximo número <strong>VERMELHO</strong> ou <strong>0</strong></p>
               <p>LOSS: Próximo número <strong>PRETO</strong></p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Race Track */}
+      {showRaceTrackModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowRaceTrackModal(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-gray-800">Race Track - Seções da Roleta</h2>
+              <button 
+                onClick={() => setShowRaceTrackModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="border-l-4 border-purple-500 pl-3">
+                <h3 className="font-semibold text-purple-700">Voisins du Zéro</h3>
+                <p className="text-sm text-gray-600 mb-1">17 números vizinhos do zero</p>
+                <div className="flex flex-wrap gap-1">
+                  {[22, 18, 29, 7, 28, 12, 35, 3, 26, 0, 32, 15, 19, 4, 21, 2, 25].map(num => (
+                    <span key={num} className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium">
+                      {num.toString().padStart(2, '0')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-l-4 border-blue-500 pl-3">
+                <h3 className="font-semibold text-blue-700">Tiers du Cylindre</h3>
+                <p className="text-sm text-gray-600 mb-1">12 números do terço oposto</p>
+                <div className="flex flex-wrap gap-1">
+                  {[27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33].map(num => (
+                    <span key={num} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                      {num.toString().padStart(2, '0')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-l-4 border-green-500 pl-3">
+                <h3 className="font-semibold text-green-700">Orphelins</h3>
+                <p className="text-sm text-gray-600 mb-1">8 números órfãos</p>
+                <div className="flex flex-wrap gap-1">
+                  {[1, 20, 14, 31, 9, 17, 34, 6].map(num => (
+                    <span key={num} className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
+                      {num.toString().padStart(2, '0')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-l-4 border-yellow-500 pl-3">
+                 <h3 className="font-semibold text-yellow-700">Jeu Zéro</h3>
+                 <p className="text-sm text-gray-600 mb-1">7 números próximos ao zero</p>
+                 <div className="flex flex-wrap gap-1">
+                   {[12, 35, 3, 26, 0, 32, 15].map(num => (
+                     <span key={num} className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-medium">
+                       {num.toString().padStart(2, '0')}
+                     </span>
+                   ))}
+                 </div>
+               </div>
+            </div>
+
+            <div className="mt-4 text-center">
+              <button 
+                onClick={() => setShowRaceTrackModal(false)}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors"
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>
