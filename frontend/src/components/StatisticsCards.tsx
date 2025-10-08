@@ -1298,43 +1298,22 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
             
             <div className="space-y-4">
               <div className="flex justify-center space-x-3">
+                <RouletteBall number={1} />
                 <RouletteBall number={2} />
-                <RouletteBall number={4} />
-                <RouletteBall number={6} />
-                <RouletteBall number={8} />
+                <RouletteBall number={3} />
               </div>
               
               <div className="flex justify-center space-x-3">
-                <RouletteBall number={10} />
-                <RouletteBall number={11} />
-                <RouletteBall number={13} />
-                <RouletteBall number={15} />
-              </div>
-              
-              <div className="flex justify-center space-x-3">
-                <RouletteBall number={17} />
-                <RouletteBall number={20} />
-                <RouletteBall number={22} />
-                <RouletteBall number={24} />
-              </div>
-
-              <div className="flex justify-center space-x-3">
-                <RouletteBall number={26} />
-                <RouletteBall number={28} />
-                <RouletteBall number={29} />
-                <RouletteBall number={31} />
-              </div>
-
-              <div className="flex justify-center space-x-2">
-                <RouletteBall number={33} />
+                <RouletteBall number={34} />
                 <RouletteBall number={35} />
+                <RouletteBall number={36} />
               </div>
             </div>
             
             <div className="mt-4 text-center text-gray-300 text-sm">
-              <p>Números <strong>PRETOS</strong> incrementam as <strong>ENTRADAS</strong></p>
-              <p>WIN: Próximo número <strong>VERMELHO</strong> ou <strong>0</strong></p>
-              <p>LOSS: Próximo número <strong>PRETO</strong></p>
+              <p>Números <strong>GATILHO</strong> incrementam as <strong>ENTRADAS</strong></p>
+              <p>WIN: Qualquer número exceto <strong>00, 01, 02, 03, 34, 35, 36</strong></p>
+              <p>LOSS: Números <strong>00, 01, 02, 03, 34, 35, 36</strong></p>
             </div>
           </div>
         </div>
