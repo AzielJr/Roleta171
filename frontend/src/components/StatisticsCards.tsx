@@ -801,31 +801,85 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     </div>
   );
 
+  // Função para calcular estatísticas dos terminais
+  const calculateTerminaisStats = React.useMemo(() => {
+    const terminaisCount: { [key: number]: number } = {};
+    
+    // Inicializar contadores para terminais 0-9
+    for (let i = 0; i <= 9; i++) {
+      terminaisCount[i] = 0;
+    }
+    
+    // Contar ocorrências dos últimos 50 números
+    const last50Numbers = lastNumbers.slice(-50);
+    last50Numbers.forEach(num => {
+      const terminal = num % 10;
+      terminaisCount[terminal]++;
+    });
+    
+    // Converter para array com percentuais
+    const terminaisData = [];
+    for (let i = 0; i <= 9; i++) {
+      const count = terminaisCount[i];
+      const percentage = last50Numbers.length > 0 ? Math.round((count / last50Numbers.length) * 100) : 0;
+      
+      // Determinar quais números pertencem a este terminal
+      const numbersInTerminal = [];
+      for (let num = i; num <= 36; num += 10) {
+        if (num <= 36) {
+          numbersInTerminal.push(num);
+        }
+      }
+      
+      terminaisData.push({
+        terminal: i,
+        count,
+        percentage,
+        numbers: numbersInTerminal
+      });
+    }
+    
+    return terminaisData.sort((a, b) => b.count - a.count);
+  }, [lastNumbers]);
+
+  // Função para calcular ranking das estratégias por WINs
+  const calculateStrategiesRanking = React.useMemo(() => {
+    const strategies = [
+      {
+        name: 'Torre',
+        wins: calculatedTorreStats.wins,
+        winPercentage: (calculatedTorreStats.wins + calculatedTorreStats.losses) > 0 ? Math.round((calculatedTorreStats.wins / (calculatedTorreStats.wins + calculatedTorreStats.losses)) * 100) : 0
+      },
+      {
+        name: 'P2',
+        wins: calculatedP2Stats.wins,
+        winPercentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.wins / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0
+      },
+      {
+        name: '5x3',
+        wins: calculatedpadrao5x3Stats.wins,
+        winPercentage: (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses) > 0 ? Math.round((calculatedpadrao5x3Stats.wins / (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses)) * 100) : 0
+      },
+      {
+        name: '171 Forçado',
+        wins: calculated171ForcedStats.wins,
+        winPercentage: (calculated171ForcedStats.wins + calculated171ForcedStats.losses) > 0 ? Math.round((calculated171ForcedStats.wins / (calculated171ForcedStats.wins + calculated171ForcedStats.losses)) * 100) : 0
+      },
+      {
+        name: '171',
+        wins: pattern171Stats.wins,
+        winPercentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.wins / pattern171Stats.entradas) * 100) : 0
+      }
+    ];
+    
+    // Ordenar por percentual de vitórias (maior para menor)
+    return strategies.sort((a, b) => b.winPercentage - a.winPercentage);
+  }, [calculatedTorreStats, calculatedP2Stats, calculatedpadrao5x3Stats, calculated171ForcedStats, pattern171Stats]);
+
   return (
     <div className="space-y-3">
       {/* Primeira linha - 7 cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-1 lg:gap-2">
-        <StatCard
-          title={
-            <div className={`cursor-pointer transition-all duration-300 flex justify-between items-center ${
-              animatingTorre === 'green' 
-                ? 'animate-pulse-green-border' 
-                : animatingTorre === 'yellow' 
-                ? 'animate-pulse-yellow-border' 
-                : ''
-            }`} onClick={() => setShowTorreModal(true)}>
-              <span>Torre</span>
-            </div>
-          }
-          data={[
-            { label: 'Entradas', value: calculatedTorreStats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedTorreStats.entradas / totalNumbers) * 100) : 0 },
-            { label: 'WIN', value: calculatedTorreStats.wins, percentage: (calculatedTorreStats.wins + calculatedTorreStats.losses) > 0 ? Math.round((calculatedTorreStats.wins / (calculatedTorreStats.wins + calculatedTorreStats.losses)) * 100) : 0 },
-            { label: 'LOSS', value: calculatedTorreStats.losses, percentage: (calculatedTorreStats.wins + calculatedTorreStats.losses) > 0 ? Math.round((calculatedTorreStats.losses / (calculatedTorreStats.wins + calculatedTorreStats.losses)) * 100) : 0 },
-            { label: 'Seq Positiva', value: calculatedTorreStats.maxPositiveSequence, customValue: `${calculatedTorreStats.currentPositiveSequence}/${calculatedTorreStats.maxPositiveSequence}`, percentage: calculatedTorreStats.entradas > 0 ? Math.round((calculatedTorreStats.maxPositiveSequence / calculatedTorreStats.entradas) * 100) : 0, hidePercentage: true }
-          ]}
-          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
-        />
-
         <StatCard
           title="Dúzias"
           data={[
@@ -846,6 +900,27 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           ]}
           colors={['bg-emerald-500', 'bg-teal-500', 'bg-lime-500']}
           cardType="columns"
+        />
+
+        <StatCard
+          title={
+            <div className={`cursor-pointer transition-all duration-300 flex justify-between items-center ${
+              animatingTorre === 'green' 
+                ? 'animate-pulse-green-border' 
+                : animatingTorre === 'yellow' 
+                ? 'animate-pulse-yellow-border' 
+                : ''
+            }`} onClick={() => setShowTorreModal(true)}>
+              <span>Torre</span>
+            </div>
+          }
+          data={[
+            { label: 'Entradas', value: calculatedTorreStats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedTorreStats.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: calculatedTorreStats.wins, percentage: (calculatedTorreStats.wins + calculatedTorreStats.losses) > 0 ? Math.round((calculatedTorreStats.wins / (calculatedTorreStats.wins + calculatedTorreStats.losses)) * 100) : 0 },
+            { label: 'LOSS', value: calculatedTorreStats.losses, percentage: (calculatedTorreStats.wins + calculatedTorreStats.losses) > 0 ? Math.round((calculatedTorreStats.losses / (calculatedTorreStats.wins + calculatedTorreStats.losses)) * 100) : 0 },
+            { label: 'Seq Positiva', value: calculatedTorreStats.maxPositiveSequence, customValue: `${calculatedTorreStats.currentPositiveSequence}/${calculatedTorreStats.maxPositiveSequence}`, percentage: calculatedTorreStats.entradas > 0 ? Math.round((calculatedTorreStats.maxPositiveSequence / calculatedTorreStats.entradas) * 100) : 0, hidePercentage: true }
+          ]}
+          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
         />
 
         <StatCard
@@ -896,7 +971,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
             { label: 'LOSS', value: calculatedP2Stats.losses, percentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.losses / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0 },
             { label: '> Seq. Negativa', value: calculatedP2Stats.maxNegativeSequence, percentage: calculatedP2Stats.entradas > 0 ? Math.round((calculatedP2Stats.maxNegativeSequence / calculatedP2Stats.entradas) * 100) : 0, hidePercentage: true }
           ]}
-          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', '0']}
+          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
         />
 
         <StatCard
@@ -1054,17 +1129,57 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           </div>
         </div>
 
-        {/* Espaços vazios para os próximos 3 cards */}
-        <div className="bg-gray-100 rounded-lg shadow-md p-2 lg:p-3 flex items-center justify-center">
-          <span className="text-gray-400 text-xs">Card 5</span>
+        {/* Card Terminais na posição 5 da segunda linha */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
+          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Terminais</h3>
+          <div className="max-h-32 overflow-y-auto">
+            <div className="space-y-0.5">
+              {calculateTerminaisStats.slice(0, 10).map(({ terminal, count, percentage, numbers }) => (
+                <div key={terminal} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
+                  <div className="flex items-center space-x-1">
+                    <div className="w-4 h-4 rounded-full bg-gray-600 flex items-center justify-center text-white font-bold text-xs">
+                      {terminal}
+                    </div>
+                    <span className="text-xs text-gray-600 truncate">
+                      {numbers.map(n => n.toString().padStart(2, '0')).join(',')}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-gray-800 text-xs">{count}</div>
+                    <div className="text-xs text-gray-500">{percentage}%</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="bg-gray-100 rounded-lg shadow-md p-2 lg:p-3 flex items-center justify-center">
           <span className="text-gray-400 text-xs">Card 6</span>
         </div>
 
-        <div className="bg-gray-100 rounded-lg shadow-md p-2 lg:p-3 flex items-center justify-center">
-          <span className="text-gray-400 text-xs">Card 7</span>
+        {/* Card 7 - Ranking das Estratégias */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
+          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Ranking Estratégias</h3>
+          <div className="max-h-32 overflow-y-auto">
+            <div className="space-y-0.5">
+              {calculateStrategiesRanking.map((strategy, index) => (
+                <div key={strategy.name} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
+                  <div className="flex items-center space-x-1">
+                    <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
+                      {index + 1}
+                    </div>
+                    <span className="text-xs text-gray-600 truncate font-medium">
+                      {strategy.name}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-gray-800 text-xs">{strategy.winPercentage}%</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
