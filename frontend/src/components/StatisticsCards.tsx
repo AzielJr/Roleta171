@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Statistics } from '../types/roulette';
 import { useStatistics } from '../hooks/useStatistics';
 import { soundGenerator } from '../utils/soundUtils';
+import { calculateFusionStats, FUSION_ENTRY_NUMBERS } from '../utils/fusionStats';
 
 // Sequência real da roleta (Race)
 const ROULETTE_SEQUENCE = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
@@ -136,6 +137,8 @@ const TORRE_LOSS_NUMBERS = [0, 1, 2, 3, 34, 35, 36];
 // Números de WIN para Torre (todos os outros números)
 const TORRE_WIN_NUMBERS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33];
 
+// Números de LOSS para Fusion (mesmos números de entrada)
+// Números de WIN para Fusion (todos os outros números)
 // Função para calcular números sugeridos do 5x3
 const calculatepadrao5x3Numbers = (lastNumber: number): { first: number; second: number; third: number } => {
   const lastIndex = ROULETTE_SEQUENCE.indexOf(lastNumber);
@@ -538,8 +541,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
   }, [lastNumbers, p2Mode]);
 
   // Calcular estatísticas do 5x3
-  const calculatedpadrao5x3Stats = React.useMemo(() => {
-    return calculatepadrao5x3Stats(lastNumbers);
+  const calculatedFusionStats = React.useMemo(() => {
+    return calculateFusionStats(lastNumbers);
   }, [lastNumbers]);
 
   // Calcular estatísticas do Torre baseado nos últimos números
@@ -883,9 +886,9 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
         winPercentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.wins / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0
       },
       {
-        name: '5x3',
-        wins: calculatedpadrao5x3Stats.wins,
-        winPercentage: (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses) > 0 ? Math.round((calculatedpadrao5x3Stats.wins / (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses)) * 100) : 0
+        name: 'Fusion',
+        wins: calculatedFusionStats.wins,
+        winPercentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.wins / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0
       },
       {
         name: '171 Forçado',
@@ -901,7 +904,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     
     // Ordenar por percentual de vitórias (maior para menor)
     return strategies.sort((a, b) => b.winPercentage - a.winPercentage);
-  }, [calculatedTorreStats, calculatedP2Stats, calculatedpadrao5x3Stats, calculated171ForcedStats, pattern171Stats]);
+  }, [calculatedTorreStats, calculatedP2Stats, calculatedFusionStats, calculated171ForcedStats, pattern171Stats]);
 
   return (
     <div className="space-y-3">
@@ -945,7 +948,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
             { label: 'Entradas', value: calculatedTorreStats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedTorreStats.entradas / totalNumbers) * 100) : 0 },
             { label: 'WIN', value: calculatedTorreStats.wins, percentage: (calculatedTorreStats.wins + calculatedTorreStats.losses) > 0 ? Math.round((calculatedTorreStats.wins / (calculatedTorreStats.wins + calculatedTorreStats.losses)) * 100) : 0 },
             { label: 'LOSS', value: calculatedTorreStats.losses, percentage: (calculatedTorreStats.wins + calculatedTorreStats.losses) > 0 ? Math.round((calculatedTorreStats.losses / (calculatedTorreStats.wins + calculatedTorreStats.losses)) * 100) : 0 },
-            { label: 'Seq Positiva', value: calculatedTorreStats.maxPositiveSequence, customValue: `${calculatedTorreStats.currentPositiveSequence}/${calculatedTorreStats.maxPositiveSequence}`, percentage: calculatedTorreStats.entradas > 0 ? Math.round((calculatedTorreStats.maxPositiveSequence / calculatedTorreStats.entradas) * 100) : 0, hidePercentage: true }
+            { label: 'Seq. Negativa', value: calculatedTorreStats.maxPositiveSequence, customValue: `${calculatedTorreStats.currentPositiveSequence}/${calculatedTorreStats.maxPositiveSequence}`, percentage: calculatedTorreStats.entradas > 0 ? Math.round((calculatedTorreStats.maxPositiveSequence / calculatedTorreStats.entradas) * 100) : 0, hidePercentage: true }
           ]}
           colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
         />
@@ -1002,27 +1005,12 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
         />
 
         <StatCard
-          title={
-            <div className="flex justify-between items-center w-full">
-              <span>5x3</span>
-              <div className="flex items-center gap-1 text-xs">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs ${getRouletteColor(calculatedpadrao5x3Stats.suggestedNumbers.first)}`}>
-                  {calculatedpadrao5x3Stats.suggestedNumbers.first.toString().padStart(2, '0')}
-                </div>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs ${getRouletteColor(calculatedpadrao5x3Stats.suggestedNumbers.second)}`}>
-                  {calculatedpadrao5x3Stats.suggestedNumbers.second.toString().padStart(2, '0')}
-                </div>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs ${getRouletteColor(calculatedpadrao5x3Stats.suggestedNumbers.third)}`}>
-                  {calculatedpadrao5x3Stats.suggestedNumbers.third.toString().padStart(2, '0')}
-                </div>
-              </div>
-            </div>
-          }
+          title="Fusion"
           data={[
-            { label: 'Entradas', value: calculatedpadrao5x3Stats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedpadrao5x3Stats.entradas / totalNumbers) * 100) : 0 },
-            { label: 'WIN', value: calculatedpadrao5x3Stats.wins, percentage: (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses) > 0 ? Math.round((calculatedpadrao5x3Stats.wins / (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses)) * 100) : 0 },
-            { label: 'LOSS', value: calculatedpadrao5x3Stats.losses, percentage: (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses) > 0 ? Math.round((calculatedpadrao5x3Stats.losses / (calculatedpadrao5x3Stats.wins + calculatedpadrao5x3Stats.losses)) * 100) : 0 },
-            { label: 'Seq Positiva', value: calculatedpadrao5x3Stats.maxPositiveSequence, customValue: `${calculatedpadrao5x3Stats.currentPositiveSequence}/${calculatedpadrao5x3Stats.maxPositiveSequence}`, percentage: calculatedpadrao5x3Stats.entradas > 0 ? Math.round((calculatedpadrao5x3Stats.maxPositiveSequence / calculatedpadrao5x3Stats.entradas) * 100) : 0, hidePercentage: true }
+            { label: 'Entradas', value: calculatedFusionStats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedFusionStats.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: calculatedFusionStats.wins, percentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.wins / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0 },
+            { label: 'LOSS', value: calculatedFusionStats.losses, percentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.losses / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0 },
+            { label: 'Seq. Negativa', value: calculatedFusionStats.maxNegativeSequence, customValue: `${0}/${calculatedFusionStats.maxNegativeSequence}`, percentage: calculatedFusionStats.entradas > 0 ? Math.round((calculatedFusionStats.maxNegativeSequence / calculatedFusionStats.entradas) * 100) : 0, hidePercentage: true }
           ]}
           colors={['bg-purple-500', 'bg-green-500', 'bg-red-500', 'bg-blue-500']}
         />
@@ -1054,12 +1042,12 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
               </div>
             </div>
           </div>
-          {/* Footer - Seq Positiva */}
+          {/* Footer - Seq. Negativa */}
           <div className="mt-0 pt-0">
             <div className="flex justify-between items-center px-0 py-1 rounded ">
               <div className="flex items-center space-x-1">
                 <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-orange-500"></div>
-                <span className="text-xs lg:text-xs text-gray-600 truncate">Seq Positiva</span>
+                <span className="text-xs lg:text-xs text-gray-600 truncate">Seq. Negativa</span>
               </div>
               <div className="text-right">
                 <div className="font-bold text-gray-800 text-xs lg:text-sm">{calculated171ForcedStats.currentPositiveSequence}/{calculated171ForcedStats.maxPositiveSequence}</div>
@@ -1070,7 +1058,12 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 
         <StatCard
           title={
-            <div className="flex justify-between items-center w-full">                <span>171</span>                <span className="font-normal text-xs text-gray-500">Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span></span>
+            <div className="flex justify-between items-center w-full">
+              <span>171</span>
+              <span className="font-normal text-xs text-gray-500">
+                Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - 
+                Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span>
+              </span>
             </div>
           }
           data={[
