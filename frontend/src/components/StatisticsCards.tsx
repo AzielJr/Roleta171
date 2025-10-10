@@ -574,6 +574,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
   const [animatingP2, setAnimatingP2] = useState<'none' | 'green' | 'yellow'>('none');
   const [animatingTorre, setAnimatingTorre] = useState<'none' | 'green' | 'yellow'>('none');
   const lastTorreConsecutiveState = useRef(false);
+  const [animatingFusion, setAnimatingFusion] = useState<'none' | 'green' | 'yellow'>('none');
+  const lastFusionConsecutiveState = useRef(false);
   // Remover animações do Padrão 72 (não há alertas sonoros no 7x7)
 
   // Função para detectar 3 ou mais números consecutivos da mesma categoria
@@ -744,6 +746,25 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
       lastTorreConsecutiveState.current = false;
     }
   }, [calculatedTorreStats.hasConsecutiveEntries, calculatedTorreStats.hasRecentEntry]);
+
+  // Efeito para controlar animações do Fusion e tocar som
+  useEffect(() => {
+    if (calculatedFusionStats.hasConsecutiveEntries) {
+      setAnimatingFusion('yellow'); // Borda laranja para Fusion consecutivos (LOSS)
+      
+      // Tocar som APENAS quando Fusion muda para consecutivo (borda laranja) E avisos sonoros estão ativos
+      if (!lastFusionConsecutiveState.current && avisosSonorosAtivos) {
+        soundGenerator.playBellSound();
+        lastFusionConsecutiveState.current = true;
+      }
+    } else if (calculatedFusionStats.hasRecentEntry) {
+      setAnimatingFusion('green'); // Borda verde para primeira entrada Fusion (SEM SOM)
+      lastFusionConsecutiveState.current = false; // Reset quando não é mais consecutivo
+    } else {
+      setAnimatingFusion('none');
+      lastFusionConsecutiveState.current = false;
+    }
+  }, [calculatedFusionStats.hasConsecutiveEntries, calculatedFusionStats.hasRecentEntry]);
 
   const StatCard = ({ title, data, colors, cardType = 'default' }: {
     title: string | React.ReactNode;
@@ -1007,7 +1028,13 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 
         <StatCard
           title={
-            <div className="cursor-pointer transition-all duration-300 flex justify-between items-center" onClick={() => setShowFusionModal(true)}>
+            <div className={`cursor-pointer transition-all duration-300 flex justify-between items-center ${
+              animatingFusion === 'green' 
+                ? 'animate-pulse-green-border' 
+                : animatingFusion === 'yellow' 
+                ? 'animate-pulse-yellow-border' 
+                : ''
+            }`} onClick={() => setShowFusionModal(true)}>
               <span>Fusion</span>
             </div>
           }
