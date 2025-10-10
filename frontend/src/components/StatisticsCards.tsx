@@ -1335,11 +1335,9 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
               <div className="border-l-4 border-purple-500 pl-3">
                 <h3 className="font-semibold text-purple-700">Números Gatilho do Fusion</h3>
                 <p className="text-sm text-gray-600 mb-3">13 números que ativam o sistema Fusion</p>
-                <div className="flex flex-wrap gap-2 justify-center">
+                <div className="flex flex-wrap gap-3 justify-center">
                   {[0, 32, 15, 19, 4, 21, 2, 25, 7, 29, 18, 22, 9].map(num => (
-                    <span key={num} className="bg-purple-100 text-purple-800 px-3 py-2 rounded-lg text-sm font-bold border-2 border-purple-300">
-                      {num.toString().padStart(2, '0')}
-                    </span>
+                    <RouletteBall key={num} number={num} />
                   ))}
                 </div>
               </div>
