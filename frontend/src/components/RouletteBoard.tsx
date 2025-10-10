@@ -1652,6 +1652,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
     // Calcular os 7 números expostos conforme documentação: voltar 3 posições e contar 7
     const startIndex = (position - 3 + 37) % 37;
+    const exposedNumbers: number[] = [];
     
     for (let i = 0; i < 7; i++) {
       const index = (startIndex + i) % 37;
@@ -3093,7 +3094,12 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         {/* Usar o componente StatisticsCards com tema escuro */}
         <div className="[&_.bg-white]:bg-gray-700 [&_.text-gray-800]:text-white [&_.text-gray-600]:text-gray-300 [&_.text-gray-500]:text-gray-400 [&_.shadow-md]:shadow-lg">
           <StatisticsCards 
-            statistics={calculateStatistics(lastNumbers)} 
+            statistics={calculateStatistics(lastNumbers.map(num => ({
+              number: num,
+              color: num === 0 ? 'green' as const : 
+                     [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(num) ? 'red' as const : 'black' as const,
+              createdAt: new Date()
+            })))} 
             patternDetectedCount={patternDetectedCount}
             winCount={winCount}
             lossCount={lossCount}

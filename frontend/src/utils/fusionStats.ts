@@ -20,7 +20,7 @@ export const calculateFusionStats = (lastNumbers: number[]): {
   console.log('🔍 FUSION MODE 1 CALC - Input:', lastNumbers.slice(-10));
   
   if (lastNumbers.length === 0) {
-    return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, currentNegativeSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false, suggestedNumbers: { first: 0, second: 0, third: 0 } };
+    return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false, suggestedNumbers: { first: 0, second: 0, third: 0 } };
   }
 
   let entradas = 0;
@@ -73,7 +73,7 @@ export const calculateFusionStats = (lastNumbers: number[]): {
     }
   }
 
-  const result = { entradas, wins, losses, maxNegativeSequence: Math.min(maxNegativeSequence, losses), hasRecentEntry, hasConsecutiveEntries };
+  const result = { entradas, wins, losses, maxNegativeSequence: Math.min(maxNegativeSequence, losses), hasRecentEntry, hasConsecutiveEntries, suggestedNumbers: { first: 0, second: 0, third: 0 } };
   console.log('📊 FUSION MODE 1 RESULT:', result);
   return result;
 };
@@ -91,7 +91,7 @@ export const calculateFusionStatsMode2 = (lastNumbers: number[]): {
   console.log('🔍 FUSION MODE 2 CALC - Input:', lastNumbers.slice(-10));
   
   if (lastNumbers.length === 0) {
-    return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, currentNegativeSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false, suggestedNumbers: { first: 0, second: 0, third: 0 } };
+    return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false, suggestedNumbers: { first: 0, second: 0, third: 0 } };
   }
 
   let entradas = 0;
@@ -163,7 +163,8 @@ export const calculateFusionStatsMode2 = (lastNumbers: number[]): {
     losses, 
     maxNegativeSequence, 
     hasRecentEntry, 
-    hasConsecutiveEntries 
+    hasConsecutiveEntries,
+    suggestedNumbers: { first: 0, second: 0, third: 0 }
   };
   console.log('📊 FUSION MODE 2 RESULT:', result);
   return result;
