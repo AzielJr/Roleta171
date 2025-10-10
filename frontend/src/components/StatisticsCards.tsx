@@ -531,6 +531,7 @@ const RouletteBall = ({ number }: { number: number }) => (
 export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount, avisosSonorosAtivos = true, mostrarPadrao5x3Race = false, torreWinCount = 0, torreLossCount = 0, setTorreWinCount, setTorreLossCount }: StatisticsCardsProps) {
   const [showP2Modal, setShowP2Modal] = useState(false);
   const [showTorreModal, setShowTorreModal] = useState(false);
+  const [showFusionModal, setShowFusionModal] = useState(false);
   const [showRaceTrackModal, setShowRaceTrackModal] = useState(false);
   const [p2Mode, setP2Mode] = useState<1 | 2>(1); // Estado para controlar o modo do toggle P2
   const lastP2ConsecutiveState = useRef(false);
@@ -1005,12 +1006,16 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
         />
 
         <StatCard
-          title="Fusion"
+          title={
+            <div className="cursor-pointer transition-all duration-300 flex justify-between items-center" onClick={() => setShowFusionModal(true)}>
+              <span>Fusion</span>
+            </div>
+          }
           data={[
             { label: 'Entradas', value: calculatedFusionStats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedFusionStats.entradas / totalNumbers) * 100) : 0 },
             { label: 'WIN', value: calculatedFusionStats.wins, percentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.wins / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0 },
             { label: 'LOSS', value: calculatedFusionStats.losses, percentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.losses / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0 },
-            { label: 'Seq. Negativa', value: calculatedFusionStats.maxNegativeSequence, percentage: calculatedFusionStats.entradas > 0 ? Math.round((calculatedFusionStats.maxNegativeSequence / calculatedFusionStats.entradas) * 100) : 0, hidePercentage: true }
+            { label: '> Seq. Negativa', value: calculatedFusionStats.maxNegativeSequence, percentage: calculatedFusionStats.entradas > 0 ? Math.round((calculatedFusionStats.maxNegativeSequence / calculatedFusionStats.entradas) * 100) : 0, hidePercentage: true }
           ]}
           colors={['bg-purple-500', 'bg-green-500', 'bg-red-500', 'bg-blue-500']}
         />
@@ -1307,6 +1312,50 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
               <p>Números <strong>GATILHO</strong> incrementam as <strong>ENTRADAS</strong></p>
               <p>WIN: Qualquer número exceto <strong>00, 01, 02, 03, 34, 35, 36</strong></p>
               <p>LOSS: Números <strong>00, 01, 02, 03, 34, 35, 36</strong></p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Fusion */}
+      {showFusionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowFusionModal(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-gray-800">Fusion - Números Gatilho</h2>
+              <button 
+                onClick={() => setShowFusionModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="border-l-4 border-purple-500 pl-3">
+                <h3 className="font-semibold text-purple-700">Números Gatilho do Fusion</h3>
+                <p className="text-sm text-gray-600 mb-3">13 números que ativam o sistema Fusion</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {[0, 32, 15, 19, 4, 21, 2, 25, 7, 29, 18, 22, 9].map(num => (
+                    <span key={num} className="bg-purple-100 text-purple-800 px-3 py-2 rounded-lg text-sm font-bold border-2 border-purple-300">
+                      {num.toString().padStart(2, '0')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 text-center text-gray-600 text-sm">
+              <p>Estes números <strong>GATILHO</strong> incrementam as <strong>ENTRADAS</strong> do sistema Fusion</p>
+            </div>
+
+            <div className="mt-4 text-center">
+              <button 
+                onClick={() => setShowFusionModal(false)}
+                className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded transition-colors"
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>
