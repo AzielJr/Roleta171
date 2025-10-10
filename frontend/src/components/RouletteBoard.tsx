@@ -396,73 +396,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [alertaPadrao171Ativo, setAlertaPadrao171Ativo] = useState(true);
   const [avisosSonorosAtivos, setAvisosSonorosAtivos] = useState(true);
-  const [mostrarPadrao5x3Race, setmostrarPadrao5x3Race] = useState(false);
-  
-  // Função para calcular números sugeridos do Padrão 5x3
-  const calculatePadrao5x3Numbers = (lastNumber: number): { first: number; second: number; third: number } => {
-    const lastIndex = ROULETTE_SEQUENCE.indexOf(lastNumber);
-    if (lastIndex === -1) return { first: 0, second: 0, third: 0 };
-    
-    // Primeiro número: +6 índices à frente (sentido horário)
-    const firstIndex = (lastIndex + 6) % ROULETTE_SEQUENCE.length;
-    const first = ROULETTE_SEQUENCE[firstIndex];
-    
-    // Segundo número: +18 índices à frente (sentido horário)
-    const secondIndex = (lastIndex + 18) % ROULETTE_SEQUENCE.length;
-    const second = ROULETTE_SEQUENCE[secondIndex];
-    
-    // Terceiro número: +30 índices à frente (sentido horário)
-    const thirdIndex = (lastIndex + 30) % ROULETTE_SEQUENCE.length;
-    const third = ROULETTE_SEQUENCE[thirdIndex];
-    
-    return { first, second, third };
-  };
-
-  // Função para calcular números expostos (LOSS) do Padrão 5x3
-  const calculatePadrao5x3ExposedNumbers = (lastNumber: number): number[] => {
-    const lastIndex = ROULETTE_SEQUENCE.indexOf(lastNumber);
-    if (lastIndex === -1) return [];
-    
-    // Os 4 números expostos são os índices: 0, 12, 24, 36
-    const exposedIndices = [0, 12, 24, 36];
-    const exposedNumbers: number[] = [];
-    
-    exposedIndices.forEach(offset => {
-      const targetIndex = (lastIndex + offset) % ROULETTE_SEQUENCE.length;
-      exposedNumbers.push(ROULETTE_SEQUENCE[targetIndex]);
-    });
-    
-    return exposedNumbers;
-  };
-  
-  // Calcular números do Padrão 5x3 para o último número
-  const padrao5x3Numbers = React.useMemo(() => {
-    if (lastNumbers.length === 0) return { first: 0, second: 0, third: 0, exposedNumbers: [] };
-    const lastNumber = lastNumbers[lastNumbers.length - 1];
-    const suggestedNumbers = calculatePadrao5x3Numbers(lastNumber);
-    const exposedNumbers = calculatePadrao5x3ExposedNumbers(lastNumber);
-    return { ...suggestedNumbers, exposedNumbers };
-  }, [lastNumbers]);
-  
-  // Converter lastNumbers para Statistics e usar useStatistics
-  const statisticsData = React.useMemo(() => {
-    const rouletteEntries = lastNumbers.map(number => ({
-      number,
-      color: getNumberColorUtil(number) as 'green' | 'red' | 'black',
-      createdAt: new Date()
-    }));
-    return calculateStatistics(rouletteEntries);
-  }, [lastNumbers]);
-  
-  // Hook para calcular estatísticas
-  const statistics = useStatistics(statisticsData);
-  
-  // Estado para controlar a simulação automática
-  const [isSimulating, setIsSimulating] = useState(false);
-  const isSimulatingRef = useRef<boolean>(false);
-  
-  // Estado para armazenar referência do interval da simulação
+// Converter lastNumbers para Statistics e usar useStatistics
   const [simulationInterval, setSimulationInterval] = useState<NodeJS.Timeout | null>(null);
+  const [isSimulating, setIsSimulating] = useState<boolean>(false);
   
   // Estado para armazenar o último número selecionado manualmente
   const [lastSelectedNumber, setLastSelectedNumber] = useState<number | null>(null);
@@ -560,6 +496,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const waitingForNextNumberRef = useRef<boolean>(false);
   const [lastPatternNumbers, setLastPatternNumbers] = useState<{covered: number[], risk: number[]}>({covered: [], risk: []});
   const lastPatternNumbersRef = useRef<{covered: number[], risk: number[]}>({covered: [], risk: []});
+  const isSimulatingRef = useRef<boolean>(false);
 
   // Estados para edição inline do saldo no header
   const [isEditingBalance, setIsEditingBalance] = useState<boolean>(false);
@@ -1715,7 +1652,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
     // Calcular os 7 números expostos conforme documentação: voltar 3 posições e contar 7
     const startIndex = (position - 3 + 37) % 37;
-    const exposedNumbers: number[] = [];
     
     for (let i = 0; i < 7; i++) {
       const index = (startIndex + i) % 37;
@@ -2695,11 +2631,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                         // Verificar se é um dos 2 números para apostar no Padrão Detectado
                         const isDetectedBetNumber = patternAlert?.type === 'race' && alertaPadrao171Ativo && patternAlert?.betNumbers?.includes(num);
                           
-                          // Verificar se é um dos números do Padrão 5x3 (apenas se configuração ativa)
-                          const isPadrao5x3Suggested = mostrarPadrao5x3Race && (padrao5x3Numbers.first === num || padrao5x3Numbers.second === num || padrao5x3Numbers.third === num);
-                          const isPadrao5x3Exposed = mostrarPadrao5x3Race && padrao5x3Numbers.exposedNumbers.includes(num);
                         
-                        // Verificar se é um dos números do Padrão 5x3 (apenas se configuração ativa)
                         // Verificar se é primeiro ou último número exposto no Padrão Detectado
                         // USAR A MESMA LÓGICA DO CARD RISCO!
                         const riskNumbers = patternAlert?.message.includes('Números no risco (7):') ? 
@@ -2760,12 +2692,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                               !patternAlert && isForcedPattern && isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
                               !patternAlert && isForcedPattern && isHighlightedRisk ? 'scale-110 shadow-lg' : '',
                               !patternAlert && isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : '',
-                                // Padrão 5x3 (apenas quando configuração ativa e sem outros padrões)
-                                !patternAlert && !isForcedPattern && isPadrao5x3Suggested ? 'border-yellow-400 border-4 ring-2 ring-yellow-300' : '',
-                                !patternAlert && !isForcedPattern && isPadrao5x3Exposed ? 'border-white border-2 ring-1 ring-white' : '',
-                              // Padrão 5x3 (apenas quando configuração ativa e sem outros padrões)
-                              !patternAlert && !isForcedPattern && isPadrao5x3Suggested ? 'border-yellow-400 border-4 ring-2 ring-yellow-300' : '',
-                              !patternAlert && !isForcedPattern && isPadrao5x3Exposed ? 'border-white border-2 ring-1 ring-white' : ''
                             )}
                             style={
                               (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? {
@@ -2810,9 +2736,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                           // Verificar se é um dos 2 números para apostar no Padrão Detectado
                           const isDetectedBetNumber = patternAlert?.type === 'race' && alertaPadrao171Ativo && patternAlert?.betNumbers?.includes(num);
                           
-                          // Verificar se é um dos números do Padrão 5x3 (apenas se configuração ativa)
-                          const isPadrao5x3Suggested = mostrarPadrao5x3Race && (padrao5x3Numbers.first === num || padrao5x3Numbers.second === num || padrao5x3Numbers.third === num);
-                          const isPadrao5x3Exposed = mostrarPadrao5x3Race && padrao5x3Numbers.exposedNumbers.includes(num);
                           
                         // Verificar se é primeiro ou último número exposto no Padrão Detectado
                         // USAR A MESMA LÓGICA DO CARD RISCO!
@@ -2841,12 +2764,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                 !patternAlert && isForcedPattern && isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
                                 !patternAlert && isForcedPattern && isHighlightedRisk ? 'scale-110 shadow-lg' : '',
                                 !patternAlert && isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : '',
-                                // Padrão 5x3 (apenas quando configuração ativa e sem outros padrões)
-                                !patternAlert && !isForcedPattern && isPadrao5x3Suggested ? 'border-yellow-400 border-4 ring-2 ring-yellow-300' : '',
-                                !patternAlert && !isForcedPattern && isPadrao5x3Exposed ? 'border-white border-2 ring-1 ring-white' : '',
-                                // Padrão 5x3 (apenas quando configuração ativa e sem outros padrões)
-                                !patternAlert && !isForcedPattern && isPadrao5x3Suggested ? 'border-yellow-400 border-4 ring-2 ring-yellow-300' : '',
-                                !patternAlert && !isForcedPattern && isPadrao5x3Exposed ? 'border-white border-2 ring-1 ring-white' : ''
                               )}
                               title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                             >
@@ -2885,9 +2802,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                           // Verificar se é um dos 2 números para apostar no Padrão Detectado
                           const isDetectedBetNumber = patternAlert?.type === 'race' && alertaPadrao171Ativo && patternAlert?.betNumbers?.includes(num);
                           
-                          // Verificar se é um dos números do Padrão 5x3 (apenas se configuração ativa)
-                          const isPadrao5x3Suggested = mostrarPadrao5x3Race && (padrao5x3Numbers.first === num || padrao5x3Numbers.second === num || padrao5x3Numbers.third === num);
-                          const isPadrao5x3Exposed = mostrarPadrao5x3Race && padrao5x3Numbers.exposedNumbers.includes(num);
                           
                           // Verificar se é primeiro ou último número exposto no Padrão Detectado
                           // USAR A MESMA LÓGICA DO CARD RISCO!
@@ -2916,9 +2830,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                 !patternAlert && isForcedPattern && isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
                                 !patternAlert && isForcedPattern && isHighlightedRisk ? 'scale-110 shadow-lg' : '',
                                 !patternAlert && isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : '',
-                                // Padrão 5x3 (apenas quando configuração ativa e sem outros padrões)
-                                !patternAlert && !isForcedPattern && isPadrao5x3Suggested ? 'border-yellow-400 border-4 ring-2 ring-yellow-300' : '',
-                                !patternAlert && !isForcedPattern && isPadrao5x3Exposed ? 'border-white border-2 ring-1 ring-white' : '',','
                               )}
                               title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                             >
@@ -2954,9 +2865,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                         // Verificar se é um dos 2 números para apostar no Padrão Detectado
                         const isDetectedBetNumber = patternAlert?.type === 'race' && alertaPadrao171Ativo && patternAlert?.betNumbers?.includes(num);
                           
-                          // Verificar se é um dos números do Padrão 5x3 (apenas se configuração ativa)
-                          const isPadrao5x3Suggested = mostrarPadrao5x3Race && (padrao5x3Numbers.first === num || padrao5x3Numbers.second === num || padrao5x3Numbers.third === num);
-                          const isPadrao5x3Exposed = mostrarPadrao5x3Race && padrao5x3Numbers.exposedNumbers.includes(num);
                         
                         // Verificar se é primeiro ou último número exposto no Padrão Detectado
                         // USAR A MESMA LÓGICA DO CARD RISCO!
@@ -2987,9 +2895,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                               !patternAlert && isForcedPattern && isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
                               !patternAlert && isForcedPattern && isHighlightedRisk ? 'scale-110 shadow-lg' : '',
                               !patternAlert && isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : '',
-                                // Padrão 5x3 (apenas quando configuração ativa e sem outros padrões)
-                                !patternAlert && !isForcedPattern && isPadrao5x3Suggested ? 'border-yellow-400 border-4 ring-2 ring-yellow-300' : '',
-                                !patternAlert && !isForcedPattern && isPadrao5x3Exposed ? 'border-white border-2 ring-1 ring-white' : '',','
                             )}
                             style={
                               (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? {
@@ -3188,7 +3093,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         {/* Usar o componente StatisticsCards com tema escuro */}
         <div className="[&_.bg-white]:bg-gray-700 [&_.text-gray-800]:text-white [&_.text-gray-600]:text-gray-300 [&_.text-gray-500]:text-gray-400 [&_.shadow-md]:shadow-lg">
           <StatisticsCards 
-            statistics={statisticsData} 
+            statistics={calculateStatistics(lastNumbers)} 
             patternDetectedCount={patternDetectedCount}
             winCount={winCount}
             lossCount={lossCount}
@@ -3209,7 +3114,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               losses: lossCount
             }}
             avisosSonorosAtivos={avisosSonorosAtivos}
-            mostrarPadrao5x3Race={mostrarPadrao5x3Race}
           />
         </div>
 
@@ -3961,8 +3865,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               <label htmlFor="avisosSonoros" className="text-white text-sm cursor-pointer">Ativar avisos sonoros</label>
             </div>
             <div className="flex items-center space-x-3">
-              <input type="checkbox" id="padrao5x3Race" checked={mostrarPadrao5x3Race} onChange={(e) => setmostrarPadrao5x3Race(e.target.checked)} className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2" />
-              <label htmlFor="padrao5x3Race" className="text-white text-sm cursor-pointer">Mostrar Padrão 5x3 na Race</label>
             </div>
           </div>
           <div className="flex justify-end p-6 border-t border-gray-600">
