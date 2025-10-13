@@ -482,15 +482,18 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Estados para contar WIN e LOSS (Padrão 171)
   const [winCount, setWinCount] = useState<number>(0);
   const [lossCount, setLossCount] = useState<number>(0);
-  
   // Estados para contar WIN e LOSS P2 (persistentes)
   const [p2WinCount, setP2WinCount] = useState<number>(0);
   const [p2LossCount, setP2LossCount] = useState<number>(0);
-  
+
   // Estados para contar WIN e LOSS Torre (persistentes)
   const [torreWinCount, setTorreWinCount] = useState<number>(0);
   const [torreLossCount, setTorreLossCount] = useState<number>(0);
-  
+
+  // Estados para o modal do Padrão 32
+  const [showPattern32Modal, setShowPattern32Modal] = useState(false);
+  const [pattern32SelectedCount, setPattern32SelectedCount] = useState<'all' | 10 | 20 | 30 | 40 | 50>('all');
+
   // Estado para controlar se estamos aguardando a próxima dezena após popup
   const [waitingForNextNumber, setWaitingForNextNumber] = useState<boolean>(false);
   const waitingForNextNumberRef = useRef<boolean>(false);
@@ -1384,29 +1387,40 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     return 'text-white';
   };
 
-  const toggleNumber = (num: number) => {
-    setLastSelectedNumber(num);
-    
-    // Adicionar número aos últimos números
-    addToLastNumbers(num);
-    
-    // Adicionar ao histórico para detecção de padrões (COM popup na seleção manual)
-    addToHistory(num);
-    
-    // Se o toggle automático estiver ativo, aplicar o padrão 171
-    if (isAutoPattern171Active) {
-      // Usar setTimeout para garantir que o estado seja atualizado primeiro
-      setTimeout(() => {
-        forcePattern171(num); // Passar o número atual diretamente
-      }, 10);
-    }
-    
-    setSelected(prev => ({
-      ...prev,
-      numbers: prev.numbers.includes(num)
-        ? prev.numbers.filter(n => n !== num)
-        : [...prev.numbers, num]
-    }));
+  // Função para calcular estatísticas do Padrão 32
+  const calculatePattern32Stats = () => {
+    const numbersToAnalyze = pattern32SelectedCount === 'all' 
+      ? lastNumbers 
+      : lastNumbers.slice(0, pattern32SelectedCount);
+
+    const columnStats = {
+      1: { preta: 0, vermelha: 0 },
+      2: { preta: 0, vermelha: 0 },
+      3: { preta: 0, vermelha: 0 }
+    };
+
+    const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+
+    numbersToAnalyze.forEach(num => {
+      if (num === 0) return; // Ignorar o zero
+
+      const column = ((num - 1) % 3) + 1;
+      const isRed = redNumbers.includes(num);
+
+      if (isRed) {
+        columnStats[column as keyof typeof columnStats].vermelha++;
+      } else {
+        columnStats[column as keyof typeof columnStats].preta++;
+      }
+    });
+
+    const total = numbersToAnalyze.filter(n => n !== 0).length;
+
+    return {
+      columnStats,
+      total,
+      numbersAnalyzed: numbersToAnalyze.length
+    };
   };
 
   // Função para adicionar número aos últimos sorteados
@@ -1523,6 +1537,31 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       
       return updatedList;
     });
+  };
+
+  const toggleNumber = (num: number) => {
+    setLastSelectedNumber(num);
+    
+    // Adicionar número aos últimos números
+    addToLastNumbers(num);
+    
+    // Adicionar ao histórico para detecção de padrões (COM popup na seleção manual)
+    addToHistory(num);
+    
+    // Se o toggle automático estiver ativo, aplicar o padrão 171
+    if (isAutoPattern171Active) {
+      // Usar setTimeout para garantir que o estado seja atualizado primeiro
+      setTimeout(() => {
+        forcePattern171(num); // Passar o número atual diretamente
+      }, 10);
+    }
+    
+    setSelected(prev => ({
+      ...prev,
+      numbers: prev.numbers.includes(num)
+        ? prev.numbers.filter(n => n !== num)
+        : [...prev.numbers, num]
+    }));
   };
 
   // P2 logic completely removed - handled in StatisticsCards.tsx
@@ -2407,6 +2446,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             title="Adicionar números já sorteados"
           >
             ➕
+          </button>
+          <button
+            onClick={() => setShowPattern32Modal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
+            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+            title="Padrão 32 - Análise de coluna e cor dos números"
+          >
+            32
           </button>
           <button
             onClick={() => setShowMonthlyGraphModal(true)}
@@ -3875,6 +3922,149 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           </div>
           <div className="flex justify-end p-6 border-t border-gray-600">
             <button onClick={() => setShowConfigModal(false)} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded transition-colors">Salvar</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Modal do Padrão 32 */}
+    {showPattern32Modal && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl w-[900px] h-[560px] mx-4 flex flex-col">
+          {/* Header */}
+          <div className="flex justify-between items-center px-6 pt-6 pb-4 border-b border-gray-200">
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                32
+              </div>
+              Padrão 32 - Análise de Coluna e Cor
+            </h2>
+            <button 
+              onClick={() => setShowPattern32Modal(false)} 
+              className="text-gray-400 hover:text-gray-600 text-3xl font-bold"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 p-6 overflow-auto">
+            {/* Seleção de quantidade de números */}
+            <div className="mb-4 -mt-3 text-center">
+              <h3 className="text-lg font-semibold text-gray-700 mb-1">Quantidade de números para análise:</h3>
+              <div className="grid grid-cols-6 gap-2 max-w-4xl mx-auto">
+                {(['all', 10, 20, 30, 40, 50] as const).map((count) => (
+                  <label key={count} className="flex items-center space-x-2 cursor-pointer justify-center">
+                    <input
+                      type="radio"
+                      name="pattern32Count"
+                      value={count}
+                      checked={pattern32SelectedCount === count}
+                      onChange={() => setPattern32SelectedCount(count)}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
+                    />
+                    <span className="text-gray-700 text-sm">
+                      {count === 'all' ? 'Todos' : `Últimos ${count}`}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Tabela de estatísticas */}
+            <div className="bg-gray-50 rounded-lg p-4 -mt-2">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-700">Estatísticas por Coluna e Cor:</h3>
+                {(() => {
+                  const stats = calculatePattern32Stats();
+                  return (
+                    <div className="text-sm text-gray-600">
+                      <strong>Números analisados:</strong> {stats.numbersAnalyzed} | 
+                      <strong> Total válido (excluindo zeros):</strong> {stats.total}
+                    </div>
+                  );
+                })()}
+              </div>
+              
+              {(() => {
+                const stats = calculatePattern32Stats();
+                
+                return (
+                  <div>
+                    
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border border-gray-300">
+                        <thead>
+                          <tr className="bg-gray-200">
+                            <th className="border border-gray-300 px-4 py-1 text-center font-semibold text-gray-500">#</th>
+                            <th className="border border-gray-300 px-4 py-1 text-center font-semibold">Coluna</th>
+                            <th className="border border-gray-300 px-4 py-1 text-left font-semibold">Cor</th>
+                            <th className="border border-gray-300 px-4 py-1 text-right font-semibold">Qtde.</th>
+                            <th className="border border-gray-300 px-4 py-1 text-right font-semibold">%</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(() => {
+                            // Criar array com todas as combinações coluna/cor
+                            const allRows = [];
+                            Object.entries(stats.columnStats).forEach(([column, colors]) => {
+                              allRows.push({
+                                column,
+                                color: 'preta',
+                                count: colors.preta,
+                                percentage: stats.total > 0 ? (colors.preta / stats.total) * 100 : 0
+                              });
+                              allRows.push({
+                                column,
+                                color: 'vermelha',
+                                count: colors.vermelha,
+                                percentage: stats.total > 0 ? (colors.vermelha / stats.total) * 100 : 0
+                              });
+                            });
+                            
+                            // Ordenar por percentual (maior para menor)
+                            allRows.sort((a, b) => b.percentage - a.percentage);
+                            
+                            return allRows.map((row, index) => (
+                              <tr key={`${row.column}-${row.color}`} className={`hover:bg-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                                <td className="border border-gray-300 px-4 py-1 text-center font-medium text-gray-500">
+                                  {index + 1}
+                                </td>
+                                <td className="border border-gray-300 px-4 py-1 text-center font-medium">
+                                  {row.column.padStart(2, '0')}ª
+                                </td>
+                                <td className="border border-gray-300 px-4 py-1">
+                                  <span className="inline-flex items-center gap-2">
+                                    <div className={`w-4 h-4 rounded-full ${row.color === 'preta' ? 'bg-gray-800' : 'bg-red-600'}`}></div>
+                                    {row.color === 'preta' ? 'Preta' : 'Vermelha'}
+                                  </span>
+                                </td>
+                                <td className="border border-gray-300 px-4 py-1 text-right font-medium">
+                                  {row.count}
+                                </td>
+                                <td className="border border-gray-300 px-4 py-1 text-right font-medium">
+                                  {row.percentage.toFixed(2)}%
+                                </td>
+                              </tr>
+                            ));
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-end px-6 py-4 border-t border-gray-200">
+            <button 
+              onClick={() => setShowPattern32Modal(false)}
+              className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors"
+            >
+              Fechar
+            </button>
           </div>
         </div>
       </div>
