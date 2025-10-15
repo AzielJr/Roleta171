@@ -428,6 +428,45 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   
   // Estados para popup de feedback de voz
   const [showVoicePopup, setShowVoicePopup] = useState(false);
+
+  // Estatísticas do BET Terminais
+  const [betTerminaisWins, setBetTerminaisWins] = useState(0);
+  const [betTerminaisLosses, setBetTerminaisLosses] = useState(0);
+  const [betTerminaisNegSeqCurrent, setBetTerminaisNegSeqCurrent] = useState(0);
+  const [betTerminaisNegSeqMax, setBetTerminaisNegSeqMax] = useState(0);
+
+  // Avaliar BET Terminais ANTES de atualizar a lista de terminais
+  const evaluateBetTerminais = (selectedNumber: number) => {
+    const snapshot = lastNumbers; // usar estado atual (antes de adicionar o novo número)
+
+    // Regra de cálculo apenas quando TODOS os 10 terminais têm algum valor nos últimos 50
+    const last50 = snapshot.slice(-50);
+    const counts = Array(10).fill(0);
+    last50.forEach(n => {
+      counts[n % 10]++;
+    });
+    const allHaveValues = counts.every(c => c > 0);
+    if (!allHaveValues) return; // não calcular BET Terminais se algum terminal está zerado
+
+    // Construir lista de Terminais ordenada por frequência (desc) e pegar os 3 últimos itens (menos frequentes)
+    const terminaisData = counts.map((count, terminal) => ({ terminal, count }));
+    terminaisData.sort((a, b) => b.count - a.count);
+    const lastThreeFromList = terminaisData.slice(-3).map(t => t.terminal);
+
+    const terminal = selectedNumber % 10;
+    const isLoss = lastThreeFromList.includes(terminal);
+    if (isLoss) {
+      setBetTerminaisLosses(prev => prev + 1);
+      setBetTerminaisNegSeqCurrent(prev => {
+        const next = prev + 1;
+        setBetTerminaisNegSeqMax(m => Math.max(m, next));
+        return next;
+      });
+    } else {
+      setBetTerminaisWins(prev => prev + 1);
+      setBetTerminaisNegSeqCurrent(0);
+    }
+  };
   const [voiceTranscript, setVoiceTranscript] = useState<string>('');
   const [voiceDigits, setVoiceDigits] = useState<string>('');
   
@@ -490,9 +529,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [torreWinCount, setTorreWinCount] = useState<number>(0);
   const [torreLossCount, setTorreLossCount] = useState<number>(0);
 
-  // Estados para o modal do Padrão 32
-  const [showPattern32Modal, setShowPattern32Modal] = useState(false);
-  const [pattern32SelectedCount, setPattern32SelectedCount] = useState<'all' | 10 | 20 | 30 | 40 | 50>('all');
+  // (Removido) Estados para o modal do Padrão 32
 
   // Estado para controlar se estamos aguardando a próxima dezena após popup
   const [waitingForNextNumber, setWaitingForNextNumber] = useState<boolean>(false);
@@ -1364,6 +1401,12 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     setP2LossCount(0); // Resetar contadores P2
     setTorreWinCount(0); // Resetar contadores Torre
     setTorreLossCount(0); // Resetar contadores Torre
+
+    // Resetar BET Terminais
+    setBetTerminaisWins(0);
+    setBetTerminaisLosses(0);
+    setBetTerminaisNegSeqCurrent(0);
+    setBetTerminaisNegSeqMax(0);
     
     // Resetar controle de duplicação P2
     lastProcessedP2Key.current = '';
@@ -1387,44 +1430,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     return 'text-white';
   };
 
-  // Função para calcular estatísticas do Padrão 32
-  const calculatePattern32Stats = () => {
-    const numbersToAnalyze = pattern32SelectedCount === 'all' 
-      ? lastNumbers 
-      : lastNumbers.slice(0, pattern32SelectedCount);
-
-    const columnStats = {
-      1: { preta: 0, vermelha: 0 },
-      2: { preta: 0, vermelha: 0 },
-      3: { preta: 0, vermelha: 0 }
-    };
-
-    const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
-
-    numbersToAnalyze.forEach(num => {
-      if (num === 0) return; // Ignorar o zero
-
-      const column = ((num - 1) % 3) + 1;
-      const isRed = redNumbers.includes(num);
-
-      if (isRed) {
-        columnStats[column as keyof typeof columnStats].vermelha++;
-      } else {
-        columnStats[column as keyof typeof columnStats].preta++;
-      }
-    });
-
-    const total = numbersToAnalyze.filter(n => n !== 0).length;
-
-    return {
-      columnStats,
-      total,
-      numbersAnalyzed: numbersToAnalyze.length
-    };
-  };
+  // (Removido) Função para calcular estatísticas do Padrão 32
 
   // Função para adicionar número aos últimos sorteados
   const addToLastNumbers = (num: number) => {
+    // Avaliar BET Terminais ANTES de adicionar o número na lista (ordem exigida)
+    evaluateBetTerminais(num);
+
     // CRÍTICO: Verificar WIN do Padrão Detectado ANTES de adicionar o número
     if (patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && patternAlert.betNumbers) {
       if (patternAlert.betNumbers.includes(num)) {
@@ -2448,14 +2460,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             ➕
           </button>
           <button
-            onClick={() => setShowPattern32Modal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
-            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
-            title="Padrão 32 - Análise de coluna e cor dos números"
-          >
-            32
-          </button>
-          <button
             onClick={() => setShowMonthlyGraphModal(true)}
             className="bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
             style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
@@ -2540,7 +2544,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       </div>
       
       {/* Box com últimos números sorteados */}
-      <div className="bg-gray-600 rounded-lg p-4" style={{marginBottom: '12px', marginTop: '-6px'}}>
+      <div className="bg-gray-600 rounded-lg p-4" style={{marginBottom: '12px', marginTop: '-11px'}}>
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-white font-semibold">Últimos Números Sorteados:</h3>
           <div className="flex gap-2">
@@ -2993,10 +2997,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               </div>
               
               {/* Conteúdo em 3 colunas */}
-              <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="grid grid-cols-3 gap-2 text-sm">
                 {/* Coluna 1: Números Sugeridos */}
                 <div className="bg-green-50 p-2 rounded border border-green-200 min-h-[150px]">
-                  <h4 className="font-bold text-green-800 mb-7 flex items-center justify-between text-xs">
+                  <h4 className="font-bold text-green-800 mb-7 flex items-center justify-between text-sm">
                     <div className="flex items-center">
                       <span className="text-sm mr-1">💰</span>
                       APOSTAR
@@ -3019,7 +3023,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                         return (
                           <div
                             key={num}
-                            className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow ${
+                            className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-[20px] shadow ${
                               getNumberColor(num)
                             } ring-1 ring-green-300`}
                           >
@@ -3030,7 +3034,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                     })()}
                   </div>
                   <div className="text-center">
-                    <span className="bg-green-200 text-green-800 px-1 py-0.5 rounded text-xs font-semibold">
+                    <span className="bg-green-200 text-green-800 px-1 py-0.5 rounded text-sm font-semibold">
                       30 números (81%)  -  ou  -  32 números (86%)
                     </span>
                   </div>
@@ -3038,7 +3042,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 
                 {/* Coluna 2: Números de Risco */}
                 <div className="bg-red-50 p-2 rounded border border-red-200 min-h-[150px]">
-                  <h4 className="font-bold text-red-800 mb-7 flex items-center justify-between text-xs">
+                  <h4 className="font-bold text-red-800 mb-7 flex items-center justify-between text-sm">
                     <div className="flex items-center">
                       <span className="text-sm mr-1">⚠️</span>
                       RISCO
@@ -3073,8 +3077,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                               getNumberColor(num),
                               // Destaque especial para primeiro e último número
                               isHighlighted 
-                                ? 'w-12 h-12 text-xl animate-pulse scale-110 shadow-lg ring-2 ring-white' 
-                                : 'w-10 h-10 text-lg'
+                                ? 'w-12 h-12 text-[22px] animate-pulse scale-110 shadow-lg ring-2 ring-white' 
+                                : 'w-10 h-10 text-[20px]'
                             )}
                           >
                             {num}
@@ -3084,7 +3088,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                     })()}
                   </div>
                   <div className="text-center mt-3">
-                    <span className="bg-red-200 text-red-800 px-1 py-0.5 rounded text-xs font-semibold">
+                    <span className="bg-red-200 text-red-800 px-1 py-0.5 rounded text-sm font-semibold">
                       7 números (19%)  -  ou  -  5 números (13%)
                     </span>
                   </div>
@@ -3092,7 +3096,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
                 {/* Coluna 3: Padrão Detectado */}
                 <div className="bg-blue-50 p-2 rounded border border-blue-200 min-h-[150px]">
-                  <h4 className="font-semibold text-blue-800 mb-7 flex items-center justify-between text-xs">
+                  <h4 className="font-semibold text-blue-800 mb-7 flex items-center justify-between text-sm">
                     <div className="flex items-center">
                       📊 PADRÃO 171
                     </div>
@@ -3100,20 +3104,25 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                   </h4>
                   <div className="flex flex-col items-center gap-1">
                     <div className="flex flex-wrap gap-0.5 justify-center">
-                      {patternAlert?.numbers.map((num, index) => (
-                        <div key={num} className="flex flex-col items-center">
-                          <div className="text-xs text-gray-400 mb-0.5 font-mono" style={{fontSize: '10px'}}>
-                            {patternAlert.positions[index] + 1}
+                      {(() => {
+                        const lastTwoSelected = selected.numbers.slice(-2).reverse();
+                        const nums = lastTwoSelected;
+                        const positions = nums.map(n => ROULETTE_SEQUENCE.indexOf(n));
+                        return nums.map((num, index) => (
+                          <div key={`${num}-${index}`} className="flex flex-col items-center">
+                            <div className="text-sm text-gray-400 mb-0.5 font-mono" style={{fontSize: '12px'}}>
+                              {positions[index] + 1}
+                            </div>
+                            <div
+                              className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-[20px] ${
+                                getNumberColor(num)
+                              } shadow-sm`}
+                            >
+                              {num}
+                            </div>
                           </div>
-                          <div
-                            className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg ${
-                              getNumberColor(num)
-                            } shadow-sm`}
-                          >
-                            {num}
-                          </div>
-                        </div>
-                      ))}
+                        ));
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -3167,6 +3176,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               losses: lossCount
             }}
             avisosSonorosAtivos={avisosSonorosAtivos}
+            betTerminaisStats={{
+              wins: betTerminaisWins,
+              losses: betTerminaisLosses,
+              winPercentage: (betTerminaisWins + betTerminaisLosses) > 0 ? Math.round((betTerminaisWins / (betTerminaisWins + betTerminaisLosses)) * 100) : 0,
+              lossPercentage: (betTerminaisWins + betTerminaisLosses) > 0 ? Math.round((betTerminaisLosses / (betTerminaisWins + betTerminaisLosses)) * 100) : 0,
+              negativeSequenceCurrent: betTerminaisNegSeqCurrent,
+              negativeSequenceMax: betTerminaisNegSeqMax
+            }}
           />
         </div>
 
@@ -3181,32 +3198,32 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="text-center">
-                <div className="text-white/80 text-xs mb-1">Data</div>
-                <div className="text-white font-bold text-sm">
+                <div className="text-white/80 text-sm mb-1">Data</div>
+                <div className="text-white font-bold text-base">
                   {currentSaldoRecord?.data ? new Date(currentSaldoRecord.data + 'T00:00:00').toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-white/80 text-xs mb-1">Saldo Inicial</div>
-                <div className="text-white font-bold text-sm">
+                <div className="text-white/80 text-sm mb-1">Saldo Inicial</div>
+                <div className="text-white font-bold text-base">
                   R$ {(currentSaldoRecord?.saldo_inicial || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-white/80 text-xs mb-1">Saldo Atual</div>
-                <div className="text-white font-bold text-sm">
+                <div className="text-white/80 text-sm mb-1">Saldo Atual</div>
+                <div className="text-white font-bold text-base">
                   R$ {(balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-white/80 text-xs mb-1">Valor do Lucro</div>
-                <div className={`font-bold text-sm ${(currentSaldoRecord?.vlr_lucro || 0) >= 0 ? 'text-green-200' : 'text-amber-900'}`}>
+                <div className="text-white/80 text-sm mb-1">Valor do Lucro</div>
+                <div className={`font-bold text-base ${(currentSaldoRecord?.vlr_lucro || 0) >= 0 ? 'text-green-200' : 'text-amber-900'}`}>
                   {(currentSaldoRecord?.vlr_lucro || 0) >= 0 ? '+' : ''}R$ {(currentSaldoRecord?.vlr_lucro || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-white/80 text-xs mb-1">Percentual do Lucro</div>
-                <div className={`font-bold text-sm ${(currentSaldoRecord?.per_lucro || 0) >= 0 ? 'text-green-200' : 'text-amber-900'}`}>
+                <div className="text-white/80 text-sm mb-1">Percentual do Lucro</div>
+                <div className={`font-bold text-base ${(currentSaldoRecord?.per_lucro || 0) >= 0 ? 'text-green-200' : 'text-amber-900'}`}>
                   {(currentSaldoRecord?.per_lucro || 0) >= 0 ? '+' : ''}{(currentSaldoRecord?.per_lucro || 0).toFixed(2)}%
                 </div>
               </div>
@@ -3216,41 +3233,41 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             <div className="mt-4 pt-3 border-t border-green-400/30">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="text-center">
-                  <div className="text-white/60 text-sm mb-1">Sugestão</div>
-                  <div className="text-white/60 text-sm">(% Lucro)</div>
+                  <div className="text-white/60 text-base mb-1">Sugestão</div>
+                  <div className="text-white/60 text-base">(% Lucro)</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-yellow-200 text-sm mb-1">2,34%</div>
-                  <div className="text-white font-bold text-sm flex items-center justify-center gap-1">
+                  <div className="text-yellow-200 text-base mb-1">2,34%</div>
+                  <div className="text-white font-bold text-base flex items-center justify-center gap-1">
                     <span>R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0234).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    <span className="text-green-300 text-xs">
+                    <span className="text-green-300 text-sm">
                       ({((currentSaldoRecord?.saldo_inicial || 0) * 0.0234).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                     </span>
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-yellow-200 text-sm mb-1">3,73%</div>
-                  <div className="text-white font-bold text-sm flex items-center justify-center gap-1">
+                  <div className="text-yellow-200 text-base mb-1">3,73%</div>
+                  <div className="text-white font-bold text-base flex items-center justify-center gap-1">
                     <span>R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0373).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    <span className="text-green-300 text-xs">
+                    <span className="text-green-300 text-sm">
                       ({((currentSaldoRecord?.saldo_inicial || 0) * 0.0373).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                     </span>
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-yellow-200 text-sm mb-1">4,73%</div>
-                  <div className="text-white font-bold text-sm flex items-center justify-center gap-1">
+                  <div className="text-yellow-200 text-base mb-1">4,73%</div>
+                  <div className="text-white font-bold text-base flex items-center justify-center gap-1">
                     <span>R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0473).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    <span className="text-green-300 text-xs">
+                    <span className="text-green-300 text-sm">
                       ({((currentSaldoRecord?.saldo_inicial || 0) * 0.0473).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                     </span>
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-yellow-200 text-sm mb-1">10,00%</div>
-                  <div className="text-white font-bold text-sm flex items-center justify-center gap-1">
+                  <div className="text-yellow-200 text-base mb-1">10,00%</div>
+                  <div className="text-white font-bold text-base flex items-center justify-center gap-1">
                     <span>R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    <span className="text-green-300 text-xs">
+                    <span className="text-green-300 text-sm">
                       ({((currentSaldoRecord?.saldo_inicial || 0) * 0.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                     </span>
                   </div>
@@ -3927,148 +3944,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       </div>
     )}
 
-    {/* Modal do Padrão 32 */}
-    {showPattern32Modal && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl w-[900px] h-[560px] mx-4 flex flex-col">
-          {/* Header */}
-          <div className="flex justify-between items-center px-6 pt-6 pb-4 border-b border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-                32
-              </div>
-              Padrão 32 - Análise de Coluna e Cor
-            </h2>
-            <button 
-              onClick={() => setShowPattern32Modal(false)} 
-              className="text-gray-400 hover:text-gray-600 text-3xl font-bold"
-            >
-              ×
-            </button>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 p-6 overflow-auto">
-            {/* Seleção de quantidade de números */}
-            <div className="mb-4 -mt-3 text-center">
-              <h3 className="text-lg font-semibold text-gray-700 mb-1">Quantidade de números para análise:</h3>
-              <div className="grid grid-cols-6 gap-2 max-w-4xl mx-auto">
-                {(['all', 10, 20, 30, 40, 50] as const).map((count) => (
-                  <label key={count} className="flex items-center space-x-2 cursor-pointer justify-center">
-                    <input
-                      type="radio"
-                      name="pattern32Count"
-                      value={count}
-                      checked={pattern32SelectedCount === count}
-                      onChange={() => setPattern32SelectedCount(count)}
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
-                    />
-                    <span className="text-gray-700 text-sm">
-                      {count === 'all' ? 'Todos' : `Últimos ${count}`}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Tabela de estatísticas */}
-            <div className="bg-gray-50 rounded-lg p-4 -mt-2">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-700">Estatísticas por Coluna e Cor:</h3>
-                {(() => {
-                  const stats = calculatePattern32Stats();
-                  return (
-                    <div className="text-sm text-gray-600">
-                      <strong>Números analisados:</strong> {stats.numbersAnalyzed} | 
-                      <strong> Total válido (excluindo zeros):</strong> {stats.total}
-                    </div>
-                  );
-                })()}
-              </div>
-              
-              {(() => {
-                const stats = calculatePattern32Stats();
-                
-                return (
-                  <div>
-                    
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse border border-gray-300">
-                        <thead>
-                          <tr className="bg-gray-200">
-                            <th className="border border-gray-300 px-4 py-1 text-center font-semibold text-gray-500">#</th>
-                            <th className="border border-gray-300 px-4 py-1 text-center font-semibold">Coluna</th>
-                            <th className="border border-gray-300 px-4 py-1 text-left font-semibold">Cor</th>
-                            <th className="border border-gray-300 px-4 py-1 text-right font-semibold">Qtde.</th>
-                            <th className="border border-gray-300 px-4 py-1 text-right font-semibold">%</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(() => {
-                            // Criar array com todas as combinações coluna/cor
-                            const allRows = [];
-                            Object.entries(stats.columnStats).forEach(([column, colors]) => {
-                              allRows.push({
-                                column,
-                                color: 'preta',
-                                count: colors.preta,
-                                percentage: stats.total > 0 ? (colors.preta / stats.total) * 100 : 0
-                              });
-                              allRows.push({
-                                column,
-                                color: 'vermelha',
-                                count: colors.vermelha,
-                                percentage: stats.total > 0 ? (colors.vermelha / stats.total) * 100 : 0
-                              });
-                            });
-                            
-                            // Ordenar por percentual (maior para menor)
-                            allRows.sort((a, b) => b.percentage - a.percentage);
-                            
-                            return allRows.map((row, index) => (
-                              <tr key={`${row.column}-${row.color}`} className={`hover:bg-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                                <td className="border border-gray-300 px-4 py-1 text-center font-medium text-gray-500">
-                                  {index + 1}
-                                </td>
-                                <td className="border border-gray-300 px-4 py-1 text-center font-medium">
-                                  {row.column.padStart(2, '0')}ª
-                                </td>
-                                <td className="border border-gray-300 px-4 py-1">
-                                  <span className="inline-flex items-center gap-2">
-                                    <div className={`w-4 h-4 rounded-full ${row.color === 'preta' ? 'bg-gray-800' : 'bg-red-600'}`}></div>
-                                    {row.color === 'preta' ? 'Preta' : 'Vermelha'}
-                                  </span>
-                                </td>
-                                <td className="border border-gray-300 px-4 py-1 text-right font-medium">
-                                  {row.count}
-                                </td>
-                                <td className="border border-gray-300 px-4 py-1 text-right font-medium">
-                                  {row.percentage.toFixed(2)}%
-                                </td>
-                              </tr>
-                            ));
-                          })()}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="flex justify-end px-6 py-4 border-t border-gray-200">
-            <button 
-              onClick={() => setShowPattern32Modal(false)}
-              className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors"
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
     </>
   );
 };

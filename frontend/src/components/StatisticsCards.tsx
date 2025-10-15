@@ -37,6 +37,15 @@ interface StatisticsCardsProps {
   torreLossCount?: number;
   setTorreWinCount?: (value: number | ((prev: number) => number)) => void;
   setTorreLossCount?: (value: number | ((prev: number) => number)) => void;
+  // Props para BET Terminais
+  betTerminaisStats?: {
+    wins: number;
+    losses: number;
+    winPercentage: number;
+    lossPercentage: number;
+    negativeSequenceCurrent: number;
+    negativeSequenceMax: number;
+  };
 }
 
 // Função para calcular números expostos no padrão 171 Forçado
@@ -266,22 +275,22 @@ const calculateTorreStats = (lastNumbers: number[]): {
   entradas: number; 
   wins: number; 
   losses: number; 
-  maxPositiveSequence: number;
-  currentPositiveSequence: number;
+  maxNegativeSequence: number;
+  currentNegativeSequence: number;
   hasRecentEntry: boolean;
   hasConsecutiveEntries: boolean;
 } => {
   console.log('🔍 TORRE CALC - Input:', lastNumbers.slice(-10)); // Mostrar apenas os últimos 10
   
   if (lastNumbers.length === 0) {
-    return { entradas: 0, wins: 0, losses: 0, maxPositiveSequence: 0, currentPositiveSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false };
+    return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, currentNegativeSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false };
   }
 
   let entradas = 0;
   let wins = 0;
   let losses = 0;
-  let maxPositiveSequence = 0;
-  let currentPositiveSequence = 0;
+  let maxNegativeSequence = 0;
+  let currentNegativeSequence = 0;
   let hasRecentEntry = false;
   let hasConsecutiveEntries = false;
 
@@ -311,8 +320,6 @@ const calculateTorreStats = (lastNumbers: number[]): {
     // Se encontrou uma entrada Torre, incrementa entradas e verifica o próximo número
     if (TORRE_ENTRY_NUMBERS.includes(number)) {
       entradas++;
-      // SEMPRE zera a sequência positiva quando sai um número do padrão Torre
-      currentPositiveSequence = 0;
       
       // Verificar se há um próximo número (mais recente) para determinar WIN/LOSS
       if (i < lastNumbers.length - 1) { // Se não é o número mais recente
@@ -321,25 +328,22 @@ const calculateTorreStats = (lastNumbers: number[]): {
         if (TORRE_LOSS_NUMBERS.includes(nextNumber)) {
           // LOSS: Se o próximo número após entrada Torre for um dos números de LOSS (01,02,03,34,35,36,0)
           losses++;
+          // Incrementa sequência NEGATIVA ao ocorrer um LOSS após uma entrada Torre
+          currentNegativeSequence++;
+          maxNegativeSequence = Math.max(maxNegativeSequence, currentNegativeSequence);
         } else if (TORRE_WIN_NUMBERS.includes(nextNumber)) {
           // WIN: Se o próximo número após entrada Torre for qualquer outro número
           wins++;
+          // Zera sequência NEGATIVA ao ocorrer um WIN após uma entrada Torre
+          currentNegativeSequence = 0;
         }
       }
     } else {
-      // Se não é um número de entrada Torre, verifica se deve incrementar ou zerar sequência positiva
-      if (TORRE_WIN_NUMBERS.includes(number)) {
-        // Se é um número de WIN (não é Torre nem LOSS), incrementa sequência positiva
-        currentPositiveSequence++;
-        maxPositiveSequence = Math.max(maxPositiveSequence, currentPositiveSequence);
-      } else if (TORRE_LOSS_NUMBERS.includes(number)) {
-        // Se é um número de LOSS (0), zera sequência positiva
-        currentPositiveSequence = 0;
-      }
+      // Não é um número de entrada Torre; sequência negativa depende apenas do resultado após entradas.
     }
   }
 
-  const result = { entradas, wins, losses, maxPositiveSequence, currentPositiveSequence, hasRecentEntry, hasConsecutiveEntries };
+  const result = { entradas, wins, losses, maxNegativeSequence, currentNegativeSequence, hasRecentEntry, hasConsecutiveEntries };
   console.log('📊 TORRE RESULT:', result);
   return result;
 };
@@ -528,7 +532,19 @@ const RouletteBall = ({ number }: { number: number }) => (
   </div>
 );
 
-export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount, avisosSonorosAtivos = true, mostrarPadrao5x3Race = false, torreWinCount = 0, torreLossCount = 0, setTorreWinCount, setTorreLossCount }: StatisticsCardsProps) {
+// Helper: obter coluna do número (1, 2, 3) ou null para 0
+const getNumberColumn = (num: number): 1 | 2 | 3 | null => {
+  if (num === 0) return null;
+  const firstColumn = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34];
+  const secondColumn = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35];
+  const thirdColumn = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36];
+  if (firstColumn.includes(num)) return 1;
+  if (secondColumn.includes(num)) return 2;
+  if (thirdColumn.includes(num)) return 3;
+  return null;
+};
+
+export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount, avisosSonorosAtivos = true, mostrarPadrao5x3Race = false, torreWinCount = 0, torreLossCount = 0, setTorreWinCount, setTorreLossCount, betTerminaisStats = { wins: 52, losses: 7, winPercentage: 88, lossPercentage: 12, negativeSequenceCurrent: 6, negativeSequenceMax: 16 } }: StatisticsCardsProps) {
   const [showP2Modal, setShowP2Modal] = useState(false);
   const [showTorreModal, setShowTorreModal] = useState(false);
   const [showFusionModal, setShowFusionModal] = useState(false);
@@ -564,6 +580,53 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
   const calculated171ForcedStats = React.useMemo(() => {
     return calculate171ForcedStats(lastNumbers);
   }, [lastNumbers]);
+
+  // Janela selecionada para os cards 32P1 e 32V2 (0 = Todos)
+  const [window32P1, setWindow32P1] = useState<number>(0);
+  const [window32V2, setWindow32V2] = useState<number>(0);
+
+  // Calcular estatísticas dos cards 32P1 e 32V2 conforme regras fornecidas
+  const calculated32P1Stats = React.useMemo(() => {
+    const slice = window32P1 && window32P1 > 0 ? lastNumbers.slice(-window32P1) : lastNumbers;
+    let winTotal = 0;
+    let wins = 0;
+    let losses = 0;
+    const winTotalSet = new Set([6, 15, 24, 33]);
+    for (const num of slice) {
+      const color = ROULETTE_COLORS[num];
+      const col = getNumberColumn(num);
+      if (winTotalSet.has(num)) winTotal++;
+      if (color === 'black' || (color === 'red' && col === 3)) {
+        wins++;
+      }
+      if (num === 0 || (color === 'red' && (col === 1 || col === 2))) {
+        losses++;
+      }
+    }
+    return { winTotal, wins, losses, total: slice.length };
+  }, [lastNumbers, window32P1]);
+
+  const calculated32V2Stats = React.useMemo(() => {
+    const slice = window32V2 && window32V2 > 0 ? lastNumbers.slice(-window32V2) : lastNumbers;
+    let winTotal = 0;
+    let wins = 0;
+    let losses = 0;
+    const winTotalSet = new Set([5, 14, 23, 32]);
+    for (const num of slice) {
+      const color = ROULETTE_COLORS[num];
+      const col = getNumberColumn(num);
+      if (winTotalSet.has(num)) winTotal++;
+      // WIN: vermelho na coluna 2 OU qualquer vermelho (equivale a qualquer vermelho)
+      if (color === 'red') {
+        wins++;
+      }
+      // LOSS: zero ou preto na coluna 1 e 3
+      if (num === 0 || (color === 'black' && (col === 1 || col === 3))) {
+        losses++;
+      }
+    }
+    return { winTotal, wins, losses, total: slice.length };
+  }, [lastNumbers, window32V2]);
 
   // Estados para animações dos cards
   const [animatingColumns, setAnimatingColumns] = useState<Set<number>>(new Set());
@@ -766,13 +829,14 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     }
   }, [calculatedFusionStats.hasConsecutiveEntries, calculatedFusionStats.hasRecentEntry]);
 
-  const StatCard = ({ title, data, colors, cardType = 'default' }: {
+  const StatCard = ({ title, data, colors, cardType = 'default', containerClassName = '' }: {
     title: string | React.ReactNode;
     data: Array<{ label: string; value: number; percentage: number; hidePercentage?: boolean; customValue?: string }>;
     colors: string[];
     cardType?: 'columns' | 'dozens' | 'highLow' | 'evenOdd' | 'colors' | 'default';
+    containerClassName?: string;
   }) => (
-    <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
+    <div className={`bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24 ${containerClassName}`}>
       <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">{title}</h3>
       <div className="space-y-0.5 lg:space-y-1">
         {data.map((item, index) => {
@@ -868,6 +932,34 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
     return terminaisData.sort((a, b) => b.count - a.count);
   }, [lastNumbers]);
 
+  // Função para calcular colunas combinadas (1&2, 1&3, 2&3)
+  const calculateCombinedColumnsStats = React.useMemo(() => {
+    const nums = lastNumbers;
+    let c12 = 0, c13 = 0, c23 = 0;
+    let base = 0;
+    nums.forEach(num => {
+      const col = getNumberColumn(num);
+      if (col === null) return; // Ignora o zero
+      base++;
+      if (col === 1) { c12++; c13++; }
+      else if (col === 2) { c12++; c23++; }
+      else if (col === 3) { c13++; c23++; }
+    });
+    const pct = (count: number) => base > 0 ? Math.round((count / base) * 100) : 0;
+    return { c12, p12: pct(c12), c13, p13: pct(c13), c23, p23: pct(c23), base };
+  }, [lastNumbers]);
+
+  // Stats de exibição para BET Terminais (zerar quando não há dados)
+  const betTerminaisStatsDisplay = React.useMemo(() => {
+    if (!betTerminaisStats) {
+      return { wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0 };
+    }
+    if (lastNumbers.length === 0) {
+      return { wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0 };
+    }
+    return betTerminaisStats;
+  }, [lastNumbers, betTerminaisStats]);
+
   // Função para calcular ranking das estratégias por WINs
   // Função para calcular estatísticas das seções da Race Track
   const calculateRaceTrackStats = React.useMemo(() => {
@@ -913,45 +1005,96 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
         winPercentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.wins / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0
       },
       {
-        name: '171 Forçado',
-        wins: calculated171ForcedStats.wins,
-        winPercentage: (calculated171ForcedStats.wins + calculated171ForcedStats.losses) > 0 ? Math.round((calculated171ForcedStats.wins / (calculated171ForcedStats.wins + calculated171ForcedStats.losses)) * 100) : 0
+        name: 'BET Terminais',
+        wins: betTerminaisStatsDisplay.wins,
+        winPercentage: betTerminaisStatsDisplay.winPercentage
       },
       {
         name: '171',
         wins: pattern171Stats.wins,
         winPercentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.wins / pattern171Stats.entradas) * 100) : 0
+      },
+      {
+        name: '32P1',
+        wins: calculated32P1Stats.wins,
+        // Percentual baseado no campo WIN do card 32P1: wins / total
+        winPercentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.wins / calculated32P1Stats.total) * 100) : 0
+      },
+      {
+        name: '32V2',
+        wins: calculated32V2Stats.wins,
+        // Percentual baseado no campo WIN do card 32V2: wins / total
+        winPercentage: calculated32V2Stats.total > 0 ? Math.round((calculated32V2Stats.wins / calculated32V2Stats.total) * 100) : 0
       }
     ];
     
     // Ordenar por percentual de vitórias (maior para menor)
     return strategies.sort((a, b) => b.winPercentage - a.winPercentage);
-  }, [calculatedTorreStats, calculatedP2Stats, calculatedFusionStats, calculated171ForcedStats, pattern171Stats]);
+  }, [calculatedTorreStats, calculatedP2Stats, calculatedFusionStats, betTerminaisStatsDisplay, pattern171Stats, calculated32P1Stats, calculated32V2Stats]);
+
+  // Ordem fixa para exibição no card Ranking (sem rolagem)
+  const displayStrategiesRanking = React.useMemo(() => {
+    const byName = new Map(calculateStrategiesRanking.map(s => [s.name, s]));
+    const order = ['Torre', 'P2', 'Fusion', 'BET Terminais', '171', '32P1', '32V2'];
+    return order
+      .map(name => byName.get(name))
+      .filter((v): v is { name: string; wins: number; winPercentage: number } => Boolean(v));
+  }, [calculateStrategiesRanking]);
 
   return (
     <div className="space-y-3">
       {/* Primeira linha - 6 cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
-        <StatCard
-          title="Dúzias"
-          data={[
-            { label: '1ª (1-12)', value: statistics.dozens.first, percentage: dozensPercentages.first },
-            { label: '2ª (13-24)', value: statistics.dozens.second, percentage: dozensPercentages.second },
-            { label: '3ª (25-36)', value: statistics.dozens.third, percentage: dozensPercentages.third }
-          ]}
-          colors={['bg-cyan-500', 'bg-indigo-500', 'bg-pink-500']}
-          cardType="dozens"
-        />
+        {/* Card - Ranking das Estratégias (primeiro da 1ª linha) */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full">
+          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Ranking Estratégias</h3>
+          <div>
+            <div className="space-y-0.5">
+              {displayStrategiesRanking.map((strategy, index) => (
+                <div key={strategy.name} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
+                  <div className="flex items-center space-x-1">
+                    <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
+                      {index + 1}
+                    </div>
+                    <span className="text-xs text-gray-600 truncate font-medium">
+                      {strategy.name}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-gray-800 text-xs">{strategy.winPercentage}%</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
 
+        {/* Novo card 32P1 */}
         <StatCard
-          title="Colunas"
+          title={
+            <div className="flex justify-between items-center w-full">
+              <span>32P1</span>
+              <select
+                className="text-xs bg-gray-200 text-gray-700 rounded px-1 py-0.5"
+                value={window32P1}
+                onChange={(e) => setWindow32P1(parseInt(e.target.value))}
+                title="Selecione a janela de números para 32P1"
+              >
+                <option value={0}>Todos</option>
+                <option value={10}>Últimos 10</option>
+                <option value={20}>Últimos 20</option>
+                <option value={30}>Últimos 30</option>
+                <option value={40}>Últimos 40</option>
+                <option value={50}>Últimos 50</option>
+              </select>
+            </div>
+          }
           data={[
-            { label: '3ª Coluna', value: statistics.columns.third, percentage: columnsPercentages.third },
-            { label: '2ª Coluna', value: statistics.columns.second, percentage: columnsPercentages.second },
-            { label: '1ª Coluna', value: statistics.columns.first, percentage: columnsPercentages.first }
+            { label: 'WIN TOTAL', value: calculated32P1Stats.winTotal, percentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.winTotal / calculated32P1Stats.total) * 100) : 0 },
+            { label: 'WIN', value: calculated32P1Stats.wins, percentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.wins / calculated32P1Stats.total) * 100) : 0 },
+            { label: 'LOSS', value: calculated32P1Stats.losses, percentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.losses / calculated32P1Stats.total) * 100) : 0 }
           ]}
-          colors={['bg-emerald-500', 'bg-teal-500', 'bg-lime-500']}
-          cardType="columns"
+          colors={['bg-blue-500', 'bg-green-500', 'bg-red-500']}
         />
 
         <StatCard
@@ -970,7 +1113,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
             { label: 'Entradas', value: calculatedTorreStats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedTorreStats.entradas / totalNumbers) * 100) : 0 },
             { label: 'WIN', value: calculatedTorreStats.wins, percentage: (calculatedTorreStats.wins + calculatedTorreStats.losses) > 0 ? Math.round((calculatedTorreStats.wins / (calculatedTorreStats.wins + calculatedTorreStats.losses)) * 100) : 0 },
             { label: 'LOSS', value: calculatedTorreStats.losses, percentage: (calculatedTorreStats.wins + calculatedTorreStats.losses) > 0 ? Math.round((calculatedTorreStats.losses / (calculatedTorreStats.wins + calculatedTorreStats.losses)) * 100) : 0 },
-            { label: 'Seq. Negativa', value: calculatedTorreStats.maxPositiveSequence, customValue: `${calculatedTorreStats.currentPositiveSequence}/${calculatedTorreStats.maxPositiveSequence}`, percentage: calculatedTorreStats.entradas > 0 ? Math.round((calculatedTorreStats.maxPositiveSequence / calculatedTorreStats.entradas) * 100) : 0, hidePercentage: true }
+            { label: 'Seq. Negativa', value: calculatedTorreStats.maxNegativeSequence, customValue: `${calculatedTorreStats.currentNegativeSequence}/${calculatedTorreStats.maxNegativeSequence}`, percentage: calculatedTorreStats.entradas > 0 ? Math.round((calculatedTorreStats.maxNegativeSequence / calculatedTorreStats.entradas) * 100) : 0, hidePercentage: true }
           ]}
           colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
         />
@@ -1017,6 +1160,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
               </div>
             </div>
           }
+          containerClassName="min-h-[111px]"
           data={[
             { label: 'Entradas', value: calculatedP2Stats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedP2Stats.entradas / totalNumbers) * 100) : 0 },
             { label: 'WIN', value: calculatedP2Stats.wins, percentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.wins / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0 },
@@ -1047,8 +1191,32 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           colors={['bg-purple-500', 'bg-green-500', 'bg-red-500', 'bg-blue-500']}
         />
 
-        {/* Card 171 Forçado (5) customizado */}
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
+        {/* Card 171 (movido para 1ª linha) */}
+        <StatCard
+          title={
+            <div className="flex justify-between items-center w-full">
+              <span>171</span>
+              <span className="font-normal text-xs text-gray-500">
+                Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - 
+                Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span>
+              </span>
+            </div>
+          }
+          data={[
+            { label: 'Entradas', value: pattern171Stats.entradas, percentage: totalNumbers > 0 ? Math.round((pattern171Stats.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: pattern171Stats.wins, percentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.wins / pattern171Stats.entradas) * 100) : 0 },
+            { label: 'LOSS', value: pattern171Stats.losses, percentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.losses / pattern171Stats.entradas) * 100) : 0 }
+          ]}
+          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500']}
+        />
+
+        
+      </div>
+
+      {/* Segunda linha - 6 cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
+        {/* Card 171 Forçado (5) - 1º da 2ª linha */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">171 Forçado (5)</h3>
           <div className="space-y-0.5">
             {/* WIN */}
@@ -1088,11 +1256,47 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           </div>
         </div>
 
-        
-      </div>
+        {/* Novo card 32V2 como primeiro da 2ª linha */}
+        <StatCard
+          title={
+            <div className="flex justify-between items-center w-full">
+              <span>32V2</span>
+              <select
+                className="text-xs bg-gray-200 text-gray-700 rounded px-1 py-0.5"
+                value={window32V2}
+                onChange={(e) => setWindow32V2(parseInt(e.target.value))}
+                title="Selecione a janela de números para 32V2"
+              >
+                <option value={0}>Todos</option>
+                <option value={10}>Últimos 10</option>
+                <option value={20}>Últimos 20</option>
+                <option value={30}>Últimos 30</option>
+                <option value={40}>Últimos 40</option>
+                <option value={50}>Últimos 50</option>
+              </select>
+            </div>
+          }
+          data={[
+            { label: 'WIN TOTAL', value: calculated32V2Stats.winTotal, percentage: calculated32V2Stats.total > 0 ? Math.round((calculated32V2Stats.winTotal / calculated32V2Stats.total) * 100) : 0 },
+            { label: 'WIN', value: calculated32V2Stats.wins, percentage: calculated32V2Stats.total > 0 ? Math.round((calculated32V2Stats.wins / calculated32V2Stats.total) * 100) : 0 },
+            { label: 'LOSS', value: calculated32V2Stats.losses, percentage: calculated32V2Stats.total > 0 ? Math.round((calculated32V2Stats.losses / calculated32V2Stats.total) * 100) : 0 }
+          ]}
+          colors={['bg-blue-500', 'bg-green-500', 'bg-red-500']}
+        />
 
-      {/* Segunda linha - 6 cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
+        {/* Colunas e Cores seguem após 32V2 */}
+
+        <StatCard
+          title="Colunas"
+          containerClassName="min-h-[111px]"
+          data={[
+            { label: '3ª Coluna', value: statistics.columns.third, percentage: columnsPercentages.third },
+            { label: '2ª Coluna', value: statistics.columns.second, percentage: columnsPercentages.second },
+            { label: '1ª Coluna', value: statistics.columns.first, percentage: columnsPercentages.first }
+          ]}
+          colors={['bg-emerald-500', 'bg-teal-500', 'bg-lime-500']}
+          cardType="columns"
+        />
         <StatCard
           title="Cores"
           data={[
@@ -1104,17 +1308,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           cardType="colors"
         />
 
-        <StatCard
-          title="Par/Ímpar"
-          data={[
-            { label: 'Par', value: statistics.evenOdd.even, percentage: evenOddPercentages.even },
-            { label: 'Ímpar', value: statistics.evenOdd.odd, percentage: evenOddPercentages.odd },
-            { label: 'Zero', value: statistics.colors.green, percentage: evenOddPercentages.zero }
-          ]}
-          colors={['bg-blue-500', 'bg-orange-500', 'bg-green-500']}
-          cardType="evenOdd"
-        />
-
+        {/* Card Alto/Baixo (4º da 2ª linha) */}
         <StatCard
           title="Alto/Baixo"
           data={[
@@ -1126,8 +1320,80 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           cardType="highLow"
         />
 
-        {/* Card com lista de números ordenada por ocorrências */}
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
+        {/* Card Coluna Combinada (5º da 2ª linha) */}
+        <StatCard
+          title="Coluna Combinada"
+          data={[
+            { label: 'Coluna 1 e 2', value: calculateCombinedColumnsStats.c12, percentage: calculateCombinedColumnsStats.p12 },
+            { label: 'Coluna 1 e 3', value: calculateCombinedColumnsStats.c13, percentage: calculateCombinedColumnsStats.p13 },
+            { label: 'Coluna 2 e 3', value: calculateCombinedColumnsStats.c23, percentage: calculateCombinedColumnsStats.p23 }
+          ]}
+          colors={['bg-teal-500', 'bg-indigo-500', 'bg-pink-500']}
+        />
+
+        
+
+        {/* Terminais movido para o fim da 3ª linha */}
+
+      </div>
+
+      {/* Terceira linha - 6 cards (Par/Ímpar, Dúzias, Race Track, Números, Coluna Combinada, Terminais) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
+        {/* Card Par/Ímpar (agora primeiro da 3ª linha) */}
+        <StatCard
+          title="Par/Ímpar"
+          data={[
+            { label: 'Par', value: statistics.evenOdd.even, percentage: evenOddPercentages.even },
+            { label: 'Ímpar', value: statistics.evenOdd.odd, percentage: evenOddPercentages.odd },
+            { label: 'Zero', value: statistics.colors.green, percentage: evenOddPercentages.zero }
+          ]}
+          colors={['bg-blue-500', 'bg-orange-500', 'bg-green-500']}
+          cardType="evenOdd"
+        />
+        {/* Card - Race Track (2º da 3ª linha) */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-[111px]">
+          <h3 
+            className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2 cursor-pointer hover:text-blue-600 transition-colors"
+            onClick={() => setShowRaceTrackModal(true)}
+            title="Clique para ver os números de cada seção da Race Track"
+          >
+            Race Track
+          </h3>
+          <div>
+            <div className="space-y-0.5">
+              {calculateRaceTrackStats.map((section, index) => (
+                <div key={section.name} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
+                  <div className="flex items-center space-x-1">
+                    <div className="w-4 h-4 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-xs">
+                      {index + 1}
+                    </div>
+                    <span className="text-xs text-gray-600 truncate font-medium">
+                      {section.name}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-gray-800 text-xs">{section.count}</div>
+                    <div className="text-xs text-gray-500">{section.percentage}%</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* Card Dúzias (3º da 3ª linha) */}
+        <StatCard
+          title="Dúzias"
+          data={[
+            { label: '1ª (1-12)', value: statistics.dozens.first, percentage: dozensPercentages.first },
+            { label: '2ª (13-24)', value: statistics.dozens.second, percentage: dozensPercentages.second },
+            { label: '3ª (25-36)', value: statistics.dozens.third, percentage: dozensPercentages.third }
+          ]}
+          colors={['bg-cyan-500', 'bg-indigo-500', 'bg-pink-500']}
+          cardType="dozens"
+        />
+
+        {/* Card com lista de números ordenada por ocorrências (movido da 2ª linha) */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Números (Max 50)</h3>
           <div className="max-h-32 overflow-y-auto">
             <div className="space-y-0.5">
@@ -1165,60 +1431,79 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           </div>
         </div>
 
-        {/* Card Terminais na posição 5 da segunda linha */}
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
-          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Terminais</h3>
+        {/* Card Terminais - agora 5º da 3ª linha */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
+          <div className="flex justify-between items-center mb-1 lg:mb-2">
+            <h3 className="text-xs lg:text-sm font-semibold text-gray-800">Terminais</h3>
+            {calculateTerminaisStats.length > 0 && (
+              <div className="flex items-center gap-[5px]">
+                {calculateTerminaisStats.slice(-3).map(({ terminal }, idx) => (
+                  <span key={`${terminal}-${idx}`} className="text-yellow-500 font-semibold text-xs lg:text-sm">{terminal}</span>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="max-h-32 overflow-y-auto">
             <div className="space-y-0.5">
-              {calculateTerminaisStats.slice(0, 10).map(({ terminal, count, percentage, numbers }) => (
-                <div key={terminal} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
-                  <div className="flex items-center space-x-1">
-                    <div className="w-4 h-4 rounded-full bg-gray-600 flex items-center justify-center text-white font-bold text-xs">
-                      {terminal}
+              {lastNumbers.length > 0 ? (
+                calculateTerminaisStats.slice(0, 10).map(({ terminal, count, percentage, numbers }) => (
+                  <div key={terminal} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
+                    <div className="flex items-center space-x-1">
+                      <div className="w-4 h-4 rounded-full bg-gray-600 flex items-center justify-center text-white font-bold text-xs">
+                        {terminal}
+                      </div>
+                      <span className="text-xs text-gray-600 truncate">
+                        {numbers.map(n => n.toString().padStart(2, '0')).join(',')}
+                      </span>
                     </div>
-                    <span className="text-xs text-gray-600 truncate">
-                      {numbers.map(n => n.toString().padStart(2, '0')).join(',')}
-                    </span>
+                    <div className="text-right">
+                      <div className="font-bold text-gray-800 text-xs">{count}</div>
+                      <div className="text-xs text-gray-500">{percentage}%</div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-gray-800 text-xs">{count}</div>
-                    <div className="text-xs text-gray-500">{percentage}%</div>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : null}
             </div>
           </div>
         </div>
 
-        {/* Card 171 realocado para a 2ª linha */}
-        <StatCard
-          title={
-            <div className="flex justify-between items-center w-full">
-              <span>171</span>
-              <span className="font-normal text-xs text-gray-500">
-                Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - 
-                Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span>
-              </span>
+        {/* Card BET Terminais - 6º da 3ª linha */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
+          <div className="flex justify-between items-center mb-1 lg:mb-2">
+            <h3 className="text-xs lg:text-sm font-semibold text-gray-800">BET Terminais</h3>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-green-500"></div>
+                <span className="text-xs lg:text-xs text-gray-600">WIN</span>
+              </div>
+              <div className="text-right">
+                <div className="font-bold text-gray-800 text-xs lg:text-sm">{betTerminaisStatsDisplay.wins}</div>
+                <div className="text-xs lg:text-xs text-gray-500">{betTerminaisStatsDisplay.winPercentage}%</div>
+              </div>
             </div>
-          }
-          data={[
-            { label: 'Entradas', value: pattern171Stats.entradas, percentage: totalNumbers > 0 ? Math.round((pattern171Stats.entradas / totalNumbers) * 100) : 0 },
-            { label: 'WIN', value: pattern171Stats.wins, percentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.wins / pattern171Stats.entradas) * 100) : 0 },
-            { label: 'LOSS', value: pattern171Stats.losses, percentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.losses / pattern171Stats.entradas) * 100) : 0 }
-          ]}
-          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500']}
-        />
-
-      </div>
-
-      {/* Terceira linha - 6 cards (todos placeholders em branco) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-red-500"></div>
+                <span className="text-xs lg:text-xs text-gray-600">LOSS</span>
+              </div>
+              <div className="text-right">
+                <div className="font-bold text-gray-800 text-xs lg:text-sm">{betTerminaisStatsDisplay.losses}</div>
+                <div className="text-xs lg:text-xs text-gray-500">{betTerminaisStatsDisplay.lossPercentage}%</div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-gray-400"></div>
+                <span className="text-xs lg:text-xs text-gray-600">Seq. Negativa</span>
+              </div>
+              <div className="text-right">
+                <div className="font-bold text-gray-800 text-xs lg:text-sm">{betTerminaisStatsDisplay.negativeSequenceCurrent}/{betTerminaisStatsDisplay.negativeSequenceMax}</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Modal P2 - Números Gatilho */}
