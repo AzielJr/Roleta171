@@ -2159,7 +2159,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         // Só mostrar popup se NÃO estiver simulando
         if (!isSimulatingRef.current) {
           // Definir o alerta do padrão - mostrar os últimos 2 números que geraram o padrão
-          const lastTwoNumbers = lastNumbers.slice(0, 2); // Os 2 últimos números selecionados
+          const lastTwoNumbers = lastNumbers.slice(-2); // Os 2 últimos números sorteados (penúltimo e último)
           setPatternAlert({
             numbers: lastTwoNumbers,
             positions: lastTwoNumbers.map(num => ROULETTE_SEQUENCE.indexOf(num)),
@@ -3105,8 +3105,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                   <div className="flex flex-col items-center gap-1">
                     <div className="flex flex-wrap gap-0.5 justify-center">
                       {(() => {
-                        const lastTwoSelected = selected.numbers.slice(-2).reverse();
-                        const nums = lastTwoSelected;
+                        // Mostrar os 2 últimos números sorteados (mais antigo à esquerda, mais recente à direita)
+                        const nums =
+                          lastNumbers.length >= 2
+                            ? lastNumbers.slice(-2) // ordem: penúltimo (à esquerda), último (à direita)
+                            : lastNumbers.length === 1
+                              ? [lastNumbers[0]]
+                              : [];
                         const positions = nums.map(n => ROULETTE_SEQUENCE.indexOf(n));
                         return nums.map((num, index) => (
                           <div key={`${num}-${index}`} className="flex flex-col items-center">
