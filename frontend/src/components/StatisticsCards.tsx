@@ -930,8 +930,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
 
   return (
     <div className="space-y-3">
-      {/* Primeira linha - 7 cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-1 lg:gap-2">
+      {/* Primeira linha - 6 cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
         <StatCard
           title="Dúzias"
           data={[
@@ -1088,27 +1088,11 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           </div>
         </div>
 
-        <StatCard
-          title={
-            <div className="flex justify-between items-center w-full">
-              <span>171</span>
-              <span className="font-normal text-xs text-gray-500">
-                Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - 
-                Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span>
-              </span>
-            </div>
-          }
-          data={[
-            { label: 'Entradas', value: pattern171Stats.entradas, percentage: totalNumbers > 0 ? Math.round((pattern171Stats.entradas / totalNumbers) * 100) : 0 },
-            { label: 'WIN', value: pattern171Stats.wins, percentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.wins / pattern171Stats.entradas) * 100) : 0 },
-            { label: 'LOSS', value: pattern171Stats.losses, percentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.losses / pattern171Stats.entradas) * 100) : 0 }
-          ]}
-          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500']}
-        />
+        
       </div>
 
-      {/* Segunda linha - 5 cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1 lg:gap-2">
+      {/* Segunda linha - 6 cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
         <StatCard
           title="Cores"
           data={[
@@ -1206,66 +1190,32 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           </div>
         </div>
 
+        {/* Card 171 realocado para a 2ª linha */}
+        <StatCard
+          title={
+            <div className="flex justify-between items-center w-full">
+              <span>171</span>
+              <span className="font-normal text-xs text-gray-500">
+                Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - 
+                Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span>
+              </span>
+            </div>
+          }
+          data={[
+            { label: 'Entradas', value: pattern171Stats.entradas, percentage: totalNumbers > 0 ? Math.round((pattern171Stats.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: pattern171Stats.wins, percentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.wins / pattern171Stats.entradas) * 100) : 0 },
+            { label: 'LOSS', value: pattern171Stats.losses, percentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.losses / pattern171Stats.entradas) * 100) : 0 }
+          ]}
+          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500']}
+        />
+
       </div>
 
-      {/* Terceira linha - 5 cards (com placeholders em branco) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1 lg:gap-2">
-        {/* Card - Race Track */}
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
-          <h3 
-            className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2 cursor-pointer hover:text-blue-600 transition-colors"
-            onClick={() => setShowRaceTrackModal(true)}
-            title="Clique para ver os números de cada seção da Race Track"
-          >
-            Race Track
-          </h3>
-          <div className="max-h-32 overflow-y-auto">
-            <div className="space-y-0.5">
-              {calculateRaceTrackStats.map((section, index) => (
-                <div key={section.name} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
-                  <div className="flex items-center space-x-1">
-                    <div className="w-4 h-4 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-xs">
-                      {index + 1}
-                    </div>
-                    <span className="text-xs text-gray-600 truncate font-medium">
-                      {section.name}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-gray-800 text-xs">{section.count}</div>
-                    <div className="text-xs text-gray-500">{section.percentage}%</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Card - Ranking das Estratégias */}
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
-          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Ranking Estratégias</h3>
-          <div className="max-h-32 overflow-y-auto">
-            <div className="space-y-0.5">
-              {calculateStrategiesRanking.map((strategy, index) => (
-                <div key={strategy.name} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
-                  <div className="flex items-center space-x-1">
-                    <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
-                      {index + 1}
-                    </div>
-                    <span className="text-xs text-gray-600 truncate font-medium">
-                      {strategy.name}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-gray-800 text-xs">{strategy.winPercentage}%</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Placeholders em branco (3) */}
+      {/* Terceira linha - 6 cards (todos placeholders em branco) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
