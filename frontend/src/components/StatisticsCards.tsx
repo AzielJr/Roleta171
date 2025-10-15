@@ -1107,8 +1107,8 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
         />
       </div>
 
-      {/* Segunda linha - 7 cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-1 lg:gap-2">
+      {/* Segunda linha - 5 cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1 lg:gap-2">
         <StatCard
           title="Cores"
           data={[
@@ -1206,7 +1206,11 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           </div>
         </div>
 
-        {/* Card 6 - Race Track */}
+      </div>
+
+      {/* Terceira linha - 5 cards (com placeholders em branco) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-1 lg:gap-2">
+        {/* Card - Race Track */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
           <h3 
             className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2 cursor-pointer hover:text-blue-600 transition-colors"
@@ -1237,7 +1241,7 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
           </div>
         </div>
 
-        {/* Card 7 - Ranking das Estratégias */}
+        {/* Card - Ranking das Estratégias */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Ranking Estratégias</h3>
           <div className="max-h-32 overflow-y-auto">
@@ -1260,6 +1264,11 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
             </div>
           </div>
         </div>
+
+        {/* Placeholders em branco (3) */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 min-h-24"></div>
       </div>
 
       {/* Modal P2 - Números Gatilho */}
