@@ -1016,7 +1016,7 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
         winPercentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.wins / pattern171Stats.entradas) * 100) : 0
       },
       {
-        name: '32P1',
+        name: '32P3',
         wins: calculated32P1Stats.wins,
         // Percentual baseado no campo WIN do card 32P1: wins / total
         winPercentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.wins / calculated32P1Stats.total) * 100) : 0
@@ -1035,11 +1035,8 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
 
   // Ordem fixa para exibição no card Ranking (sem rolagem)
   const displayStrategiesRanking = React.useMemo(() => {
-    const byName = new Map(calculateStrategiesRanking.map(s => [s.name, s]));
-    const order = ['Torre', 'P2', 'Fusion', 'BET Terminais', '171', '32P1', '32V2'];
-    return order
-      .map(name => byName.get(name))
-      .filter((v): v is { name: string; wins: number; winPercentage: number } => Boolean(v));
+    // Exibir ordenado por maior percentual de vitórias para menor
+    return calculateStrategiesRanking;
   }, [calculateStrategiesRanking]);
 
   return (
@@ -1050,7 +1047,7 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
         marginTop: '0',
         marginBottom: rowOrder === 1 ? '0' : '0.75rem'
       }}>
-        {/* Card - Ranking das Estratégias (primeiro da 1ª linha) */}
+        {/* Card - Ranking das Estratégias (de volta ao primeiro da 1ª linha) */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Ranking Estratégias</h3>
           <div>
@@ -1074,16 +1071,16 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
           </div>
         </div>
 
-        {/* Novo card 32P1 */}
+        {/* Novo card 32P3 (apenas rótulo; lógica permanece 32P1) */}
         <StatCard
           title={
             <div className="flex justify-between items-center w-full">
-              <span>32P1</span>
+              <span>32P3</span>
               <select
                 className="text-xs bg-gray-200 text-gray-700 rounded px-1 py-0.5"
                 value={window32P1}
                 onChange={(e) => setWindow32P1(parseInt(e.target.value))}
-                title="Selecione a janela de números para 32P1"
+                title="Selecione a janela de números para 32P3"
               >
                 <option value={0}>Todos</option>
                 <option value={10}>Últimos 10</option>
@@ -1123,78 +1120,79 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
           colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
         />
 
-        <StatCard
-          title={
-            <div className={`cursor-pointer transition-all duration-300 flex justify-between items-center ${
-              animatingP2 === 'green' 
-                ? 'animate-pulse-green-border' 
-                : animatingP2 === 'yellow' 
-                ? 'animate-pulse-yellow-border' 
-                : ''
-            }`} onClick={() => setShowP2Modal(true)}>
-              <span>P2</span>
+        {/* Card Terminais (agora na 1ª linha, posição do antigo P2) */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
+          <div className="flex justify-between items-center mb-1 lg:mb-2">
+            <h3 className="text-xs lg:text-sm font-semibold text-gray-800">Terminais</h3>
+            {calculateTerminaisStats.length > 0 && (
+              <div className="flex items-center gap-[5px]">
+                {calculateTerminaisStats.slice(-3).map(({ terminal }, idx) => (
+                  <span key={`${terminal}-${idx}`} className="text-yellow-500 font-semibold text-xs lg:text-sm">{terminal}</span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="max-h-[calc(8rem+19px)] overflow-y-auto">
+            <div className="space-y-0.5">
+              {lastNumbers.length > 0 ? (
+                calculateTerminaisStats.slice(0, 10).map(({ terminal, count, percentage, numbers }) => (
+                  <div key={terminal} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
+                    <div className="flex items-center space-x-1">
+                      <div className="w-4 h-4 rounded-full bg-gray-600 flex items-center justify-center text-white font-bold text-[14px]">
+                        {terminal}
+                      </div>
+                      <span className="text-xs text-gray-600 truncate">
+                        {numbers.map(n => n.toString().padStart(2, '0')).join(',')}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-gray-800 text-xs">{count}</div>
+                      <div className="text-xs text-gray-500">{percentage}%</div>
+                    </div>
+                  </div>
+                ))
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {/* Card BET Terminais (agora na 1ª linha, posição do antigo Fusion) */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
+          <div className="flex justify-between items-center mb-1 lg:mb-2">
+            <h3 className="text-xs lg:text-sm font-semibold text-gray-800">BET Terminais</h3>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setP2Mode(1);
-                  }}
-                  title="Com 1 padrão"
-                  className={`rounded transition-all ${
-                    p2Mode === 1 
-                      ? 'px-2 py-1 text-xs bg-blue-500 text-white' 
-                      : 'px-1 py-0.5 text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 opacity-70 scale-90'
-                  }`}
-                >
-                  1
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setP2Mode(2);
-                  }}
-                  title="Com 2 padrões"
-                  className={`rounded transition-all ${
-                    p2Mode === 2 
-                      ? 'px-2 py-1 text-xs bg-blue-500 text-white' 
-                      : 'px-1 py-0.5 text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 opacity-70 scale-90'
-                  }`}
-                >
-                  2
-                </button>
+                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-green-500"></div>
+                <span className="text-xs lg:text-xs text-gray-600">WIN</span>
+              </div>
+              <div className="text-right">
+                <div className="font-bold text-gray-800 text-xs lg:text-sm">{betTerminaisStatsDisplay.wins}</div>
+                <div className="text-xs lg:text-xs text-gray-500">{betTerminaisStatsDisplay.winPercentage}%</div>
               </div>
             </div>
-          }
-          containerClassName="min-h-[111px]"
-          data={[
-            { label: 'Entradas', value: calculatedP2Stats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedP2Stats.entradas / totalNumbers) * 100) : 0 },
-            { label: 'WIN', value: calculatedP2Stats.wins, percentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.wins / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0 },
-            { label: 'LOSS', value: calculatedP2Stats.losses, percentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.losses / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0 },
-            { label: '> Seq. Negativa', value: calculatedP2Stats.maxNegativeSequence, percentage: calculatedP2Stats.entradas > 0 ? Math.round((calculatedP2Stats.maxNegativeSequence / calculatedP2Stats.entradas) * 100) : 0, hidePercentage: true }
-          ]}
-          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
-        />
-
-        <StatCard
-          title={
-            <div className={`cursor-pointer transition-all duration-300 flex justify-between items-center ${
-              animatingFusion === 'green' 
-                ? 'animate-pulse-green-border' 
-                : animatingFusion === 'yellow' 
-                ? 'animate-pulse-yellow-border' 
-                : ''
-            }`} onClick={() => setShowFusionModal(true)}>
-              <span>Fusion</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-red-500"></div>
+                <span className="text-xs lg:text-xs text-gray-600">LOSS</span>
+              </div>
+              <div className="text-right">
+                <div className="font-bold text-gray-800 text-xs lg:text-sm">{betTerminaisStatsDisplay.losses}</div>
+                <div className="text-xs lg:text-xs text-gray-500">{betTerminaisStatsDisplay.lossPercentage}%</div>
+              </div>
             </div>
-          }
-          data={[
-            { label: 'Entradas', value: calculatedFusionStats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedFusionStats.entradas / totalNumbers) * 100) : 0 },
-            { label: 'WIN', value: calculatedFusionStats.wins, percentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.wins / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0 },
-            { label: 'LOSS', value: calculatedFusionStats.losses, percentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.losses / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0 },
-            { label: '> Seq. Negativa', value: calculatedFusionStats.maxNegativeSequence, percentage: calculatedFusionStats.entradas > 0 ? Math.round((calculatedFusionStats.maxNegativeSequence / calculatedFusionStats.entradas) * 100) : 0, hidePercentage: true }
-          ]}
-          colors={['bg-purple-500', 'bg-green-500', 'bg-red-500', 'bg-blue-500']}
-        />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-gray-400"></div>
+                <span className="text-xs lg:text-xs text-gray-600">Seq. Negativa</span>
+              </div>
+              <div className="text-right">
+                <div className="font-bold text-gray-800 text-xs lg:text-sm">{betTerminaisStatsDisplay.negativeSequenceCurrent}/{betTerminaisStatsDisplay.negativeSequenceMax}</div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Card 171 (movido para 1ª linha) */}
         <StatCard
@@ -1405,23 +1403,96 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
           cardType="dozens"
         />
 
-        {/* Card com lista de números ordenada por ocorrências (movido da 2ª linha) */}
+        {/* Card Fusion - movido para a posição onde estava o Ranking */}
+        <StatCard
+          title={
+            <div className={`cursor-pointer transition-all duration-300 flex justify-between items-center ${
+              animatingFusion === 'green' 
+                ? 'animate-pulse-green-border' 
+                : animatingFusion === 'yellow' 
+                ? 'animate-pulse-yellow-border' 
+                : ''
+            }`} onClick={() => setShowFusionModal(true)}>
+              <span>Fusion</span>
+            </div>
+          }
+          data={[
+            { label: 'Entradas', value: calculatedFusionStats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedFusionStats.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: calculatedFusionStats.wins, percentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.wins / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0 },
+            { label: 'LOSS', value: calculatedFusionStats.losses, percentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.losses / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0 },
+            { label: '> Seq. Negativa', value: calculatedFusionStats.maxNegativeSequence, percentage: calculatedFusionStats.entradas > 0 ? Math.round((calculatedFusionStats.maxNegativeSequence / calculatedFusionStats.entradas) * 100) : 0, hidePercentage: true }
+          ]}
+          colors={['bg-purple-500', 'bg-green-500', 'bg-red-500', 'bg-blue-500']}
+        />
+
+        {/* Card P2 - movido para 3ª linha, posição do Terminais */}
+        <StatCard
+          title={
+            <div className={`cursor-pointer transition-all duration-300 flex justify-between items-center ${
+              animatingP2 === 'green' 
+                ? 'animate-pulse-green-border' 
+                : animatingP2 === 'yellow' 
+                ? 'animate-pulse-yellow-border' 
+                : ''
+            }`} onClick={() => setShowP2Modal(true)}>
+              <span>P2</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setP2Mode(1);
+                  }}
+                  title="Com 1 padrão"
+                  className={`rounded transition-all ${
+                    p2Mode === 1 
+                      ? 'px-2 py-1 text-xs bg-blue-500 text-white' 
+                      : 'px-1 py-0.5 text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 opacity-70 scale-90'
+                  }`}
+                >
+                  1
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setP2Mode(2);
+                  }}
+                  title="Com 2 padrões"
+                  className={`rounded transition-all ${
+                    p2Mode === 2 
+                      ? 'px-2 py-1 text-xs bg-blue-500 text-white' 
+                      : 'px-1 py-0.5 text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 opacity-70 scale-90'
+                  }`}
+                >
+                  2
+                </button>
+              </div>
+            </div>
+          }
+          containerClassName="min-h-[111px]"
+          data={[
+            { label: 'Entradas', value: calculatedP2Stats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedP2Stats.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: calculatedP2Stats.wins, percentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.wins / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0 },
+            { label: 'LOSS', value: calculatedP2Stats.losses, percentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.losses / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0 },
+            { label: '> Seq. Negativa', value: calculatedP2Stats.maxNegativeSequence, percentage: calculatedP2Stats.entradas > 0 ? Math.round((calculatedP2Stats.maxNegativeSequence / calculatedP2Stats.entradas) * 100) : 0, hidePercentage: true }
+          ]}
+          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
+        />
+
+        {/* Card - Números (Max 50) (agora na posição onde estava o Ranking) */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Números (Max 50)</h3>
-          <div className="max-h-32 overflow-y-auto">
+          <div className="max-h-[calc(8rem+16px)] overflow-y-auto">
             <div className="space-y-0.5">
               {React.useMemo(() => {
-                // Contar ocorrências de cada número
                 const numberCounts: { [key: number]: number } = {};
                 lastNumbers.forEach(num => {
                   numberCounts[num] = (numberCounts[num] || 0) + 1;
                 });
 
-                // Converter para array e ordenar por ocorrências (maior para menor)
                 const sortedNumbers = Object.entries(numberCounts)
                   .map(([num, count]) => ({ number: parseInt(num), count }))
                   .sort((a, b) => b.count - a.count)
-                  .slice(0, 50); // Máximo 50 números
+                  .slice(0, 50);
 
                 return sortedNumbers.map(({ number, count }) => {
                   const percentage = totalNumbers > 0 ? Math.round((count / totalNumbers) * 100) : 0;
@@ -1440,80 +1511,6 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
                   );
                 });
               }, [lastNumbers, totalNumbers])}
-            </div>
-          </div>
-        </div>
-
-        {/* Card Terminais - agora 5º da 3ª linha */}
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
-          <div className="flex justify-between items-center mb-1 lg:mb-2">
-            <h3 className="text-xs lg:text-sm font-semibold text-gray-800">Terminais</h3>
-            {calculateTerminaisStats.length > 0 && (
-              <div className="flex items-center gap-[5px]">
-                {calculateTerminaisStats.slice(-3).map(({ terminal }, idx) => (
-                  <span key={`${terminal}-${idx}`} className="text-yellow-500 font-semibold text-xs lg:text-sm">{terminal}</span>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="max-h-32 overflow-y-auto">
-            <div className="space-y-0.5">
-              {lastNumbers.length > 0 ? (
-                calculateTerminaisStats.slice(0, 10).map(({ terminal, count, percentage, numbers }) => (
-                  <div key={terminal} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-4 h-4 rounded-full bg-gray-600 flex items-center justify-center text-white font-bold text-xs">
-                        {terminal}
-                      </div>
-                      <span className="text-xs text-gray-600 truncate">
-                        {numbers.map(n => n.toString().padStart(2, '0')).join(',')}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-gray-800 text-xs">{count}</div>
-                      <div className="text-xs text-gray-500">{percentage}%</div>
-                    </div>
-                  </div>
-                ))
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        {/* Card BET Terminais - 6º da 3ª linha */}
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
-          <div className="flex justify-between items-center mb-1 lg:mb-2">
-            <h3 className="text-xs lg:text-sm font-semibold text-gray-800">BET Terminais</h3>
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-green-500"></div>
-                <span className="text-xs lg:text-xs text-gray-600">WIN</span>
-              </div>
-              <div className="text-right">
-                <div className="font-bold text-gray-800 text-xs lg:text-sm">{betTerminaisStatsDisplay.wins}</div>
-                <div className="text-xs lg:text-xs text-gray-500">{betTerminaisStatsDisplay.winPercentage}%</div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-red-500"></div>
-                <span className="text-xs lg:text-xs text-gray-600">LOSS</span>
-              </div>
-              <div className="text-right">
-                <div className="font-bold text-gray-800 text-xs lg:text-sm">{betTerminaisStatsDisplay.losses}</div>
-                <div className="text-xs lg:text-xs text-gray-500">{betTerminaisStatsDisplay.lossPercentage}%</div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-gray-400"></div>
-                <span className="text-xs lg:text-xs text-gray-600">Seq. Negativa</span>
-              </div>
-              <div className="text-right">
-                <div className="font-bold text-gray-800 text-xs lg:text-sm">{betTerminaisStatsDisplay.negativeSequenceCurrent}/{betTerminaisStatsDisplay.negativeSequenceMax}</div>
-              </div>
             </div>
           </div>
         </div>
