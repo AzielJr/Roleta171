@@ -583,7 +583,7 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
   }, [lastNumbers]);
 
   // Janela selecionada para os cards 32P1 e 32V2 (0 = Todos)
-  const [window32P1, setWindow32P1] = useState<number>(0);
+  const [window32P1, setWindow32P1] = useState<number>(50);
   const [window32V2, setWindow32V2] = useState<number>(0);
 
   // Calcular estatísticas dos cards 32P1 e 32V2 conforme regras fornecidas
