@@ -9,6 +9,7 @@ const ROULETTE_SEQUENCE = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 1
 
 interface StatisticsCardsProps {
   statistics: Statistics;
+  rowOrder?: number; // 0, 1, 2 para diferentes ordens das linhas
   patternDetectedCount?: number;
   winCount?: number;
   lossCount?: number;
@@ -544,7 +545,7 @@ const getNumberColumn = (num: number): 1 | 2 | 3 | null => {
   return null;
 };
 
-export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount, avisosSonorosAtivos = true, mostrarPadrao5x3Race = false, torreWinCount = 0, torreLossCount = 0, setTorreWinCount, setTorreLossCount, betTerminaisStats = { wins: 52, losses: 7, winPercentage: 88, lossPercentage: 12, negativeSequenceCurrent: 6, negativeSequenceMax: 16 } }: StatisticsCardsProps) {
+export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount, avisosSonorosAtivos = true, mostrarPadrao5x3Race = false, torreWinCount = 0, torreLossCount = 0, setTorreWinCount, setTorreLossCount, betTerminaisStats = { wins: 52, losses: 7, winPercentage: 88, lossPercentage: 12, negativeSequenceCurrent: 6, negativeSequenceMax: 16 } }: StatisticsCardsProps) {
   const [showP2Modal, setShowP2Modal] = useState(false);
   const [showTorreModal, setShowTorreModal] = useState(false);
   const [showFusionModal, setShowFusionModal] = useState(false);
@@ -1042,9 +1043,13 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
   }, [calculateStrategiesRanking]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 flex flex-col">
       {/* Primeira linha - 6 cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2 transition-all duration-300 ease-in-out" style={{
+        order: rowOrder === 0 ? 1 : rowOrder === 1 ? 3 : 2,
+        marginTop: '0',
+        marginBottom: rowOrder === 1 ? '0' : '0.75rem'
+      }}>
         {/* Card - Ranking das Estratégias (primeiro da 1ª linha) */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Ranking Estratégias</h3>
@@ -1214,7 +1219,11 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
       </div>
 
       {/* Segunda linha - 6 cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2 transition-all duration-300 ease-in-out" style={{
+        order: rowOrder === 0 ? 2 : rowOrder === 1 ? 1 : 3,
+        marginTop: '0',
+        marginBottom: rowOrder === 2 ? '0' : '0.75rem'
+      }}>
         {/* Card 171 Forçado (5) - 1º da 2ª linha */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">171 Forçado (5)</h3>
@@ -1338,7 +1347,11 @@ export function StatisticsCards({ statistics, patternDetectedCount = 0, winCount
       </div>
 
       {/* Terceira linha - 6 cards (Par/Ímpar, Dúzias, Race Track, Números, Coluna Combinada, Terminais) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1 lg:gap-2 transition-all duration-300 ease-in-out" style={{
+        order: rowOrder === 0 ? 3 : rowOrder === 1 ? 2 : 1,
+        marginTop: '0',
+        marginBottom: rowOrder === 0 ? '0' : '0.75rem'
+      }}>
         {/* Card Par/Ímpar (agora primeiro da 3ª linha) */}
         <StatCard
           title="Par/Ímpar"

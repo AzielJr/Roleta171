@@ -434,10 +434,21 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [betTerminaisLosses, setBetTerminaisLosses] = useState(0);
   const [betTerminaisNegSeqCurrent, setBetTerminaisNegSeqCurrent] = useState(0);
   const [betTerminaisNegSeqMax, setBetTerminaisNegSeqMax] = useState(0);
+  
+  // Controle para evitar duplicação de avaliação BET Terminais
+  const lastEvaluatedBetTerminais = useRef<string>('');
 
   // Avaliar BET Terminais ANTES de atualizar a lista de terminais
   const evaluateBetTerminais = (selectedNumber: number, currentNumbers: number[]) => {
     const snapshot = currentNumbers; // usar lista atual (SEM o novo número)
+
+    // Criar chave única para evitar duplicação
+    const evaluationKey = `${selectedNumber}-${snapshot.length}`;
+    if (lastEvaluatedBetTerminais.current === evaluationKey) {
+      console.log(`🚫 BET TERMINAIS - Avaliação duplicada evitada para ${selectedNumber}`);
+      return;
+    }
+    lastEvaluatedBetTerminais.current = evaluationKey;
 
     // Regra de cálculo quando pelo menos 8 dos 10 terminais têm algum valor nos últimos 50
     const last50 = snapshot.slice(-50);
@@ -456,27 +467,17 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     terminaisData.sort((a, b) => b.count - a.count);
     const lastThreeFromList = terminaisData.slice(-3).map(t => t.terminal);
 
-    console.log(`🎯 BET TERMINAIS - Número: ${selectedNumber}`);
-    console.log(`📊 Frequências:`, terminaisData);
-    console.log(`🔴 3 Menos Frequentes (LOSS):`, lastThreeFromList);
-
     const terminal = selectedNumber % 10;
     const isLoss = lastThreeFromList.includes(terminal);
     
-    console.log(`🎲 Terminal do número ${selectedNumber}: ${terminal}`);
-    console.log(`❌ É LOSS? ${isLoss} (terminal ${terminal} está nos menos frequentes: ${lastThreeFromList})`);
-    
     if (isLoss) {
-      console.log(`📈 LOSS! Incrementando losses e sequência negativa`);
       setBetTerminaisLosses(prev => prev + 1);
       setBetTerminaisNegSeqCurrent(prev => {
         const next = prev + 1;
         setBetTerminaisNegSeqMax(m => Math.max(m, next));
-        console.log(`📊 Sequência negativa: ${next}`);
         return next;
       });
     } else {
-      console.log(`✅ WIN! Incrementando wins e zerando sequência negativa`);
       setBetTerminaisWins(prev => prev + 1);
       setBetTerminaisNegSeqCurrent(0);
     }
@@ -535,6 +536,19 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Estados para contar WIN e LOSS (Padrão 171)
   const [winCount, setWinCount] = useState<number>(0);
   const [lossCount, setLossCount] = useState<number>(0);
+  
+  // Estado para controlar a ordem das linhas das estatísticas
+  const [statisticsRowOrder, setStatisticsRowOrder] = useState<number>(0); // 0, 1, 2 para diferentes ordens
+  
+  // Função para alternar a ordem das linhas das estatísticas
+  const toggleStatisticsRowOrder = () => {
+    setStatisticsRowOrder(prev => {
+      const newOrder = (prev + 1) % 3;
+      // Feedback visual temporário
+      console.log(`🔄 Ordem das linhas alterada: ${prev + 1} → ${newOrder + 1}`);
+      return newOrder;
+    });
+  };
   // Estados para contar WIN e LOSS P2 (persistentes)
   const [p2WinCount, setP2WinCount] = useState<number>(0);
   const [p2LossCount, setP2LossCount] = useState<number>(0);
@@ -1421,6 +1435,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     setBetTerminaisLosses(0);
     setBetTerminaisNegSeqCurrent(0);
     setBetTerminaisNegSeqMax(0);
+    lastEvaluatedBetTerminais.current = ''; // Resetar controle de duplicação
     
     // Resetar controle de duplicação P2
     lastProcessedP2Key.current = '';
@@ -1460,10 +1475,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       }
     }
     
-    // Avaliar BET Terminais ANTES de adicionar o número na lista (usando lista atual)
-    evaluateBetTerminais(num, lastNumbers);
-    
     setLastNumbers(prev => {
+      // Avaliar BET Terminais ANTES de adicionar o número na lista (usando lista atual)
+      evaluateBetTerminais(num, prev);
+      
       const newList = [...prev, num]; // CORREÇÃO: Adicionar no FINAL - ordem cronológica correta
       const updatedList = newList.slice(-60); // Manter apenas os últimos 60
       
@@ -3159,7 +3174,16 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           >
         {/* Cabeçalho com título à esquerda e total à direita */}
         <div className="flex justify-between items-center -mt-1.5" style={{marginBottom: '3px'}}>
-          <h3 className="text-white font-bold text-sm">📊 Estatística das Rodadas</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-white font-bold text-sm">📊 Estatística das Rodadas</h3>
+            <button
+              onClick={toggleStatisticsRowOrder}
+              className="text-gray-400 hover:text-white transition-colors duration-200 text-xs opacity-60 hover:opacity-100 focus:outline-none hover:bg-gray-700 rounded px-1 py-0.5"
+              title={`Ordem atual: ${statisticsRowOrder + 1}/3 - Clique para alternar (${statisticsRowOrder === 0 ? '1-2-3' : statisticsRowOrder === 1 ? '3-1-2' : '2-3-1'})`}
+            >
+              ⚡
+            </button>
+          </div>
           <div className="text-white text-sm">
             <span className="text-gray-300">Total de Números: </span>
             <span className="font-bold text-yellow-300" style={{fontSize: '17px'}}>{lastNumbers.length}</span>
@@ -3169,6 +3193,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         {/* Usar o componente StatisticsCards com tema escuro */}
         <div className="[&_.bg-white]:bg-gray-700 [&_.text-gray-800]:text-white [&_.text-gray-600]:text-gray-300 [&_.text-gray-500]:text-gray-400 [&_.shadow-md]:shadow-lg">
           <StatisticsCards 
+            rowOrder={statisticsRowOrder}
             statistics={calculateStatistics(lastNumbers.map(num => ({
               number: num,
               color: num === 0 ? 'green' as const : 
