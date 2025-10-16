@@ -435,18 +435,21 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [betTerminaisNegSeqCurrent, setBetTerminaisNegSeqCurrent] = useState(0);
   const [betTerminaisNegSeqMax, setBetTerminaisNegSeqMax] = useState(0);
 
-  // Avaliar BET Terminais ANTES de atualizar a lista de terminais
-  const evaluateBetTerminais = (selectedNumber: number) => {
-    const snapshot = lastNumbers; // usar estado atual (antes de adicionar o novo número)
+  // Avaliar BET Terminais DEPOIS de atualizar a lista de terminais
+  const evaluateBetTerminais = (selectedNumber: number, currentNumbers: number[]) => {
+    const snapshot = currentNumbers; // usar lista atual (incluindo o novo número)
 
-    // Regra de cálculo apenas quando TODOS os 10 terminais têm algum valor nos últimos 50
+    // Regra de cálculo quando pelo menos 8 dos 10 terminais têm algum valor nos últimos 50
     const last50 = snapshot.slice(-50);
     const counts = Array(10).fill(0);
     last50.forEach(n => {
       counts[n % 10]++;
     });
-    const allHaveValues = counts.every(c => c > 0);
-    if (!allHaveValues) return; // não calcular BET Terminais se algum terminal está zerado
+    const terminalsWithValues = counts.filter(c => c > 0).length;
+    
+    if (terminalsWithValues < 8) {
+      return; // não calcular BET Terminais se menos de 8 terminais têm valores
+    }
 
     // Construir lista de Terminais ordenada por frequência (desc) e pegar os 3 últimos itens (menos frequentes)
     const terminaisData = counts.map((count, terminal) => ({ terminal, count }));
@@ -455,6 +458,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
     const terminal = selectedNumber % 10;
     const isLoss = lastThreeFromList.includes(terminal);
+    
     if (isLoss) {
       setBetTerminaisLosses(prev => prev + 1);
       setBetTerminaisNegSeqCurrent(prev => {
@@ -1434,9 +1438,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
   // Função para adicionar número aos últimos sorteados
   const addToLastNumbers = (num: number) => {
-    // Avaliar BET Terminais ANTES de adicionar o número na lista (ordem exigida)
-    evaluateBetTerminais(num);
-
     // CRÍTICO: Verificar WIN do Padrão Detectado ANTES de adicionar o número
     if (patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && patternAlert.betNumbers) {
       if (patternAlert.betNumbers.includes(num)) {
@@ -1452,6 +1453,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     setLastNumbers(prev => {
       const newList = [...prev, num]; // CORREÇÃO: Adicionar no FINAL - ordem cronológica correta
       const updatedList = newList.slice(-60); // Manter apenas os últimos 60
+      
+      // Avaliar BET Terminais DEPOIS de adicionar o número na lista
+      evaluateBetTerminais(num, updatedList);
       
       // SOLUÇÃO DEFINITIVA: Verificar sequência específica 18-15-10 EXATA
       let specialSequenceDetected = false;
