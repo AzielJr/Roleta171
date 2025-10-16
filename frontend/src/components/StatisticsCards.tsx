@@ -584,11 +584,11 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
     return calculate171ForcedStats(lastNumbers);
   }, [lastNumbers]);
 
-  // Janela selecionada para os cards 32P1 e 32V2 (0 = Todos)
+  // Janela selecionada para os cards 32P1 e Castelo (0 = Todos)
   const [window32P1, setWindow32P1] = useState<number>(50);
-  const [window32V2, setWindow32V2] = useState<number>(0);
+  const [windowCastelo, setWindowCastelo] = useState<number>(0);
 
-  // Calcular estatísticas dos cards 32P1 e 32V2 conforme regras fornecidas
+  // Calcular estatísticas dos cards 32P1 e Castelo conforme regras fornecidas
   const calculated32P1Stats = React.useMemo(() => {
     const slice = window32P1 && window32P1 > 0 ? lastNumbers.slice(-window32P1) : lastNumbers;
     let winTotal = 0;
@@ -609,27 +609,42 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
     return { winTotal, wins, losses, total: slice.length };
   }, [lastNumbers, window32P1]);
 
-  const calculated32V2Stats = React.useMemo(() => {
-    const slice = window32V2 && window32V2 > 0 ? lastNumbers.slice(-window32V2) : lastNumbers;
-    let winTotal = 0;
+  const calculatedCasteloStats = React.useMemo(() => {
+    const slice = windowCastelo && windowCastelo > 0 ? lastNumbers.slice(-windowCastelo) : lastNumbers;
     let wins = 0;
     let losses = 0;
-    const winTotalSet = new Set([5, 14, 23, 32]);
+    let positiveSequenceCurrent = 0;
+    let positiveSequenceMax = 0;
+    let negativeSequenceCurrent = 0;
+    let negativeSequenceMax = 0;
+
     for (const num of slice) {
-      const color = ROULETTE_COLORS[num];
-      const col = getNumberColumn(num);
-      if (winTotalSet.has(num)) winTotal++;
-      // WIN: vermelho na coluna 2 OU qualquer vermelho (equivale a qualquer vermelho)
-      if (color === 'red') {
-        wins++;
-      }
-      // LOSS: zero ou preto na coluna 1 e 3
-      if (num === 0 || (color === 'black' && (col === 1 || col === 3))) {
+      const isLoss = (num === 0 || num === 15 || num === 24);
+      if (isLoss) {
         losses++;
+        negativeSequenceCurrent += 1;
+        if (negativeSequenceCurrent > negativeSequenceMax) negativeSequenceMax = negativeSequenceCurrent;
+        // resetar positiva
+        positiveSequenceCurrent = 0;
+      } else {
+        wins++;
+        positiveSequenceCurrent += 1;
+        if (positiveSequenceCurrent > positiveSequenceMax) positiveSequenceMax = positiveSequenceCurrent;
+        // resetar negativa
+        negativeSequenceCurrent = 0;
       }
     }
-    return { winTotal, wins, losses, total: slice.length };
-  }, [lastNumbers, window32V2]);
+
+    return {
+      wins,
+      losses,
+      total: slice.length,
+      positiveSequenceCurrent,
+      positiveSequenceMax,
+      negativeSequenceCurrent,
+      negativeSequenceMax
+    };
+  }, [lastNumbers, windowCastelo]);
 
   // Estados para animações dos cards
   const [animatingColumns, setAnimatingColumns] = useState<Set<number>>(new Set());
@@ -1024,16 +1039,16 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
         winPercentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.wins / calculated32P1Stats.total) * 100) : 0
       },
       {
-        name: '32V2',
-        wins: calculated32V2Stats.wins,
-        // Percentual baseado no campo WIN do card 32V2: wins / total
-        winPercentage: calculated32V2Stats.total > 0 ? Math.round((calculated32V2Stats.wins / calculated32V2Stats.total) * 100) : 0
+        name: 'Castelo',
+        wins: calculatedCasteloStats.wins,
+        // Percentual baseado no campo WIN do card Castelo: wins / total
+        winPercentage: calculatedCasteloStats.total > 0 ? Math.round((calculatedCasteloStats.wins / calculatedCasteloStats.total) * 100) : 0
       }
     ];
     
     // Ordenar por percentual de vitórias (maior para menor)
     return strategies.sort((a, b) => b.winPercentage - a.winPercentage);
-  }, [calculatedTorreStats, calculatedP2Stats, calculatedFusionStats, betTerminaisStatsDisplay, pattern171Stats, calculated32P1Stats, calculated32V2Stats]);
+  }, [calculatedTorreStats, calculatedP2Stats, calculatedFusionStats, betTerminaisStatsDisplay, pattern171Stats, calculated32P1Stats, calculatedCasteloStats]);
 
   // Ordem fixa para exibição no card Ranking (sem rolagem)
   const displayStrategiesRanking = React.useMemo(() => {
@@ -1184,7 +1199,7 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
                 <div className="text-xs lg:text-xs text-gray-500">{betTerminaisStatsDisplay.lossPercentage}%</div>
               </div>
             </div>
-            <div className="flex items-center justify-between mt-[15px]">
+            <div className="flex items-center justify-between mt-[25px]">
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-blue-500"></div>
                 <span className="text-xs lg:text-xs text-gray-600">Seq. Positiva</span>
@@ -1205,23 +1220,33 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
           </div>
         </div>
 
-        {/* Card 171 (movido para 1ª linha) */}
+        {/* Card Castelo (agora na 1ª linha) */}
         <StatCard
           title={
             <div className="flex justify-between items-center w-full">
-              <span>171</span>
-              <span className="font-normal text-xs text-gray-500">
-                Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - 
-                Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span>
-              </span>
+              <span>Castelo</span>
+              <select
+                className="text-xs bg-gray-200 text-gray-700 rounded px-1 py-0.5"
+                value={windowCastelo}
+                onChange={(e) => setWindowCastelo(parseInt(e.target.value))}
+                title="Selecione a janela de números para Castelo"
+              >
+                <option value={0}>Todos</option>
+                <option value={10}>Últimos 10</option>
+                <option value={20}>Últimos 20</option>
+                <option value={30}>Últimos 30</option>
+                <option value={40}>Últimos 40</option>
+                <option value={50}>Últimos 50</option>
+              </select>
             </div>
           }
           data={[
-            { label: 'Entradas', value: pattern171Stats.entradas, percentage: totalNumbers > 0 ? Math.round((pattern171Stats.entradas / totalNumbers) * 100) : 0 },
-            { label: 'WIN', value: pattern171Stats.wins, percentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.wins / pattern171Stats.entradas) * 100) : 0 },
-            { label: 'LOSS', value: pattern171Stats.losses, percentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.losses / pattern171Stats.entradas) * 100) : 0 }
+            { label: 'WIN', value: calculatedCasteloStats.wins, percentage: calculatedCasteloStats.total > 0 ? Math.round((calculatedCasteloStats.wins / calculatedCasteloStats.total) * 100) : 0 },
+            { label: 'LOSS', value: calculatedCasteloStats.losses, percentage: calculatedCasteloStats.total > 0 ? Math.round((calculatedCasteloStats.losses / calculatedCasteloStats.total) * 100) : 0 },
+            { label: 'Seq. Positiva', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedCasteloStats.positiveSequenceCurrent}/${calculatedCasteloStats.positiveSequenceMax}` },
+            { label: 'Seq. Negativa', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedCasteloStats.negativeSequenceCurrent}/${calculatedCasteloStats.negativeSequenceMax}` }
           ]}
-          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500']}
+          colors={['bg-green-500', 'bg-red-500', 'bg-blue-500', 'bg-orange-500']}
         />
 
         
@@ -1274,35 +1299,26 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
           </div>
         </div>
 
-        {/* Novo card 32V2 como primeiro da 2ª linha */}
+        {/* Card 171 (agora na 2ª linha) */}
         <StatCard
           title={
             <div className="flex justify-between items-center w-full">
-              <span>32V2</span>
-              <select
-                className="text-xs bg-gray-200 text-gray-700 rounded px-1 py-0.5"
-                value={window32V2}
-                onChange={(e) => setWindow32V2(parseInt(e.target.value))}
-                title="Selecione a janela de números para 32V2"
-              >
-                <option value={0}>Todos</option>
-                <option value={10}>Últimos 10</option>
-                <option value={20}>Últimos 20</option>
-                <option value={30}>Últimos 30</option>
-                <option value={40}>Últimos 40</option>
-                <option value={50}>Últimos 50</option>
-              </select>
+              <span>171</span>
+              <span className="font-normal text-xs text-gray-500">
+                Qt: <span className="font-bold text-white">{numbersWithoutPattern}</span> - 
+                Md: <span className="font-bold text-white">{pattern171Stats.entradas > 0 ? Math.round((lastNumbers.length / pattern171Stats.entradas) * 100) / 100 : 0}</span>
+              </span>
             </div>
           }
           data={[
-            { label: 'WIN TOTAL', value: calculated32V2Stats.winTotal, percentage: calculated32V2Stats.total > 0 ? Math.round((calculated32V2Stats.winTotal / calculated32V2Stats.total) * 100) : 0 },
-            { label: 'WIN', value: calculated32V2Stats.wins, percentage: calculated32V2Stats.total > 0 ? Math.round((calculated32V2Stats.wins / calculated32V2Stats.total) * 100) : 0 },
-            { label: 'LOSS', value: calculated32V2Stats.losses, percentage: calculated32V2Stats.total > 0 ? Math.round((calculated32V2Stats.losses / calculated32V2Stats.total) * 100) : 0 }
+            { label: 'Entradas', value: pattern171Stats.entradas, percentage: totalNumbers > 0 ? Math.round((pattern171Stats.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: pattern171Stats.wins, percentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.wins / pattern171Stats.entradas) * 100) : 0 },
+            { label: 'LOSS', value: pattern171Stats.losses, percentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.losses / pattern171Stats.entradas) * 100) : 0 }
           ]}
-          colors={['bg-blue-500', 'bg-green-500', 'bg-red-500']}
+          colors={['bg-gray-500', 'bg-green-500', 'bg-red-500']}
         />
 
-        {/* Colunas e Cores seguem após 32V2 */}
+        {/* Colunas e Cores seguem após Castelo */}
 
         <StatCard
           title="Colunas"
