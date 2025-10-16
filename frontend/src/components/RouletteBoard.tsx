@@ -434,6 +434,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [betTerminaisLosses, setBetTerminaisLosses] = useState(0);
   const [betTerminaisNegSeqCurrent, setBetTerminaisNegSeqCurrent] = useState(0);
   const [betTerminaisNegSeqMax, setBetTerminaisNegSeqMax] = useState(0);
+  const [betTerminaisPosSeqCurrent, setBetTerminaisPosSeqCurrent] = useState(0);
+  const [betTerminaisPosSeqMax, setBetTerminaisPosSeqMax] = useState(0);
   
   // Controle para evitar duplicação de avaliação BET Terminais
   const lastEvaluatedBetTerminais = useRef<string>('');
@@ -477,9 +479,17 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         setBetTerminaisNegSeqMax(m => Math.max(m, next));
         return next;
       });
+      // LOSS: resetar sequência positiva
+      setBetTerminaisPosSeqCurrent(0);
     } else {
       setBetTerminaisWins(prev => prev + 1);
       setBetTerminaisNegSeqCurrent(0);
+      // WIN: incrementar sequência positiva
+      setBetTerminaisPosSeqCurrent(prev => {
+        const next = prev + 1;
+        setBetTerminaisPosSeqMax(m => Math.max(m, next));
+        return next;
+      });
     }
   };
   const [voiceTranscript, setVoiceTranscript] = useState<string>('');
@@ -1435,6 +1445,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     setBetTerminaisLosses(0);
     setBetTerminaisNegSeqCurrent(0);
     setBetTerminaisNegSeqMax(0);
+    setBetTerminaisPosSeqCurrent(0);
+    setBetTerminaisPosSeqMax(0);
     lastEvaluatedBetTerminais.current = ''; // Resetar controle de duplicação
     
     // Resetar controle de duplicação P2
@@ -3226,7 +3238,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               winPercentage: (betTerminaisWins + betTerminaisLosses) > 0 ? Math.round((betTerminaisWins / (betTerminaisWins + betTerminaisLosses)) * 100) : 0,
               lossPercentage: (betTerminaisWins + betTerminaisLosses) > 0 ? Math.round((betTerminaisLosses / (betTerminaisWins + betTerminaisLosses)) * 100) : 0,
               negativeSequenceCurrent: betTerminaisNegSeqCurrent,
-              negativeSequenceMax: betTerminaisNegSeqMax
+              negativeSequenceMax: betTerminaisNegSeqMax,
+              positiveSequenceCurrent: betTerminaisPosSeqCurrent,
+              positiveSequenceMax: betTerminaisPosSeqMax
             }}
           />
         </div>

@@ -46,6 +46,8 @@ interface StatisticsCardsProps {
     lossPercentage: number;
     negativeSequenceCurrent: number;
     negativeSequenceMax: number;
+    positiveSequenceCurrent: number;
+    positiveSequenceMax: number;
   };
 }
 
@@ -953,10 +955,10 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
   // Stats de exibição para BET Terminais (zerar quando não há dados)
   const betTerminaisStatsDisplay = React.useMemo(() => {
     if (!betTerminaisStats) {
-      return { wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0 };
+      return { wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0, positiveSequenceCurrent: 0, positiveSequenceMax: 0 };
     }
     if (lastNumbers.length === 0) {
-      return { wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0 };
+      return { wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0, positiveSequenceCurrent: 0, positiveSequenceMax: 0 };
     }
     return betTerminaisStats;
   }, [lastNumbers, betTerminaisStats]);
@@ -1184,7 +1186,16 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
-                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-gray-400"></div>
+                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-blue-500"></div>
+                <span className="text-xs lg:text-xs text-gray-600">Seq. Positiva</span>
+              </div>
+              <div className="text-right">
+                <div className="font-bold text-gray-800 text-xs lg:text-sm">{betTerminaisStatsDisplay.positiveSequenceCurrent}/{betTerminaisStatsDisplay.positiveSequenceMax}</div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 lg:w-3 lg:h-3 rounded-full bg-orange-500"></div>
                 <span className="text-xs lg:text-xs text-gray-600">Seq. Negativa</span>
               </div>
               <div className="text-right">
