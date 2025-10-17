@@ -552,6 +552,7 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
   const [showTorreModal, setShowTorreModal] = useState(false);
   const [showFusionModal, setShowFusionModal] = useState(false);
   const [showRaceTrackModal, setShowRaceTrackModal] = useState(false);
+  const [showTriangulacaoModal, setShowTriangulacaoModal] = useState(false);
   const [p2Mode, setP2Mode] = useState<1 | 2>(1); // Estado para controlar o modo do toggle P2
   const lastP2ConsecutiveState = useRef(false);
 
@@ -967,8 +968,118 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
     return { c12, p12: pct(c12), c13, p13: pct(c13), c23, p23: pct(c23), base };
   }, [lastNumbers]);
 
-  // Stats de exibição para BET Terminais (zerar quando não há dados)
-  const betTerminaisStatsDisplay = React.useMemo(() => {
+  // Triangulação: tríade com base no último número e seus vizinhos
+  const triangulacaoTriadDisplay = React.useMemo(() => {
+    const len = ROULETTE_SEQUENCE.length;
+    const last = lastNumbers[lastNumbers.length - 1];
+    let baseIndex = ROULETTE_SEQUENCE.indexOf(last);
+    if (baseIndex < 0) baseIndex = 0; // fallback para 0
+    const secondIndex = (baseIndex + 12) % len;
+    const thirdIndex = (baseIndex + 24) % len;
+    return [ROULETTE_SEQUENCE[baseIndex], ROULETTE_SEQUENCE[secondIndex], ROULETTE_SEQUENCE[thirdIndex]];
+  }, [lastNumbers]);
+
+  const triangulacaoSections = React.useMemo(() => {
+    const len = ROULETTE_SEQUENCE.length;
+    const getNeighbors = (pos: number, count: number) => {
+      const right: number[] = [];
+      const left: number[] = [];
+      for (let i = 1; i <= count; i++) {
+        right.push(ROULETTE_SEQUENCE[(pos + i) % len]);
+        left.push(ROULETTE_SEQUENCE[(pos - i + len) % len]);
+      }
+      return { right, left };
+    };
+    return triangulacaoTriadDisplay.map(center => {
+      const pos = ROULETTE_SEQUENCE.indexOf(center);
+      const { right, left } = getNeighbors(pos, 4);
+      return { center, neighborsRight: right, neighborsLeft: left };
+    });
+  }, [triangulacaoTriadDisplay]);
+
+  const triangulacaoCoveredNumbers = React.useMemo(() => {
+    const set = new Set<number>();
+    triangulacaoSections.forEach(section => {
+      set.add(section.center);
+      section.neighborsRight.forEach(n => set.add(n));
+      section.neighborsLeft.forEach(n => set.add(n));
+    });
+    return Array.from(set);
+  }, [triangulacaoSections]);
+
+  const triangulacaoExposedNumbers = React.useMemo(() => {
+    return ROULETTE_SEQUENCE.filter(n => !triangulacaoCoveredNumbers.includes(n));
+  }, [triangulacaoCoveredNumbers]);
+
+  // Estatísticas da Triangulação: WIN/LOSS e sequências
+  const calculatedTriangulacaoStats = React.useMemo(() => {
+    const len = ROULETTE_SEQUENCE.length;
+    let wins = 0, losses = 0;
+    let positiveSequenceCurrent = 0, positiveSequenceMax = 0;
+    let negativeSequenceCurrent = 0, negativeSequenceMax = 0;
+
+    if (lastNumbers.length < 2) {
+      return {
+        wins: 0, losses: 0,
+        winPercentage: 0, lossPercentage: 0,
+        positiveSequenceCurrent: 0, positiveSequenceMax: 0,
+        negativeSequenceCurrent: 0, negativeSequenceMax: 0
+      };
+    }
+
+    for (let i = 1; i < lastNumbers.length; i++) {
+      const base = lastNumbers[i - 1];
+      let baseIndex = ROULETTE_SEQUENCE.indexOf(base);
+      if (baseIndex < 0) baseIndex = 0; // fallback
+
+      const centers = [
+        ROULETTE_SEQUENCE[baseIndex],
+        ROULETTE_SEQUENCE[(baseIndex + 12) % len],
+        ROULETTE_SEQUENCE[(baseIndex + 24) % len]
+      ];
+
+      const cover = new Set<number>();
+      centers.forEach(center => {
+        cover.add(center);
+        const pos = ROULETTE_SEQUENCE.indexOf(center);
+        for (let k = 1; k <= 4; k++) {
+          cover.add(ROULETTE_SEQUENCE[(pos + k) % len]);
+          cover.add(ROULETTE_SEQUENCE[(pos - k + len) % len]);
+        }
+      });
+
+      const result = lastNumbers[i];
+      if (cover.has(result)) {
+        wins++;
+        positiveSequenceCurrent += 1;
+        negativeSequenceCurrent = 0;
+        if (positiveSequenceCurrent > positiveSequenceMax) positiveSequenceMax = positiveSequenceCurrent;
+      } else {
+        losses++;
+        negativeSequenceCurrent += 1;
+        positiveSequenceCurrent = 0;
+        if (negativeSequenceCurrent > negativeSequenceMax) negativeSequenceMax = negativeSequenceCurrent;
+      }
+    }
+
+    const total = wins + losses;
+    const winPercentage = total > 0 ? Math.round((wins / total) * 100) : 0;
+    const lossPercentage = total > 0 ? Math.round((losses / total) * 100) : 0;
+
+    return {
+      wins,
+      losses,
+      winPercentage,
+      lossPercentage,
+      positiveSequenceCurrent,
+      positiveSequenceMax,
+      negativeSequenceCurrent,
+      negativeSequenceMax
+    };
+  }, [lastNumbers]);
+ 
+   // Stats de exibição para BET Terminais (zerar quando não há dados)
+   const betTerminaisStatsDisplay = React.useMemo(() => {
     if (!betTerminaisStats) {
       return { wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0, positiveSequenceCurrent: 0, positiveSequenceMax: 0 };
     }
@@ -1033,6 +1144,16 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
         winPercentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.wins / pattern171Stats.entradas) * 100) : 0
       },
       {
+        name: '171 Forçado (5)',
+        wins: calculated171ForcedStats.wins,
+        winPercentage: (calculated171ForcedStats.wins + calculated171ForcedStats.losses) > 0 ? Math.round((calculated171ForcedStats.wins / (calculated171ForcedStats.wins + calculated171ForcedStats.losses)) * 100) : 0
+      },
+      {
+        name: 'Triangulação',
+        wins: calculatedTriangulacaoStats.wins,
+        winPercentage: calculatedTriangulacaoStats.winPercentage
+      },
+      {
         name: '32P3',
         wins: calculated32P1Stats.wins,
         // Percentual baseado no campo WIN do card 32P1: wins / total
@@ -1048,7 +1169,7 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
     
     // Ordenar por percentual de vitórias (maior para menor)
     return strategies.sort((a, b) => b.winPercentage - a.winPercentage);
-  }, [calculatedTorreStats, calculatedP2Stats, calculatedFusionStats, betTerminaisStatsDisplay, pattern171Stats, calculated32P1Stats, calculatedCasteloStats]);
+  }, [calculatedTorreStats, calculatedP2Stats, calculatedFusionStats, betTerminaisStatsDisplay, pattern171Stats, calculated171ForcedStats, calculatedTriangulacaoStats, calculated32P1Stats, calculatedCasteloStats]);
 
   // Ordem fixa para exibição no card Ranking (sem rolagem)
   const displayStrategiesRanking = React.useMemo(() => {
@@ -1067,8 +1188,14 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
         {/* Card - Ranking das Estratégias (de volta ao primeiro da 1ª linha) */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Ranking Estratégias</h3>
+          <style>{`
+            .ranking-scroll { scrollbar-width: thin; scrollbar-color: #4b5563 #111827; }
+            .ranking-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+            .ranking-scroll::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 6px; }
+            .ranking-scroll::-webkit-scrollbar-track { background-color: #111827; }
+          `}</style>
           <div>
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 ranking-scroll max-h-[150px] overflow-y-auto pr-1">
               {displayStrategiesRanking.map((strategy, index) => (
                 <div key={strategy.name} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
                   <div className="flex items-center space-x-1">
@@ -1137,46 +1264,47 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
           colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
         />
 
-        {/* Card Terminais (agora na 1ª linha, posição do antigo P2) */}
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
-          <div className="flex justify-between items-center mb-1 lg:mb-2">
-            <h3 className="text-xs lg:text-sm font-semibold text-gray-800">Terminais</h3>
-            {calculateTerminaisStats.length > 0 && (
-              <div className="flex items-center gap-[5px]">
-                {calculateTerminaisStats.slice(-3).map(({ terminal }, idx) => (
-                  <span key={`${terminal}-${idx}`} className="text-yellow-500 font-semibold text-xs lg:text-sm">{terminal}</span>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="max-h-[calc(8rem+19px)] overflow-y-auto">
-            <div className="space-y-0.5">
-              {lastNumbers.length > 0 ? (
-                calculateTerminaisStats.slice(0, 10).map(({ terminal, count, percentage, numbers }) => (
-                  <div key={terminal} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-4 h-4 rounded-full bg-gray-600 flex items-center justify-center text-white font-bold text-[14px]">
-                        {terminal}
-                      </div>
-                      <span className="text-xs text-gray-600 truncate">
-                        {numbers.map(n => n.toString().padStart(2, '0')).join(',')}
-                      </span>
+        {/* Card Triangulação (substitui Coluna Combinada) */}
+         <StatCard
+           title={
+             <div className="flex items-center justify-between">
+               <span
+                 className="cursor-pointer hover:text-blue-600 transition-colors"
+                 onClick={() => setShowTriangulacaoModal(true)}
+                 title="Clique para ver cobertura e números expostos"
+               >
+                 Triangulação
+               </span>
+               <div className="flex items-center gap-1">
+                  {triangulacaoTriadDisplay.map(n => (
+                    <div key={n} className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs ${getRouletteColor(n)}`}>
+                      {n.toString().padStart(2, '0')}
                     </div>
-                    <div className="text-right">
-                      <div className="font-bold text-gray-800 text-xs">{count}</div>
-                      <div className="text-xs text-gray-500">{percentage}%</div>
-                    </div>
-                  </div>
-                ))
-              ) : null}
-            </div>
-          </div>
-        </div>
+                  ))}
+                </div>
+             </div>
+           }
+           containerClassName="min-h-[111px]"
+           data={[
+             { label: 'WIN', value: calculatedTriangulacaoStats.wins, percentage: calculatedTriangulacaoStats.winPercentage },
+             { label: 'LOSS', value: calculatedTriangulacaoStats.losses, percentage: calculatedTriangulacaoStats.lossPercentage },
+             { label: 'Seq. Positiva', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedTriangulacaoStats.positiveSequenceCurrent}/${calculatedTriangulacaoStats.positiveSequenceMax}` },
+             { label: 'Seq. Negativa', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedTriangulacaoStats.negativeSequenceCurrent}/${calculatedTriangulacaoStats.negativeSequenceMax}` }
+           ]}
+           colors={['bg-green-500', 'bg-red-500', 'bg-blue-500', 'bg-orange-500']}
+         />
 
         {/* Card BET Terminais (agora na 1ª linha, posição do antigo Fusion) */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
           <div className="flex justify-between items-center mb-1 lg:mb-2">
             <h3 className="text-xs lg:text-sm font-semibold text-gray-800">BET Terminais</h3>
+            {calculateTerminaisStats.length > 0 && (
+              <div className="flex items-center gap-[5px]">
+                {calculateTerminaisStats.slice(-3).map(({ terminal }, idx) => (
+                  <span key={`bet-${terminal}-${idx}`} className="text-yellow-500 font-semibold text-xs lg:text-sm">{terminal}</span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="space-y-1">
             <div className="flex items-center justify-between">
@@ -1354,19 +1482,42 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
           cardType="highLow"
         />
 
-        {/* Card Coluna Combinada (5º da 2ª linha) */}
-        <StatCard
-          title="Coluna Combinada"
-          data={[
-            { label: 'Coluna 1 e 2', value: calculateCombinedColumnsStats.c12, percentage: calculateCombinedColumnsStats.p12 },
-            { label: 'Coluna 1 e 3', value: calculateCombinedColumnsStats.c13, percentage: calculateCombinedColumnsStats.p13 },
-            { label: 'Coluna 2 e 3', value: calculateCombinedColumnsStats.c23, percentage: calculateCombinedColumnsStats.p23 }
-          ]}
-          colors={['bg-teal-500', 'bg-indigo-500', 'bg-pink-500']}
-        />
-
+        {/* Card Terminais (agora na 1ª linha, posição do antigo P2) */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
+          <div className="flex justify-between items-center mb-1 lg:mb-2">
+            <h3 className="text-xs lg:text-sm font-semibold text-gray-800">Terminais</h3>
+            {calculateTerminaisStats.length > 0 && (
+              <div className="flex items-center gap-[5px]">
+                {calculateTerminaisStats.slice(-3).map(({ terminal }, idx) => (
+                  <span key={`${terminal}-${idx}`} className="text-yellow-500 font-semibold text-xs lg:text-sm">{terminal}</span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="ranking-scroll max-h-[calc(8rem+19px)] overflow-y-auto">
+            <div className="space-y-0.5">
+              {lastNumbers.length > 0 ? (
+                calculateTerminaisStats.slice(0, 10).map(({ terminal, count, percentage, numbers }) => (
+                  <div key={terminal} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
+                    <div className="flex items-center space-x-1">
+                      <div className="w-4 h-4 rounded-full bg-gray-600 flex items-center justify-center text-white font-bold text-[14px]">
+                        {terminal}
+                      </div>
+                      <span className="text-xs text-gray-600 truncate">
+                        {numbers.map(n => n.toString().padStart(2, '0')).join(',')}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-gray-800 text-xs">{count}</div>
+                      <div className="text-xs text-gray-500">{percentage}%</div>
+                    </div>
+                  </div>
+                ))
+              ) : null}
+            </div>
+          </div>
+        </div>
         
-
         {/* Terminais movido para o fim da 3ª linha */}
 
       </div>
@@ -1508,7 +1659,7 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
         {/* Card - Números (Max 50) (agora na posição onde estava o Ranking) */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Números (Max 50)</h3>
-          <div className="max-h-[calc(8rem+16px)] overflow-y-auto">
+          <div className="ranking-scroll max-h-[calc(8rem+16px)] overflow-y-auto">
             <div className="space-y-0.5">
               {React.useMemo(() => {
                 const numberCounts: { [key: number]: number } = {};
@@ -1734,6 +1885,98 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
             <div className="mt-4 text-center">
               <button 
                 onClick={() => setShowRaceTrackModal(false)}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Triangulação */}
+      {showTriangulacaoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowTriangulacaoModal(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-gray-800">Triangulação</h2>
+              <button 
+                onClick={() => setShowTriangulacaoModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="border-l-4 border-blue-500 pl-3">
+                <h3 className="font-semibold text-blue-700">Tríade atual</h3>
+                <p className="text-sm text-gray-600 mb-2">Último número e offsets (+12, +24)</p>
+                <div className="flex items-center gap-3">
+                  {triangulacaoTriadDisplay.map(num => (
+                    <RouletteBall key={num} number={num} />
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-l-4 border-teal-500 pl-3">
+                <h3 className="font-semibold text-teal-700">Vizinhos por centro</h3>
+                <p className="text-sm text-gray-600 mb-2">4 vizinhos à esquerda e à direita</p>
+                <div className="space-y-2">
+                  {triangulacaoSections.map(s => (
+                    <div key={s.center} className="bg-gray-50 rounded p-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs text-gray-600">Centro</span>
+                        <RouletteBall number={s.center} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-600 w-16">Esquerda</span>
+                        <div className="flex flex-wrap gap-1">
+                          {s.neighborsLeft.map(n => (
+                            <div key={`${s.center}-L-${n}`} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColor(n)}`}>{n.toString().padStart(2,'0')}</div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs text-gray-600 w-16">Direita</span>
+                        <div className="flex flex-wrap gap-1">
+                          {s.neighborsRight.map(n => (
+                            <div key={`${s.center}-R-${n}`} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColor(n)}`}>{n.toString().padStart(2,'0')}</div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-l-4 border-indigo-500 pl-3">
+                <h3 className="font-semibold text-indigo-700">Cobertura</h3>
+                <p className="text-sm text-gray-600 mb-2">Números cobertos e expostos</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs text-gray-600 mb-1">Cobertos ({triangulacaoCoveredNumbers.length})</div>
+                    <div className="flex flex-wrap gap-1">
+                      {triangulacaoCoveredNumbers.map(n => (
+                        <span key={`cov-${n}`} className={`px-2 py-1 rounded text-xs font-medium text-white ${getRouletteColor(n)}`}>{n.toString().padStart(2,'0')}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-600 mb-1">Expostos ({triangulacaoExposedNumbers.length})</div>
+                    <div className="flex flex-wrap gap-1">
+                      {triangulacaoExposedNumbers.map(n => (
+                        <span key={`exp-${n}`} className="px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-800">{n.toString().padStart(2,'0')}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 text-center">
+              <button 
+                onClick={() => setShowTriangulacaoModal(false)}
                 className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors"
               >
                 Fechar
