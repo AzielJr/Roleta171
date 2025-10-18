@@ -394,8 +394,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [lastNumbers, setLastNumbers] = useState<number[]>([]);  
   // Estados para configurações do sistema
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [alertaPadrao171Ativo, setAlertaPadrao171Ativo] = useState(true);
+  const [alertaPadrao171Ativo, setAlertaPadrao171Ativo] = useState(false);
   const [avisosSonorosAtivos, setAvisosSonorosAtivos] = useState(true);
+  const [espanholEnabled, setEspanholEnabled] = useState(false);
+  
 // Converter lastNumbers para Statistics e usar useStatistics
   const [simulationInterval, setSimulationInterval] = useState<NodeJS.Timeout | null>(null);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
@@ -411,7 +413,23 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   
   // Estado para histórico de números sorteados (para detecção de padrões)
   const [drawnHistory, setDrawnHistory] = useState<number[]>([]);
-  
+
+  // Estados do recurso Espanhol
+  const [espanholChamados, setEspanholChamados] = useState<number[]>([]);
+  const [espanholRepetidos, setEspanholRepetidos] = useState<number[]>([]);
+  const [espanholModulo1X, setEspanholModulo1X] = useState<number>(0);
+  const [espanholModulo2X, setEspanholModulo2X] = useState<number>(0);
+  const [espanholModulo3X, setEspanholModulo3X] = useState<number>(0);
+  const [espanholValorInicial, setEspanholValorInicial] = useState<number>(1.00);
+  const [espanholTotal, setEspanholTotal] = useState<number>(0);
+  const [espanholWinValue, setEspanholWinValue] = useState<number | null>(null);
+  const espanholCountsRef = useRef<Map<number, number>>(new Map());
+  const prevLastNumbersLenRef = useRef<number>(0);
+  const espanholWinTriggeredRef = useRef<boolean>(false);
+  const [espanholLocked, setEspanholLocked] = useState<boolean>(false);
+  const [apostandoEspanhol, setApostandoEspanhol] = useState<boolean>(false);
+
+
   // Estado para controlar o modal de adicionar números
   const [showAddNumbersModal, setShowAddNumbersModal] = useState(false);
   const [addNumbersInput, setAddNumbersInput] = useState('');
@@ -496,7 +514,129 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [voiceDigits, setVoiceDigits] = useState<string>('');
   
   const drawnHistoryRef = useRef<number[]>([]);
-  
+
+  // Atualiza lógica do Espanhol conforme números são adicionados
+  useEffect(() => {
+    if (!espanholEnabled || espanholLocked) {
+      prevLastNumbersLenRef.current = lastNumbers.length;
+      return;
+    }
+    const prevLen = prevLastNumbersLenRef.current;
+    if (lastNumbers.length <= prevLen) {
+      prevLastNumbersLenRef.current = lastNumbers.length;
+      return;
+    }
+    const newAdded = lastNumbers.slice(prevLen);
+    setEspanholChamados(prev => [...prev, ...newAdded].slice(-200));
+
+    const counts = new Map(espanholCountsRef.current);
+    const newReps: number[] = [];
+
+    // Começar dos valores atuais dos módulos
+    let m1 = espanholModulo1X;
+    let m2 = espanholModulo2X;
+    let m3 = espanholModulo3X;
+
+    for (const num of newAdded) {
+      // Atualiza contagem do número
+      const c = (counts.get(num) || 0) + 1;
+      counts.set(num, c);
+      if (c === 2) {
+        newReps.push(num);
+      }
+
+      // Quantidade de números repetidos (contagem >= 2)
+      const repCount = Array.from(counts.values()).filter(v => v >= 2).length;
+
+      // Incrementar módulos pelo repCount a cada número chamado
+      if (m1 < 24) {
+        const before = m1;
+        m1 = Math.min(24, m1 + repCount);
+        const overflow1 = repCount - (m1 - before);
+        if (overflow1 > 0) {
+          if (m2 < 32) {
+            const before2 = m2;
+            m2 = Math.min(32, m2 + overflow1);
+            const overflow2 = overflow1 - (m2 - before2);
+            if (overflow2 > 0) {
+              m3 = Math.min(64, m3 + overflow2);
+            }
+          } else {
+            m3 = Math.min(64, m3 + overflow1);
+          }
+        }
+      } else if (m2 < 32) {
+        const before2 = m2;
+        m2 = Math.min(32, m2 + repCount);
+        const overflow2 = repCount - (m2 - before2);
+        if (overflow2 > 0) {
+          m3 = Math.min(64, m3 + overflow2);
+        }
+      } else {
+        m3 = Math.min(64, m3 + repCount);
+      }
+
+      // Vitória quando um número é chamado pela terceira vez (apenas se 'Apostando' estiver ativo)
+      if (!espanholWinTriggeredRef.current && c === 3 && apostandoEspanhol) {
+        const activeMultiplier = m3 > 0 ? 4 : (m2 > 0 ? 2 : 1);
+        setEspanholWinValue(36 * espanholValorInicial * activeMultiplier);
+        espanholWinTriggeredRef.current = true;
+        if (avisosSonorosAtivos) {
+          try { soundGenerator.playBellSound(); } catch {}
+        }
+        setEspanholLocked(true);
+      }
+    }
+
+    // Persistir contagens
+    espanholCountsRef.current = counts;
+
+    if (newReps.length > 0) {
+      setEspanholRepetidos(prev => [...prev, ...newReps]);
+    }
+
+    if (apostandoEspanhol) {
+      setEspanholModulo1X(m1);
+      setEspanholModulo2X(m2);
+      setEspanholModulo3X(m3);
+
+      const total = (espanholValorInicial * (m1 * 1 + m2 * 2 + m3 * 4));
+      setEspanholTotal(total);
+    }
+
+    // Aviso visual será exibido no container quando m3 >= 64
+
+
+    prevLastNumbersLenRef.current = lastNumbers.length;
+  }, [lastNumbers, espanholEnabled, espanholValorInicial, espanholModulo1X, espanholModulo2X, espanholModulo3X, espanholLocked, apostandoEspanhol]);
+
+
+
+  // Limpa estados do recurso Espanhol
+  const clearEspanhol = () => {
+    setEspanholChamados([]);
+    setEspanholRepetidos([]);
+    setEspanholModulo1X(0);
+    setEspanholModulo2X(0);
+    setEspanholModulo3X(0);
+    setEspanholTotal(0);
+    setEspanholWinValue(null);
+    setEspanholLocked(false);
+    espanholCountsRef.current = new Map();
+    prevLastNumbersLenRef.current = lastNumbers.length;
+    espanholWinTriggeredRef.current = false;
+  };
+
+  // Zerar módulos quando toggle 'Apostando' é desmarcado
+  useEffect(() => {
+    if (!apostandoEspanhol) {
+      setEspanholModulo1X(0);
+      setEspanholModulo2X(0);
+      setEspanholModulo3X(0);
+      setEspanholTotal(0);
+    }
+  }, [apostandoEspanhol]);
+
   // Estado para controlar padrão forçado
   const [forcedPattern, setForcedPattern] = useState<{
     exposedNumbers: number[];
@@ -1459,6 +1599,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     isSimulatingRef.current = false;
     setNumbersWithoutPattern(0); // Zerar contador ao limpar tela
     setTotalNumbersWithoutPattern(0); // Zerar total acumulado ao limpar tela
+
+    // Limpar container do Espanhol clássico
+     clearEspanhol();
+    prevLastNumbersLenRef.current = 0; // garantir reset do ponteiro de processamento
   };
 
   const getNumberColor = (num: number): string => {
@@ -1469,6 +1613,12 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
   const getTextColor = (num: number): string => {
     return 'text-white';
+  };
+
+  // Formata valores monetários em BRL
+  const formatCurrency = (value: number): string => {
+    if (!isFinite(value)) return 'R$ 0,00';
+    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
   // (Removido) Função para calcular estatísticas do Padrão 32
@@ -3175,12 +3325,138 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               </div>
             </div>
           )}
+          
+          {/* Container Espanhol */}
+          {espanholEnabled && (
+            <div 
+              className="bg-white rounded-lg p-3 h-fit transform-gpu animate-slide-in-right mb-4"
+              style={{ marginTop: '-21px', marginBottom: '35px', willChange: 'transform, opacity, filter' }}
+            >
+              <button
+                onClick={() => { setEspanholEnabled(false); }}
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-lg w-6 h-6 flex items-center justify-center rounded-full border border-red-400 hover:border-red-500 transition-colors leading-none z-10"
+              >
+                ×
+              </button>
+              <div className="grid grid-cols-10 items-center -mt-1.5" style={{marginBottom: '3px', marginLeft: '12px'}}>
+                <h3 className="text-gray-800 font-bold text-sm flex items-center gap-1 col-span-5">
+                  Espanhol
+                </h3>
+                <div className="col-start-6 col-span-3 flex items-center gap-2 flex-nowrap">
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    <label className="text-gray-700 text-sm">Valor Inicial:</label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-gray-700 text-sm">R$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={espanholValorInicial.toFixed(2)}
+                        onChange={(e) => setEspanholValorInicial(parseFloat(e.target.value) || 0)}
+                        className="w-24 p-1 border border-gray-300 rounded text-right"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={clearEspanhol}
+                    className="bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs"
+                    title="Limpar campos e valores"
+                  >
+                    Limpar
+                  </button>
+                  <div className="flex items-center gap-2 ml-auto" style={{ marginLeft: '102px' }}>
+                    <input type="checkbox" id="apostandoEspanhol" checked={apostandoEspanhol} onChange={(e) => setApostandoEspanhol(e.target.checked)} className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2" />
+                    <label htmlFor="apostandoEspanhol" className="text-gray-800 text-sm cursor-pointer">Apostando</label>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-10 gap-2 text-sm">
+                <div className="col-span-5 bg-gray-50 p-2 rounded border border-gray-200 min-h-[150px]">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-bold text-gray-800">Números Chamados</h4>
+                    <span className="text-xs text-gray-500">Total: {espanholChamados.slice(-120).length}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {espanholChamados.slice(-120).map((num, idx) => (
+                      <div
+                        key={`${num}-${idx}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[14px] ${getNumberColor(num)} border border-gray-300`}
+                      >
+                        {num}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="col-span-3 bg-yellow-50 p-2 rounded border border-yellow-200 min-h-[150px]">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-bold text-yellow-800">Repetidos</h4>
+                    <span className="text-xs text-gray-500">Total: {espanholRepetidos.length}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {espanholRepetidos.map((num, idx) => (
+                      <div
+                        key={`${num}-${idx}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[14px] ${getNumberColor(num)} border border-gray-300`}
+                      >
+                        {num}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="col-span-2 bg-blue-50 p-2 rounded border border-blue-200 min-h-[150px]">
+                  {espanholModulo3X >= 64 && (
+                    <div className="bg-amber-100 border border-amber-300 text-amber-800 rounded p-2 text-xs mb-2">
+                      Atenção: limite do Módulo-3 (64) atingido. Considere parar.
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-1">
+                        <span className="text-blue-800">Módulo-1:</span>
+                        <span className="font-semibold text-blue-800">{espanholModulo1X}</span>
+                      </div>
+                      <span className="text-red-700">{formatCurrency(espanholValorInicial * espanholModulo1X * 1)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-1">
+                        <span className="text-blue-800">Módulo-2:</span>
+                        <span className="font-semibold text-blue-800">{espanholModulo2X}</span>
+                      </div>
+                      <span className="text-red-700">{formatCurrency(espanholValorInicial * espanholModulo2X * 2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-1">
+                        <span className="text-blue-800">Módulo-3:</span>
+                        <span className="font-semibold text-blue-800">{espanholModulo3X}</span>
+                      </div>
+                      <span className="text-red-700">{formatCurrency(espanholValorInicial * espanholModulo3X * 4)}</span>
+                    </div>
+                    <div className="border-t pt-2 mt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-gray-800">Total:</span>
+                        <span className="text-gray-800">{formatCurrency(espanholTotal)}</span>
+                      </div>
+                      {espanholWinValue !== null && (
+                        <div className="mt-1 text-sm flex justify-between items-center">
+                          <span className="text-green-700 font-semibold">Vitória: {formatCurrency(espanholWinValue)}</span>
+                          <span className="text-blue-700 font-semibold">{formatCurrency(espanholWinValue - espanholTotal)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+
 
           {/* Container de Estatísticas - Sempre visível, empurrado para baixo quando Padrão Detectado estiver ativo */}
           <div 
             className="bg-gray-800 rounded-lg p-3 h-fit transform-gpu transition-all duration-300"
             style={{
-              marginTop: patternAlert ? '-21px' : '-26px',
+              marginTop: (patternAlert || espanholEnabled) ? '-21px' : '-26px',
               willChange: 'transform, opacity, filter'
             }}
           >
@@ -3993,7 +4269,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               <label htmlFor="avisosSonoros" className="text-white text-sm cursor-pointer">Ativar avisos sonoros</label>
             </div>
             <div className="flex items-center space-x-3">
+              <input type="checkbox" id="espanhol" checked={espanholEnabled} onChange={(e) => setEspanholEnabled(e.target.checked)} className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2" />
+              <label htmlFor="espanhol" className="text-white text-sm cursor-pointer">Espanhol</label>
             </div>
+
           </div>
           <div className="flex justify-end p-6 border-t border-gray-600">
             <button onClick={() => setShowConfigModal(false)} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded transition-colors">Salvar</button>

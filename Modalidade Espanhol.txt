@@ -1,0 +1,68 @@
+
+Quero MUITA ATENÇÃO para fazer essa implementação, pois o sistema
+está bem funcional e existem várias pessoas usando, não quero nenhuma
+atualização ou deploy quando acabar, preciso validar para atualizarmos.
+
+ATENÇÃO !!!
+
+Quero no modal de Configurações um checkbox com o titulo "Espanhol"
+
+quero que apareça um container nas mesmas dimensões e localização do 
+container "?? Padrão Detectado - Estratégia 171"
+quero que essa tela seja dividida em 3 partes.
+
+quero a tela dividida 3m 3 partes conforma abaixo, 50%,20% e 30%
+
+                  50%                     20%               30% 
+-------------------------------------------------------------------------
+            Números Chamados      |    Repetidos   | Módulo-1: x     0,00
+                                  |                |
+                                  |                | Módulo-2: x     0,00
+                                  |                |
+                                  |                | Módulo-3: x     0,00
+-------------------------------------------------------------------------
+                                  |                | Total:
+-------------------------------------------------------------------------
+- Preciso de um botão para "Limpar" os campos e valores
+- Vou precisar de um botão Fechar para desaparecer o container
+- Preciso de um Campo "Valor Inicial: " que deverá iniciar com R$ 1,00
+
+como vai funcionar:
+- Todos os numeros chamados irão entrar na lista "Numeros Chamados"
+- Quando houver a 1a repetição de algum numero, ele entra na lista de "Repetidos"
+  e é incrementado no campo x do "Módulo-1", ao lado dele teremos o "Valor Inicial" ´
+  multiplicado pelo numero x do "Módulo-1", quando o valor x do "Módulo-1" for MAIOR
+  que 24, o incremento para para o "Módulo-2", ou seja se tivermos com 3 numeros na 
+  lista de "Repetidos" o "Módulo-2" terá o numero 3, ou seja sempre o numero x é 
+  incrementado com o numero de repetidos, quando o x "Módulo-2" for maior que 32, passa
+  automáticamente para incrementar o x do "Módulo-3" que terá o limite de 64, 
+  quando esse limite chegar, quero uma mensagem aconselhando o apostador a parar.
+  
+  Importante, o valor que fica ao lado do x do "Módulo-1" deverá ser multiplicado pelo
+  (x do "Módulo-1" com o campo "Valor Inicial"), quando passar para o "Módulo-2" o valor
+  será o "Valor Inicial" multiplicado por 2, e quando for para o "Módulo-3" será o 
+  "Valor Inicial" multiplicado por 4.
+  
+  Ex: Valor Inicial: 2,00
+  -------------------------------------------------------------------------
+              Números Chamados      |    Repetidos   | Módulo-1: 1     2,00
+                                    |                |
+    10 21 32 10 12                  |        10      | Módulo-2: x     0,00
+                                    |                |
+                                    |                | Módulo-3: x     0,00
+---------------------------------------------------------------------------
+
+Se tivermos no x do Módulo-2 o numero 3, será: "Módulo-2: 3    12,00"
+Se tivermos no x do Módulo-3 o numero 4, será: "Módulo-2: 4    32,00"
+
+a aposta se encerra quando aparecer o TERCEIRO numero repetido na lista de 
+"Números Chamados" o valor déssa vitória será o numero 36 mutiplicado pelo
+campo "Valor Inicial" que poderá ser o valor normal se for no módulo 1, 
+o valor multiplicado por 2 se for no módulo 2 e o valor multiplicado por 
+4 se for no módulo 3.
+
+o container "Espanhol" deverá empurrar o container estatísticas para baixo, e
+será fechado quando o checkbox do popup de "Configurações" estiver desmarcado
+ou quando clicar no botão fechar do container Espenhol", desmarcando também o
+checkbox do popup de configurações.
+
