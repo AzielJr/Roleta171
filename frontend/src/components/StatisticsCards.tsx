@@ -1,1024 +1,140 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Statistics } from '../types/roulette';
-import { useStatistics } from '../hooks/useStatistics';
-import { soundGenerator } from '../utils/soundUtils';
-import { calculateFusionStats, FUSION_ENTRY_NUMBERS } from '../utils/fusionStats';
-
-// Sequência real da roleta (Race)
-const ROULETTE_SEQUENCE = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
-
-interface StatisticsCardsProps {
-  statistics: Statistics;
-  rowOrder?: number; // 0, 1, 2 para diferentes ordens das linhas
-  patternDetectedCount?: number;
-  winCount?: number;
-  lossCount?: number;
-  numbersWithoutPattern?: number;
-  totalNumbersWithoutPattern?: number;
-  lastNumbers?: number[]; // Adicionar para detectar colunas repetidas
-  pattern171Stats?: {
-    entradas: number;
-    wins: number;
-    losses: number;
-  };
-  pattern171ForcedStats?: {
-    wins: number;
-    losses: number;
-  };
-  // Novos props para P2 persistente
-  p2WinCount?: number;
-  p2LossCount?: number;
-  setP2WinCount?: (value: number | ((prev: number) => number)) => void;
-  setP2LossCount?: (value: number | ((prev: number) => number)) => void;
-  // Props para configurações do sistema
-  avisosSonorosAtivos?: boolean;
-  mostrarPadrao5x3Race?: boolean;
-  // Novos props para Torre
-  torreWinCount?: number;
-  torreLossCount?: number;
-  setTorreWinCount?: (value: number | ((prev: number) => number)) => void;
-  setTorreLossCount?: (value: number | ((prev: number) => number)) => void;
-  // Props para BET Terminais
-  betTerminaisStats?: {
-    wins: number;
-    losses: number;
-    winPercentage: number;
-    lossPercentage: number;
-    negativeSequenceCurrent: number;
-    negativeSequenceMax: number;
-    positiveSequenceCurrent: number;
-    positiveSequenceMax: number;
-  };
-}
-
-// Função para calcular números expostos no padrão 171 Forçado
-const calculate171ForcedExposedNumbers = (selectedNumber: number): number[] => {
-  const position = ROULETTE_SEQUENCE.indexOf(selectedNumber);
-  if (position === -1) return [];
-  
-  // Voltar 3 posições e pegar 7 números consecutivos
-  const startIndex = (position - 3 + 37) % 37;
-  const exposedNumbers: number[] = [];
-  
-  for (let i = 0; i < 7; i++) {
-    const index = (startIndex + i) % 37;
-    exposedNumbers.push(ROULETTE_SEQUENCE[index]);
-  }
-  
-  return exposedNumbers;
-};
-
-// Função para determinar WIN ou LOSS no padrão 171 Forçado
-const determine171ForcedResult = (selectedNumber: number, nextNumber: number): 'WIN' | 'LOSS' | null => {
-  const exposedNumbers = calculate171ForcedExposedNumbers(selectedNumber);
-  if (exposedNumbers.length === 0) return null;
-  
-  // Os 30 números apostados são todos os outros (não expostos)
-  const betNumbers = ROULETTE_SEQUENCE.filter(num => !exposedNumbers.includes(num));
-  
-  // Primeiro e último dos números expostos (também são WIN)
-  const firstExposed = exposedNumbers[0];
-  const lastExposed = exposedNumbers[6];
-  
-  // Os 5 números do meio dos expostos (são LOSS)
-  const middleExposed = exposedNumbers.slice(1, 6); // índices 1, 2, 3, 4, 5
-  
-  // WIN: próximo número é um dos 30 apostados OU primeiro/último exposto
-  if (betNumbers.includes(nextNumber) || nextNumber === firstExposed || nextNumber === lastExposed) {
-    return 'WIN';
-  }
-  
-  // LOSS: próximo número é um dos 5 números do meio dos expostos
-  if (middleExposed.includes(nextNumber)) {
-    return 'LOSS';
-  }
-  
-  return null;
-};
-
-// Função para calcular estatísticas do 171 Forçado baseado nos últimos números
-const calculate171ForcedStats = (lastNumbers: number[]): { wins: number; losses: number; maxPositiveSequence: number; currentPositiveSequence: number } => {
-  let wins = 0;
-  let losses = 0;
-  let maxPositiveSequence = 0;
-  let currentPositiveSequence = 0;
-  
-  // Precisa de pelo menos 2 números para fazer a análise
-  if (lastNumbers.length < 2) {
-    return { wins, losses, maxPositiveSequence, currentPositiveSequence };
-  }
-  
-  // Analisar cada par de números consecutivos
-  // lastNumbers[0] é o mais recente, lastNumbers[1] é o anterior, etc.
-  for (let i = 1; i < lastNumbers.length; i++) {
-    const currentNumber = lastNumbers[i]; // Número que foi selecionado
-    const nextNumber = lastNumbers[i - 1]; // Próximo número que saiu
-    
-    const result = determine171ForcedResult(currentNumber, nextNumber);
-    
-    if (result === 'WIN') {      wins++;      currentPositiveSequence++;      if (currentPositiveSequence > maxPositiveSequence) {        maxPositiveSequence = currentPositiveSequence;      }    } else if (result === 'LOSS') {      losses++;      currentPositiveSequence = 0;    }
-  }
-  
-  return { wins, losses, maxPositiveSequence, currentPositiveSequence };
-};
-
-// Cores reais da roleta para cada número
-const ROULETTE_COLORS: { [key: number]: 'red' | 'black' | 'green' } = {
-  0: 'green',
-  1: 'red', 2: 'black', 3: 'red', 4: 'black', 5: 'red', 6: 'black', 7: 'red', 8: 'black', 9: 'red', 10: 'black',
-  11: 'black', 12: 'red', 13: 'black', 14: 'red', 15: 'black', 16: 'red', 17: 'black', 18: 'red', 19: 'red', 20: 'black',
-  21: 'red', 22: 'black', 23: 'red', 24: 'black', 25: 'red', 26: 'black', 27: 'red', 28: 'black', 29: 'black', 30: 'red',
-  31: 'black', 32: 'red', 33: 'black', 34: 'red', 35: 'black', 36: 'red'
-};
-
-// Números de entrada para P2
-const P2_ENTRY_NUMBERS = [3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
-
-// Números de LOSS para P2 (mesmos números de entrada)
-const P2_LOSS_NUMBERS = [3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
-
-// Números de WIN para P2
-const P2_WIN_NUMBERS = [0, 1, 2, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 19, 20, 23, 24, 26, 27, 28, 30, 31, 32, 34, 35];
-
-// Números de entrada para Torre (conforme especificado pelo usuário)
-const TORRE_ENTRY_NUMBERS = [1, 2, 3, 34, 35, 36];
-
-// Números de LOSS para Torre (entrada + zero)
-const TORRE_LOSS_NUMBERS = [0, 1, 2, 3, 34, 35, 36];
-
-// Números de WIN para Torre (todos os outros números)
-const TORRE_WIN_NUMBERS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33];
-
-// Números de LOSS para Fusion (mesmos números de entrada)
-// Números de WIN para Fusion (todos os outros números)
-// Função para calcular números sugeridos do 5x3
-const calculatepadrao5x3Numbers = (lastNumber: number): { first: number; second: number; third: number } => {
-  const lastIndex = ROULETTE_SEQUENCE.indexOf(lastNumber);
-  if (lastIndex === -1) return { first: 0, second: 0, third: 0 };
-  
-  // Primeiro número: +6 índices à frente (sentido horário)
-  const firstIndex = (lastIndex + 6) % ROULETTE_SEQUENCE.length;
-  const first = ROULETTE_SEQUENCE[firstIndex];
-  
-  // Segundo número: +18 índices à frente (sentido horário)
-  const secondIndex = (lastIndex + 18) % ROULETTE_SEQUENCE.length;
-  const second = ROULETTE_SEQUENCE[secondIndex];
-  
-  // Terceiro número: +30 índices à frente (sentido horário)
-  const thirdIndex = (lastIndex + 30) % ROULETTE_SEQUENCE.length;
-  const third = ROULETTE_SEQUENCE[thirdIndex];
-  
-  return { first, second, third };
-};
-
-// Função para calcular números expostos (LOSS) do 5x3
-const calculatepadrao5x3LossNumbers = (baseNumber: number): number[] => {
-  const baseIndex = ROULETTE_SEQUENCE.indexOf(baseNumber);
-  if (baseIndex === -1) return [];
-  
-  // Os 4 números expostos são os índices: 0, 12, 24, 36
-  const exposedIndices = [0, 12, 24, 36];
-  const exposedNumbers: number[] = [];
-  
-  exposedIndices.forEach(offset => {
-    const targetIndex = (baseIndex + offset) % ROULETTE_SEQUENCE.length;
-    exposedNumbers.push(ROULETTE_SEQUENCE[targetIndex]);
-  });
-  
-  return exposedNumbers;
-};
-
-// Função para calcular estatísticas do 5x3
-const calculatepadrao5x3Stats = (lastNumbers: number[]): { 
-  entradas: number; 
-  wins: number; 
-  losses: number;
-  maxPositiveSequence: number;
-  currentPositiveSequence: number;
-  suggestedNumbers: { first: number; second: number; third: number };
-} => {
-  if (lastNumbers.length === 0) {
-    return { entradas: 0, wins: 0, losses: 0, maxPositiveSequence: 0, currentPositiveSequence: 0, suggestedNumbers: { first: 0, second: 0, third: 0 } };
-  }
-
-  let entradas = 0;
-  let wins = 0;
-  let losses = 0;
-  let maxPositiveSequence = 0;
-  let currentPositiveSequence = 0;
-  // Calcular números sugeridos baseado no último número
-  const lastNumber = lastNumbers[lastNumbers.length - 1];
-  const suggestedNumbers = calculatepadrao5x3Numbers(lastNumber);
-
-  // Analisar todos os números para calcular estatísticas
-  // Cada número é uma 'entrada' no 5x3
-  for (let i = 0; i < lastNumbers.length - 1; i++) {
-    const currentNumber = lastNumbers[i];
-    const nextNumber = lastNumbers[i + 1];
-    
-    entradas++;
-    
-    // Calcular números de LOSS para o número atual
-    const lossNumbers = calculatepadrao5x3LossNumbers(currentNumber);
-    
-    // Verificar se o próximo número é LOSS ou WIN
-    if (lossNumbers.includes(nextNumber)) {
-      losses++;
-      // LOSS: resetar sequência positiva atual
-      currentPositiveSequence = 0;
-    } else {
-      wins++;
-      // WIN: incrementar sequência positiva atual
-      currentPositiveSequence++;
-      // Atualizar maior sequência se necessário
-      if (currentPositiveSequence > maxPositiveSequence) {
-        maxPositiveSequence = currentPositiveSequence;
-      }
-    }
-  }
-  // Se há pelo menos um número, contar como entrada (para o último número)
-  if (lastNumbers.length > 0) {
-    entradas++;
-  }
-
-  // Manter sequência atual se terminou com WIN
-
-  if (lastNumbers.length > 1) {
-
-    const lastNumber = lastNumbers[lastNumbers.length - 2];
-
-    const nextNumber = lastNumbers[lastNumbers.length - 1];
-
-    const lossNumbers = calculatepadrao5x3LossNumbers(lastNumber);
-
-    if (!lossNumbers.includes(nextNumber)) {
-
-      // Último foi WIN, manter currentPositiveSequence
-
-    } else {
-
-      // Último foi LOSS, resetar
-
-      currentPositiveSequence = 0;
-
-    }
-
-  }
-
-  
-
-
-  // Calcular números sugeridos baseado no último número
-
-  return { entradas, wins, losses, maxPositiveSequence, currentPositiveSequence, suggestedNumbers };
-};
-
-// Função para calcular estatísticas do Torre
-const calculateTorreStats = (lastNumbers: number[]): { 
-  entradas: number; 
-  wins: number; 
-  losses: number; 
-  maxNegativeSequence: number;
-  currentNegativeSequence: number;
-  hasRecentEntry: boolean;
-  hasConsecutiveEntries: boolean;
-} => {
-  console.log('🔍 TORRE CALC - Input:', lastNumbers.slice(-10)); // Mostrar apenas os últimos 10
-  
-  if (lastNumbers.length === 0) {
-    return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, currentNegativeSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false };
-  }
-
-  let entradas = 0;
-  let wins = 0;
-  let losses = 0;
-  let maxNegativeSequence = 0;
-  let currentNegativeSequence = 0;
-  let hasRecentEntry = false;
-  let hasConsecutiveEntries = false;
-
-  // Verificar se o número mais recente é uma entrada (último do array)
-  if (lastNumbers.length > 0 && TORRE_ENTRY_NUMBERS.includes(lastNumbers[lastNumbers.length - 1])) {
-    hasRecentEntry = true;
-  }
-
-  // Verificar entradas consecutivas (2 ou mais) - começar do final do array
-  let consecutiveEntries = 0;
-  for (let i = lastNumbers.length - 1; i >= 0 && consecutiveEntries < 10; i--) {
-    if (TORRE_ENTRY_NUMBERS.includes(lastNumbers[i])) {
-      consecutiveEntries++;
-    } else {
-      break;
-    }
-  }
-  hasConsecutiveEntries = consecutiveEntries >= 2;
-
-  // Calcular estatísticas baseadas nos números
-  // WIN/LOSS só é computado APÓS cada ENTRADA específica (padrão Torre)
-  // lastNumbers[length-1] é o mais recente, percorrer do mais antigo para o mais recente
-  
-  for (let i = 0; i < lastNumbers.length; i++) { // Percorrer do mais antigo para o mais recente
-    const number = lastNumbers[i];
-    
-    // Se encontrou uma entrada Torre, incrementa entradas e verifica o próximo número
-    if (TORRE_ENTRY_NUMBERS.includes(number)) {
-      entradas++;
-      
-      // Verificar se há um próximo número (mais recente) para determinar WIN/LOSS
-      if (i < lastNumbers.length - 1) { // Se não é o número mais recente
-        const nextNumber = lastNumbers[i + 1]; // Próximo número (mais recente)
-        
-        if (TORRE_LOSS_NUMBERS.includes(nextNumber)) {
-          // LOSS: Se o próximo número após entrada Torre for um dos números de LOSS (01,02,03,34,35,36,0)
-          losses++;
-          // Incrementa sequência NEGATIVA ao ocorrer um LOSS após uma entrada Torre
-          currentNegativeSequence++;
-          maxNegativeSequence = Math.max(maxNegativeSequence, currentNegativeSequence);
-        } else if (TORRE_WIN_NUMBERS.includes(nextNumber)) {
-          // WIN: Se o próximo número após entrada Torre for qualquer outro número
-          wins++;
-          // Zera sequência NEGATIVA ao ocorrer um WIN após uma entrada Torre
-          currentNegativeSequence = 0;
-        }
-      }
-    } else {
-      // Não é um número de entrada Torre; sequência negativa depende apenas do resultado após entradas.
-    }
-  }
-
-  const result = { entradas, wins, losses, maxNegativeSequence, currentNegativeSequence, hasRecentEntry, hasConsecutiveEntries };
-  console.log('📊 TORRE RESULT:', result);
-  return result;
-};
-
-// Função para calcular estatísticas do P2 (modo 1 - original)
-const calculateP2Stats = (lastNumbers: number[]): { 
-  entradas: number; 
-  wins: number; 
-  losses: number; 
-  maxNegativeSequence: number;
-  hasRecentEntry: boolean;
-  hasConsecutiveEntries: boolean;
-} => {
-  console.log('🔍 P2 MODE 1 CALC - Input:', lastNumbers.slice(-10)); // Mostrar apenas os últimos 10
-  
-  if (lastNumbers.length === 0) {
-    return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false };
-  }
-
-  let entradas = 0;
-  let wins = 0;
-  let losses = 0;
-  let maxPositiveSequence = 0;
-  let currentPositiveSequence = 0;
-  let maxNegativeSequence = 0;
-  let currentNegativeSequence = 0;
-  let hasRecentEntry = false;
-  let hasConsecutiveEntries = false;
-
-  // Verificar se o número mais recente é uma entrada (CORREÇÃO: último do array)
-  if (lastNumbers.length > 0 && P2_ENTRY_NUMBERS.includes(lastNumbers[lastNumbers.length - 1])) {
-    hasRecentEntry = true;
-  }
-
-  // Verificar entradas consecutivas (2 ou mais) - CORREÇÃO: começar do final do array
-  let consecutiveEntries = 0;
-  for (let i = lastNumbers.length - 1; i >= 0 && consecutiveEntries < 10; i--) {
-    if (P2_ENTRY_NUMBERS.includes(lastNumbers[i])) {
-      consecutiveEntries++;
-    } else {
-      break;
-    }
-  }
-  hasConsecutiveEntries = consecutiveEntries >= 2;
-
-  // Calcular estatísticas baseadas nos números
-  // WIN/LOSS só é computado APÓS cada ENTRADA específica (padrão P2)
-  // lastNumbers[length-1] é o mais recente, percorrer do mais antigo para o mais recente
-  
-  for (let i = 0; i < lastNumbers.length; i++) { // Percorrer do mais antigo para o mais recente
-    const number = lastNumbers[i];
-    
-    // Se encontrou uma entrada P2, incrementa entradas e verifica o próximo número
-    if (P2_ENTRY_NUMBERS.includes(number)) {
-      entradas++;
-      
-      // Verificar se há um próximo número (mais recente) para determinar WIN/LOSS
-      if (i < lastNumbers.length - 1) { // Se não é o número mais recente
-        const nextNumber = lastNumbers[i + 1]; // Próximo número (mais recente)
-        
-        if (P2_ENTRY_NUMBERS.includes(nextNumber)) {
-          // LOSS: Se o próximo número após entrada P2 for outro número P2 (consecutivo)
-          losses++;
-          currentNegativeSequence++;
-          maxNegativeSequence = Math.max(maxNegativeSequence, currentNegativeSequence);
-        } else {
-          // WIN: Se o próximo número após entrada P2 NÃO for um número P2
-          wins++;
-          currentNegativeSequence = 0; // Reset sequência negativa
-        }
-      }
-    }
-  }
-
-  const result = { entradas, wins, losses, maxNegativeSequence, hasRecentEntry, hasConsecutiveEntries };
-  console.log('📊 P2 MODE 1 RESULT:', result);
-  return result;
-};
-
-// Função para calcular estatísticas P2 no modo 2 (entradas consecutivas)
-const calculateP2StatsMode2 = (lastNumbers: number[]): { 
-  entradas: number; 
-  wins: number; 
-  losses: number; 
-  maxNegativeSequence: number;
-  hasRecentEntry: boolean;
-  hasConsecutiveEntries: boolean;
-} => {
-  console.log('🔍 P2 MODE 2 CALC - Input:', lastNumbers.slice(-10)); // Mostrar apenas os últimos 10
-  
-  if (lastNumbers.length === 0) {
-    return { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, hasRecentEntry: false, hasConsecutiveEntries: false };
-  }
-
-  let entradas = 0;
-  let wins = 0;
-  let losses = 0;
-  let maxPositiveSequence = 0;
-  let currentPositiveSequence = 0;
-  let maxNegativeSequence = 0;
-  let currentNegativeSequence = 0;
-  let hasRecentEntry = false;
-  let hasConsecutiveEntries = false;
-
-  // Verificar se há entrada recente (último número é P2) - CORREÇÃO: último do array
-  if (lastNumbers.length > 0 && P2_ENTRY_NUMBERS.includes(lastNumbers[lastNumbers.length - 1])) {
-    hasRecentEntry = true;
-  }
-
-  // Verificar se há entradas consecutivas (2 ou mais P2 consecutivos do final)
-  let consecutiveEntries = 0;
-  for (let i = lastNumbers.length - 1; i >= 0 && consecutiveEntries < 10; i--) {
-    if (P2_ENTRY_NUMBERS.includes(lastNumbers[i])) {
-      consecutiveEntries++;
-    } else {
-      break;
-    }
-  }
-  hasConsecutiveEntries = consecutiveEntries >= 2;
-
-  // LÓGICA MODO 2: Só incrementa ENTRADAS a partir do 2º número consecutivo P2
-  // Percorrer do mais antigo para o mais recente
-  for (let i = 0; i < lastNumbers.length; i++) {
-    const number = lastNumbers[i];
-    
-    // Se encontrou uma entrada P2
-    if (P2_ENTRY_NUMBERS.includes(number)) {
-      
-      // DIFERENÇA DO MODO 2: Só incrementa ENTRADAS se o número ANTERIOR também for P2
-      // (ou seja, a partir do 2º número de uma sequência consecutiva)
-      let isValidEntry = (i > 0 && P2_ENTRY_NUMBERS.includes(lastNumbers[i - 1]));
-      
-      if (isValidEntry) {
-        entradas++;
-        
-        // WIN/LOSS só é computado para entradas válidas no modo 2
-        if (i < lastNumbers.length - 1) {
-          const nextNumber = lastNumbers[i + 1];
-          
-          if (P2_ENTRY_NUMBERS.includes(nextNumber)) {
-            // LOSS: Se o próximo número após entrada P2 for outro número P2 (consecutivo)
-            losses++;
-            currentNegativeSequence++;
-            maxNegativeSequence = Math.max(maxNegativeSequence, currentNegativeSequence);
-          } else {
-            // WIN: Se o próximo número após entrada P2 NÃO for um número P2
-            wins++;
-            currentNegativeSequence = 0;
-          }
-        }
-      }
-    }
-  }
-
-  const result = { 
-    entradas, 
-    wins, 
-    losses, 
-    maxNegativeSequence, 
-    hasRecentEntry, 
-    hasConsecutiveEntries 
-  };
-  console.log('📊 P2 MODE 2 RESULT:', result);
-  return result;
-};
-
-// Função para obter a cor de fundo baseada na cor da roleta
-const getRouletteColor = (number: number): string => {
-  const color = ROULETTE_COLORS[number];
-  switch (color) {
-    case 'red':
-      return 'bg-red-600';
-    case 'black':
-      return 'bg-gray-900';
-    case 'green':
-      return 'bg-green-600';
-    default:
-      return 'bg-gray-600';
-  }
-};
-
-// Componente para renderizar uma bola de número da roleta
-const RouletteBall = ({ number }: { number: number }) => (
-  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-gray-300 ${getRouletteColor(number)}`}>
-    {number.toString().padStart(2, '0')}
-  </div>
-);
-
-// Helper: obter coluna do número (1, 2, 3) ou null para 0
-const getNumberColumn = (num: number): 1 | 2 | 3 | null => {
-  if (num === 0) return null;
-  const firstColumn = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34];
-  const secondColumn = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35];
-  const thirdColumn = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36];
-  if (firstColumn.includes(num)) return 1;
-  if (secondColumn.includes(num)) return 2;
-  if (thirdColumn.includes(num)) return 3;
-  return null;
-};
-
-export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount = 0, winCount = 0, lossCount = 0, numbersWithoutPattern = 0, totalNumbersWithoutPattern = 0, lastNumbers = [], pattern171Stats = { entradas: 0, wins: 0, losses: 0 }, pattern171ForcedStats = { wins: 11, losses: 0 }, p2WinCount = 0, p2LossCount = 0, setP2WinCount, setP2LossCount, avisosSonorosAtivos = true, mostrarPadrao5x3Race = false, torreWinCount = 0, torreLossCount = 0, setTorreWinCount, setTorreLossCount, betTerminaisStats = { wins: 52, losses: 7, winPercentage: 88, lossPercentage: 12, negativeSequenceCurrent: 6, negativeSequenceMax: 16, positiveSequenceCurrent: 0, positiveSequenceMax: 0 } }: StatisticsCardsProps) {
-  const [showP2Modal, setShowP2Modal] = useState(false);
-  const [showTorreModal, setShowTorreModal] = useState(false);
-  const [showFusionModal, setShowFusionModal] = useState(false);
-  const [showRaceTrackModal, setShowRaceTrackModal] = useState(false);
-  const [showTriangulacaoModal, setShowTriangulacaoModal] = useState(false);
-  const [p2Mode, setP2Mode] = useState<1 | 2>(1); // Estado para controlar o modo do toggle P2
-  const lastP2ConsecutiveState = useRef(false);
-
-  // Calcular estatísticas do P2 baseado nos últimos números
-  const calculatedP2Stats = React.useMemo(() => {
-    return p2Mode === 1 ? calculateP2Stats(lastNumbers) : calculateP2StatsMode2(lastNumbers);
-  }, [lastNumbers, p2Mode]);
-
-  // Calcular estatísticas do 5x3
-  const calculatedFusionStats = React.useMemo(() => {
-    return calculateFusionStats(lastNumbers);
-  }, [lastNumbers]);
-
-  // Calcular estatísticas do Torre baseado nos últimos números
-  const calculatedTorreStats = React.useMemo(() => {
-    return calculateTorreStats(lastNumbers);
-  }, [lastNumbers]);
-
-  const {
-    totalNumbers,
-    colorPercentages,
-    evenOddPercentages,
-    highLowPercentages,
-    dozensPercentages,
-    columnsPercentages
-  } = useStatistics(statistics);
-
-  // Calcular estatísticas do 171 Forçado baseado nos últimos números
-  const calculated171ForcedStats = React.useMemo(() => {
-    return calculate171ForcedStats(lastNumbers);
-  }, [lastNumbers]);
-
-  // Janela selecionada para os cards 32P1 e Castelo (0 = Todos)
-  const [window32P1, setWindow32P1] = useState<number>(50);
-  const [windowCastelo, setWindowCastelo] = useState<number>(0);
-
-  // Calcular estatísticas dos cards 32P1 e Castelo conforme regras fornecidas
-  const calculated32P1Stats = React.useMemo(() => {
-    const slice = window32P1 && window32P1 > 0 ? lastNumbers.slice(-window32P1) : lastNumbers;
-    let winTotal = 0;
-    let wins = 0;
-    let losses = 0;
-    const winTotalSet = new Set([6, 15, 24, 33]);
-    for (const num of slice) {
-      const color = ROULETTE_COLORS[num];
-      const col = getNumberColumn(num);
-      if (winTotalSet.has(num)) winTotal++;
-      if (color === 'black' || (color === 'red' && col === 3)) {
-        wins++;
-      }
-      if (num === 0 || (color === 'red' && (col === 1 || col === 2))) {
-        losses++;
-      }
-    }
-    return { winTotal, wins, losses, total: slice.length };
-  }, [lastNumbers, window32P1]);
-
-  const calculatedCasteloStats = React.useMemo(() => {
-    const slice = windowCastelo && windowCastelo > 0 ? lastNumbers.slice(-windowCastelo) : lastNumbers;
-    let wins = 0;
-    let losses = 0;
-    let positiveSequenceCurrent = 0;
-    let positiveSequenceMax = 0;
-    let negativeSequenceCurrent = 0;
-    let negativeSequenceMax = 0;
-
-    for (const num of slice) {
-      const isLoss = (num === 0 || num === 15 || num === 24);
-      if (isLoss) {
-        losses++;
-        negativeSequenceCurrent += 1;
-        if (negativeSequenceCurrent > negativeSequenceMax) negativeSequenceMax = negativeSequenceCurrent;
-        // resetar positiva
-        positiveSequenceCurrent = 0;
-      } else {
-        wins++;
-        positiveSequenceCurrent += 1;
-        if (positiveSequenceCurrent > positiveSequenceMax) positiveSequenceMax = positiveSequenceCurrent;
-        // resetar negativa
-        negativeSequenceCurrent = 0;
-      }
-    }
-
-    return {
-      wins,
-      losses,
-      total: slice.length,
-      positiveSequenceCurrent,
-      positiveSequenceMax,
-      negativeSequenceCurrent,
-      negativeSequenceMax
+import React from 'react';
+
+
+const StatisticsCards = ({
+  lastNumbers = [],
+  totalNumbers,
+  numbersWithoutPattern = 0,
+  totalNumbersWithoutPattern = 0,
+  window32P1,
+  windowCastelo,
+  pattern171Stats = { entradas: 0, wins: 0, losses: 0 },
+  calculatedTorreStats = { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, currentNegativeSequence: 0 },
+  calculatedP2Stats = { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0 },
+  calculatedFusionStats,
+  betTerminaisStats,
+  calculated171ForcedStats = { wins: 0, losses: 0, currentPositiveSequence: 0, maxPositiveSequence: 0 },
+  calculated32P1Stats = { winTotal: 0, wins: 0, losses: 0, total: 0 },
+  calculatedCasteloStats = { wins: 0, losses: 0, total: 0, positiveSequenceCurrent: 0, positiveSequenceMax: 0 },
+  calculatedTriangulacaoStats = { wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, positiveSequenceCurrent: 0, positiveSequenceMax: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0 },
+  showP2Modal,
+  showTorreModal,
+  showFusionModal,
+  showRaceTrackModal,
+  showTriangulacaoModal,
+  setShowP2Modal,
+  setShowTorreModal,
+  setShowFusionModal,
+  setShowRaceTrackModal,
+  setShowTriangulacaoModal,
+  triangulacaoTriadDisplay = [],
+  triangulacaoSections = [],
+  triangulacaoCoveredNumbers = [],
+  triangulacaoExposedNumbers = [],
+  animatingTorre,
+  animatingFusion,
+  animatingP2,
+  animatingDozens = new Set<number>(),
+  getNumberColumn,
+  getNumberDozen,
+  statistics = { columns: { first: 0, second: 0, third: 0 }, dozens: { first: 0, second: 0, third: 0 }, colors: { red: 0, black: 0, green: 0 }, highLow: { high: 0, low: 0 }, evenOdd: { even: 0, odd: 0 } },
+  columnsPercentages = { first: 0, second: 0, third: 0 },
+  dozensPercentages = { first: 0, second: 0, third: 0 },
+  colorPercentages = { red: 0, black: 0, green: 0 },
+  highLowPercentages = { high: 0, low: 0, zero: 0 },
+  evenOddPercentages = { even: 0, odd: 0, zero: 0 },
+  p2Mode,
+  rowOrder = 0,
+  ROULETTE_SEQUENCE = []
+}) => {
+  const getRouletteColorLocal = (n: number) => {
+     if (n === 0) return 'bg-green-600';
+     const reds = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+     return reds.has(n) ? 'bg-red-600' : 'bg-black';
+   };
+   const fusionSafe = calculatedFusionStats ?? { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, currentNegativeSequence: 0 };
+    const p2Safe = calculatedP2Stats ?? { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0 };
+    const getNumberColumnSafe = (num: number) => {
+      if (getNumberColumn) return getNumberColumn(num);
+      if (num === 0) return null;
+      return ((num - 1) % 3) + 1;
     };
-  }, [lastNumbers, windowCastelo]);
-
-  // Estados para animações dos cards
-  const [animatingColumns, setAnimatingColumns] = useState<Set<number>>(new Set());
-  const [animatingDozens, setAnimatingDozens] = useState<Set<number>>(new Set());
-  const [animatingHighLow, setAnimatingHighLow] = useState<Set<string>>(new Set());
-  const [animatingEvenOdd, setAnimatingEvenOdd] = useState<Set<string>>(new Set());
-  const [animatingColors, setAnimatingColors] = useState<Set<string>>(new Set());
-  const [animatingP2, setAnimatingP2] = useState<'none' | 'green' | 'yellow'>('none');
-  const [animatingTorre, setAnimatingTorre] = useState<'none' | 'green' | 'yellow'>('none');
-  const lastTorreConsecutiveState = useRef(false);
-  const [animatingFusion, setAnimatingFusion] = useState<'none' | 'green' | 'yellow'>('none');
-  const lastFusionConsecutiveState = useRef(false);
-  // Remover animações do Padrão 72 (não há alertas sonoros no 7x7)
-
-  // Função para detectar 3 ou mais números consecutivos da mesma categoria
-  const detectRepeatedCategories = () => {
-    if (lastNumbers.length < 3) {
-      return {
-        columns: new Set<number>(),
-        dozens: new Set<number>(),
-        highLow: new Set<number>(),
-        evenOdd: new Set<number>(),
-        colors: new Set<string>()
-      };
-    }
-
-    // Inicializar com sets vazios (estado padrão = sem alertas)
-    const repeatedColumns = new Set<number>();
-    const repeatedDozens = new Set<number>();
-    const repeatedHighLow = new Set<string>();
-    const repeatedEvenOdd = new Set<string>();
-    const repeatedColors = new Set<string>();
-
-    // Verificar se há padrão contínuo a partir dos números mais recentes
-    // Começar com os 3 primeiros números (mais recentes) e expandir se necessário
-    let maxSequenceLength = 3;
-    
-    // Encontrar a maior sequência contínua possível
-    for (let len = 3; len <= lastNumbers.length; len++) {
-      const sequenceNumbers = lastNumbers.slice(-len);
-      
-      // Verificar se todos os números da sequência são da mesma categoria
-      const firstNum = sequenceNumbers[0];
-      
-      // COLUNAS
-      const firstColumn = firstNum === 0 ? 0 : ((firstNum - 1) % 3) + 1;
-      if (firstColumn !== 0) {
-        const allSameColumn = sequenceNumbers.every(num => {
-          const col = num === 0 ? 0 : ((num - 1) % 3) + 1;
-          return col === firstColumn;
-        });
-        if (allSameColumn) {
-          repeatedColumns.add(firstColumn);
-          maxSequenceLength = Math.max(maxSequenceLength, len);
-        }
-      }
-      
-      // DÚZIAS
-      const firstDozen = firstNum === 0 ? 0 : Math.ceil(firstNum / 12);
-      if (firstDozen !== 0) {
-        const allSameDozen = sequenceNumbers.every(num => {
-          const dozen = num === 0 ? 0 : Math.ceil(num / 12);
-          return dozen === firstDozen;
-        });
-        if (allSameDozen) {
-          repeatedDozens.add(firstDozen);
-          maxSequenceLength = Math.max(maxSequenceLength, len);
-        }
-      }
-      
-      // ALTO/BAIXO
-      const firstHighLow = firstNum === 0 ? 'green' : (firstNum >= 1 && firstNum <= 18 ? 'low' : 'high');
-      if (firstHighLow !== 'green') {
-        const allSameHighLow = sequenceNumbers.every(num => {
-          const highLow = num === 0 ? 'green' : (num >= 1 && num <= 18 ? 'low' : 'high');
-          return highLow === firstHighLow;
-        });
-        if (allSameHighLow) {
-          repeatedHighLow.add(firstHighLow);
-          maxSequenceLength = Math.max(maxSequenceLength, len);
-        }
-      }
-      
-      // PAR/ÍMPAR
-      const firstEvenOdd = firstNum === 0 ? 'green' : (firstNum % 2 === 0 ? 'even' : 'odd');
-      if (firstEvenOdd !== 'green') {
-        const allSameEvenOdd = sequenceNumbers.every(num => {
-          const evenOdd = num === 0 ? 'green' : (num % 2 === 0 ? 'even' : 'odd');
-          return evenOdd === firstEvenOdd;
-        });
-        if (allSameEvenOdd) {
-          repeatedEvenOdd.add(firstEvenOdd);
-          maxSequenceLength = Math.max(maxSequenceLength, len);
-        }
-      }
-      
-      // CORES
-      const firstColor = firstNum === 0 ? 'green' : ([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(firstNum) ? 'red' : 'black');
-      if (firstColor !== 'green') {
-        const allSameColor = sequenceNumbers.every(num => {
-          const color = num === 0 ? 'green' : ([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(num) ? 'red' : 'black');
-          return color === firstColor;
-        });
-        if (allSameColor) {
-          repeatedColors.add(firstColor);
-          maxSequenceLength = Math.max(maxSequenceLength, len);
-        }
-      }
-    }
-    
-    return {
-      columns: repeatedColumns,
-      dozens: repeatedDozens,
-      highLow: repeatedHighLow,
-      evenOdd: repeatedEvenOdd,
-      colors: repeatedColors
+    const getNumberDozenSafe = (num: number) => {
+      if (getNumberDozen) return getNumberDozen(num);
+      if (num === 0) return null;
+      return Math.ceil(num / 12);
     };
-  };
-
-  // Efeito para detectar e animar todas as categorias repetidas
-  useEffect(() => {
-    if (lastNumbers.length >= 3) {
-      const repeated = detectRepeatedCategories();
-      
-      // Manter alertas ativos apenas se há padrões contínuos de 3 ou mais
-      setAnimatingColumns(repeated.columns.size > 0 ? repeated.columns : new Set());
-      setAnimatingDozens(repeated.dozens.size > 0 ? repeated.dozens : new Set());
-      setAnimatingHighLow(repeated.highLow.size > 0 ? repeated.highLow as Set<string> : new Set<string>());
-      setAnimatingEvenOdd(repeated.evenOdd.size > 0 ? repeated.evenOdd as Set<string> : new Set<string>());
-      setAnimatingColors(repeated.colors.size > 0 ? repeated.colors : new Set());
-    } else {
-      // Limpar todos os alertas se não há números suficientes
-      setAnimatingColumns(new Set<number>());
-      setAnimatingDozens(new Set<number>());
-      setAnimatingHighLow(new Set<string>());
-      setAnimatingEvenOdd(new Set<string>());
-      setAnimatingColors(new Set<string>());
-    }
-  }, [lastNumbers.join(',')]); // Monitorar todos os números, não apenas os últimos 3
-
-  // CORREÇÃO: Usar diretamente os valores calculados ao invés de contadores persistentes
-  // Os contadores persistentes estavam causando acumulação incorreta
-  
-  // Efeito para controlar animações do P2 e tocar som
-  useEffect(() => {
-    if (calculatedP2Stats.hasConsecutiveEntries) {
-      setAnimatingP2('yellow'); // Borda laranja para P2 consecutivos (LOSS)
-      
-      // Tocar som APENAS quando P2 muda para consecutivo (borda laranja) E avisos sonoros estão ativos
-      if (!lastP2ConsecutiveState.current && avisosSonorosAtivos) {
-        soundGenerator.playBellSound();
-        lastP2ConsecutiveState.current = true;
-      }
-    } else if (calculatedP2Stats.hasRecentEntry) {
-      setAnimatingP2('green'); // Borda verde para primeira entrada P2 (SEM SOM)
-      lastP2ConsecutiveState.current = false; // Reset quando não é mais consecutivo
-    } else {
-      setAnimatingP2('none');
-      lastP2ConsecutiveState.current = false;
-    }
-  }, [calculatedP2Stats.hasConsecutiveEntries, calculatedP2Stats.hasRecentEntry]);
-
-  // 5x3 não tem alertas sonoros ou animações
-
-  // Efeito para controlar animações do Torre e tocar som
-  useEffect(() => {
-    if (calculatedTorreStats.hasConsecutiveEntries) {
-      setAnimatingTorre('yellow'); // Borda laranja para Torre consecutivos (LOSS)
-      
-      // Tocar som APENAS quando Torre muda para consecutivo (borda laranja) E avisos sonoros estão ativos
-      if (!lastTorreConsecutiveState.current && avisosSonorosAtivos) {
-        soundGenerator.playBellSound();
-        lastTorreConsecutiveState.current = true;
-      }
-    } else if (calculatedTorreStats.hasRecentEntry) {
-      setAnimatingTorre('green'); // Borda verde para primeira entrada Torre (SEM SOM)
-      lastTorreConsecutiveState.current = false; // Reset quando não é mais consecutivo
-    } else {
-      setAnimatingTorre('none');
-      lastTorreConsecutiveState.current = false;
-    }
-  }, [calculatedTorreStats.hasConsecutiveEntries, calculatedTorreStats.hasRecentEntry]);
-
-  // Efeito para controlar animações do Fusion e tocar som
-  useEffect(() => {
-    if (calculatedFusionStats.hasConsecutiveEntries) {
-      setAnimatingFusion('yellow'); // Borda laranja para Fusion consecutivos (LOSS)
-      
-      // Tocar som APENAS quando Fusion muda para consecutivo (borda laranja) E avisos sonoros estão ativos
-      if (!lastFusionConsecutiveState.current && avisosSonorosAtivos) {
-        soundGenerator.playBellSound();
-        lastFusionConsecutiveState.current = true;
-      }
-    } else if (calculatedFusionStats.hasRecentEntry) {
-      setAnimatingFusion('green'); // Borda verde para primeira entrada Fusion (SEM SOM)
-      lastFusionConsecutiveState.current = false; // Reset quando não é mais consecutivo
-    } else {
-      setAnimatingFusion('none');
-      lastFusionConsecutiveState.current = false;
-    }
-  }, [calculatedFusionStats.hasConsecutiveEntries, calculatedFusionStats.hasRecentEntry]);
-
-  const StatCard = ({ title, data, colors, cardType = 'default', containerClassName = '' }: {
-    title: string | React.ReactNode;
-    data: Array<{ label: string; value: number; percentage: number; hidePercentage?: boolean; customValue?: string }>;
-    colors: string[];
-    cardType?: 'columns' | 'dozens' | 'highLow' | 'evenOdd' | 'colors' | 'default';
+   const StatCard = ({
+    title,
+    data,
+    colors = [],
+    cardType,
+    containerClassName = 'min-h-[111px]'
+  }: {
+    title: React.ReactNode | string;
+    data: Array<{ label: string; value: number; percentage?: number; hidePercentage?: boolean; customValue?: string }>;
+    colors?: string[];
+    cardType?: 'colors' | 'highLow' | 'evenOdd' | string;
     containerClassName?: string;
-  }) => (
-    <div className={`bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24 ${containerClassName}`}>
-      <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">{title}</h3>
-      <div className="space-y-0.5 lg:space-y-1">
-        {data.map((item, index) => {
-          // Verificar se o item está repetido baseado no tipo de card
-          let isRepeated = false;
-          
-          switch (cardType) {
-            case 'columns':
-              isRepeated = animatingColumns.has(index === 0 ? 3 : index === 1 ? 2 : 1);
-              break;
-            case 'dozens':
-              isRepeated = animatingDozens.has(index + 1);
-              break;
-            case 'highLow':
-              const highLowKey = index === 0 ? 'high' : index === 1 ? 'low' : 'green';
-              isRepeated = animatingHighLow.has(highLowKey);
-              break;
-            case 'evenOdd':
-              const evenOddKey = index === 0 ? 'even' : index === 1 ? 'odd' : 'green';
-              isRepeated = animatingEvenOdd.has(evenOddKey);
-              break;
-            case 'colors':
-              const colorKey = index === 0 ? 'red' : index === 1 ? 'black' : 'green';
-              isRepeated = animatingColors.has(colorKey);
-              break;
-            default:
-              isRepeated = false;
-          }
-          
-          return (
-            <div key={item.label} className="flex items-center justify-between">
+  }) => {
+    return (
+      <div className={`bg-white rounded-lg shadow-md p-2 lg:p-3 h-full ${containerClassName}`}>
+        <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">
+          {title}
+        </h3>
+        <div className="space-y-0.5 lg:space-y-1">
+          {data.map((item, idx) => (
+            <div key={`${typeof title === 'string' ? title : 'stat'}-${item.label}-${idx}`} className="flex items-center justify-between">
               <div className="flex items-center gap-0.5 lg:gap-1">
-                <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${colors[index]}`}></div>
+                {colors[idx] ? <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${colors[idx]}`}></div> : null}
                 <span className="text-xs lg:text-xs text-gray-600 truncate">{item.label}</span>
               </div>
               <div className="text-right">
-                <div className={`font-bold text-gray-800 text-xs lg:text-sm ${
-                  isRepeated 
-                    ? 'animate-pulse-color-size' 
-                    : ''
-                }`}>
-                  {item.customValue !== undefined ? item.customValue : item.value}
-                </div>
-                {!item.hidePercentage && (
+                <div className="font-bold text-gray-800 text-xs lg:text-sm">{item.customValue ?? item.value}</div>
+                {!item.hidePercentage && item.percentage !== undefined ? (
                   <div className="text-xs lg:text-xs text-gray-500">{item.percentage}%</div>
-                )}
+                ) : null}
               </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+  const getRouletteColor = (num: number): string => {
+    if (num === 0) return 'bg-green-600';
+    const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+    return redNumbers.includes(num) ? 'bg-red-700' : 'bg-gray-800';
+  };
 
-  // Função para calcular estatísticas dos terminais
   const calculateTerminaisStats = React.useMemo(() => {
-    const terminaisCount: { [key: number]: number } = {};
-    
-    // Inicializar contadores para terminais 0-9
-    for (let i = 0; i <= 9; i++) {
-      terminaisCount[i] = 0;
-    }
-    
-    // Contar ocorrências dos últimos 50 números
-    const last50Numbers = lastNumbers.slice(-50);
-    last50Numbers.forEach(num => {
-      const terminal = num % 10;
-      terminaisCount[terminal]++;
-    });
-    
-    // Converter para array com percentuais
-    const terminaisData = [];
-    for (let i = 0; i <= 9; i++) {
-      const count = terminaisCount[i];
-      const percentage = last50Numbers.length > 0 ? Math.round((count / last50Numbers.length) * 100) : 0;
-      
-      // Determinar quais números pertencem a este terminal
-      const numbersInTerminal = [];
-      for (let num = i; num <= 36; num += 10) {
-        if (num <= 36) {
-          numbersInTerminal.push(num);
-        }
-      }
-      
-      terminaisData.push({
-        terminal: i,
-        count,
-        percentage,
-        numbers: numbersInTerminal
-      });
-    }
-    
-    return terminaisData.sort((a, b) => b.count - a.count);
-  }, [lastNumbers]);
-
-  // Função para calcular colunas combinadas (1&2, 1&3, 2&3)
-  const calculateCombinedColumnsStats = React.useMemo(() => {
-    const nums = lastNumbers;
-    let c12 = 0, c13 = 0, c23 = 0;
-    let base = 0;
-    nums.forEach(num => {
-      const col = getNumberColumn(num);
-      if (col === null) return; // Ignora o zero
-      base++;
-      if (col === 1) { c12++; c13++; }
-      else if (col === 2) { c12++; c23++; }
-      else if (col === 3) { c13++; c23++; }
-    });
-    const pct = (count: number) => base > 0 ? Math.round((count / base) * 100) : 0;
-    return { c12, p12: pct(c12), c13, p13: pct(c13), c23, p23: pct(c23), base };
-  }, [lastNumbers]);
-
-  // Triangulação: tríade com base no último número e seus vizinhos
-  const triangulacaoTriadDisplay = React.useMemo(() => {
-    const len = ROULETTE_SEQUENCE.length;
-    const last = lastNumbers[lastNumbers.length - 1];
-    let baseIndex = ROULETTE_SEQUENCE.indexOf(last);
-    if (baseIndex < 0) baseIndex = 0; // fallback para 0
-    const secondIndex = (baseIndex + 12) % len;
-    const thirdIndex = (baseIndex + 24) % len;
-    return [ROULETTE_SEQUENCE[baseIndex], ROULETTE_SEQUENCE[secondIndex], ROULETTE_SEQUENCE[thirdIndex]];
-  }, [lastNumbers]);
-
-  const triangulacaoSections = React.useMemo(() => {
-    const len = ROULETTE_SEQUENCE.length;
+    const len = Array.isArray(ROULETTE_SEQUENCE) ? ROULETTE_SEQUENCE.length : 0;
     const getNeighbors = (pos: number, count: number) => {
       const right: number[] = [];
       const left: number[] = [];
-      for (let i = 1; i <= count; i++) {
+      for (let i = 1; i <= count && len > 0; i++) {
         right.push(ROULETTE_SEQUENCE[(pos + i) % len]);
         left.push(ROULETTE_SEQUENCE[(pos - i + len) % len]);
       }
       return { right, left };
     };
-    return triangulacaoTriadDisplay.map(center => {
+    if (len === 0) {
+      return lastNumbers.map(center => ({ center, neighborsRight: [], neighborsLeft: [] }));
+    }
+    return lastNumbers.map(center => {
       const pos = ROULETTE_SEQUENCE.indexOf(center);
       const { right, left } = getNeighbors(pos, 4);
       return { center, neighborsRight: right, neighborsLeft: left };
     });
-  }, [triangulacaoTriadDisplay]);
+  }, [lastNumbers, ROULETTE_SEQUENCE]);
 
-  const triangulacaoCoveredNumbers = React.useMemo(() => {
-    const set = new Set<number>();
-    triangulacaoSections.forEach(section => {
-      set.add(section.center);
-      section.neighborsRight.forEach(n => set.add(n));
-      section.neighborsLeft.forEach(n => set.add(n));
-    });
-    return Array.from(set);
-  }, [triangulacaoSections]);
-
-  const triangulacaoExposedNumbers = React.useMemo(() => {
-    return ROULETTE_SEQUENCE.filter(n => !triangulacaoCoveredNumbers.includes(n));
-  }, [triangulacaoCoveredNumbers]);
-
-  // Estatísticas da Triangulação: WIN/LOSS e sequências
-  const calculatedTriangulacaoStats = React.useMemo(() => {
-    const len = ROULETTE_SEQUENCE.length;
+  const calculatedTerminaisStats = React.useMemo(() => {
+    const len = Array.isArray(ROULETTE_SEQUENCE) ? ROULETTE_SEQUENCE.length : 0;
     let wins = 0, losses = 0;
     let positiveSequenceCurrent = 0, positiveSequenceMax = 0;
     let negativeSequenceCurrent = 0, negativeSequenceMax = 0;
 
-    if (lastNumbers.length < 2) {
+    if (lastNumbers.length < 2 || len === 0) {
       return {
         wins: 0, losses: 0,
         winPercentage: 0, lossPercentage: 0,
@@ -1076,7 +192,7 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
       negativeSequenceCurrent,
       negativeSequenceMax
     };
-  }, [lastNumbers]);
+  }, [lastNumbers, ROULETTE_SEQUENCE]);
  
    // Stats de exibição para BET Terminais (zerar quando não há dados)
    const betTerminaisStatsDisplay = React.useMemo(() => {
@@ -1117,54 +233,35 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
   }, [lastNumbers]);
 
   const calculateStrategiesRanking = React.useMemo(() => {
+    const torreWins = calculatedTorreStats?.wins ?? 0;
+    const torreLosses = calculatedTorreStats?.losses ?? 0;
+    const p2Wins = calculatedP2Stats?.wins ?? 0;
+    const p2Losses = calculatedP2Stats?.losses ?? 0;
+    const fusionWins = calculatedFusionStats?.wins ?? 0;
+    const fusionLosses = calculatedFusionStats?.losses ?? 0;
+    const betWins = betTerminaisStatsDisplay?.wins ?? 0;
+    const betWinPercentage = betTerminaisStatsDisplay?.winPercentage ?? 0;
+    const patternWins = pattern171Stats?.wins ?? 0;
+    const patternEntradas = pattern171Stats?.entradas ?? 0;
+    const forcedWins = calculated171ForcedStats?.wins ?? 0;
+    const forcedLosses = calculated171ForcedStats?.losses ?? 0;
+    const triangWins = calculatedTriangulacaoStats?.wins ?? 0;
+    const triangWinPercentage = calculatedTriangulacaoStats?.winPercentage ?? 0;
+    const p32Total = calculated32P1Stats?.total ?? 0;
+    const p32Wins = calculated32P1Stats?.wins ?? 0;
+    const castTotal = calculatedCasteloStats?.total ?? 0;
+    const castWins = calculatedCasteloStats?.wins ?? 0;
+
     const strategies = [
-      {
-        name: 'Torre',
-        wins: calculatedTorreStats.wins,
-        winPercentage: (calculatedTorreStats.wins + calculatedTorreStats.losses) > 0 ? Math.round((calculatedTorreStats.wins / (calculatedTorreStats.wins + calculatedTorreStats.losses)) * 100) : 0
-      },
-      {
-        name: 'P2',
-        wins: calculatedP2Stats.wins,
-        winPercentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.wins / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0
-      },
-      {
-        name: 'Fusion',
-        wins: calculatedFusionStats.wins,
-        winPercentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.wins / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0
-      },
-      {
-        name: 'BET Terminais',
-        wins: betTerminaisStatsDisplay.wins,
-        winPercentage: betTerminaisStatsDisplay.winPercentage
-      },
-      {
-        name: '171',
-        wins: pattern171Stats.wins,
-        winPercentage: pattern171Stats.entradas > 0 ? Math.round((pattern171Stats.wins / pattern171Stats.entradas) * 100) : 0
-      },
-      {
-        name: '171 Forçado (5)',
-        wins: calculated171ForcedStats.wins,
-        winPercentage: (calculated171ForcedStats.wins + calculated171ForcedStats.losses) > 0 ? Math.round((calculated171ForcedStats.wins / (calculated171ForcedStats.wins + calculated171ForcedStats.losses)) * 100) : 0
-      },
-      {
-        name: 'Triangulação',
-        wins: calculatedTriangulacaoStats.wins,
-        winPercentage: calculatedTriangulacaoStats.winPercentage
-      },
-      {
-        name: '32P3',
-        wins: calculated32P1Stats.wins,
-        // Percentual baseado no campo WIN do card 32P1: wins / total
-        winPercentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.wins / calculated32P1Stats.total) * 100) : 0
-      },
-      {
-        name: 'Castelo',
-        wins: calculatedCasteloStats.wins,
-        // Percentual baseado no campo WIN do card Castelo: wins / total
-        winPercentage: calculatedCasteloStats.total > 0 ? Math.round((calculatedCasteloStats.wins / calculatedCasteloStats.total) * 100) : 0
-      }
+      { name: 'Torre', wins: torreWins, winPercentage: (torreWins + torreLosses) > 0 ? Math.round((torreWins / (torreWins + torreLosses)) * 100) : 0 },
+      { name: 'P2', wins: p2Wins, winPercentage: (p2Wins + p2Losses) > 0 ? Math.round((p2Wins / (p2Wins + p2Losses)) * 100) : 0 },
+      { name: 'Fusion', wins: fusionWins, winPercentage: (fusionWins + fusionLosses) > 0 ? Math.round((fusionWins / (fusionWins + fusionLosses)) * 100) : 0 },
+      { name: 'BET Terminais', wins: betWins, winPercentage: betWinPercentage },
+      { name: '171', wins: patternWins, winPercentage: patternEntradas > 0 ? Math.round((patternWins / patternEntradas) * 100) : 0 },
+      { name: '171 Forçado (5)', wins: forcedWins, winPercentage: (forcedWins + forcedLosses) > 0 ? Math.round((forcedWins / (forcedWins + forcedLosses)) * 100) : 0 },
+      { name: 'Triangulação', wins: triangWins, winPercentage: triangWinPercentage },
+      { name: '32P3', wins: p32Wins, winPercentage: p32Total > 0 ? Math.round((p32Wins / p32Total) * 100) : 0 },
+      { name: 'Castelo', wins: castWins, winPercentage: castTotal > 0 ? Math.round((castWins / castTotal) * 100) : 0 },
     ];
     
     // Ordenar por percentual de vitórias (maior para menor)
@@ -1264,37 +361,6 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
           colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
         />
 
-        {/* Card Triangulação (substitui Coluna Combinada) */}
-         <StatCard
-           title={
-             <div className="flex items-center justify-between">
-               <span
-                 className="cursor-pointer hover:text-blue-600 transition-colors"
-                 onClick={() => setShowTriangulacaoModal(true)}
-                 title="Clique para ver cobertura e números expostos"
-               >
-                 Triangulação
-               </span>
-               <div className="flex items-center gap-1">
-                  {triangulacaoTriadDisplay.map(n => (
-                    <div key={n} className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs ${getRouletteColor(n)}`}>
-                      {n.toString().padStart(2, '0')}
-                    </div>
-                  ))}
-                </div>
-             </div>
-           }
-           containerClassName="min-h-[111px]"
-           data={[
-             { label: 'WIN', value: calculatedTriangulacaoStats.wins, percentage: calculatedTriangulacaoStats.winPercentage },
-             { label: 'LOSS', value: calculatedTriangulacaoStats.losses, percentage: calculatedTriangulacaoStats.lossPercentage },
-             { label: 'Seq. Positiva', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedTriangulacaoStats.positiveSequenceCurrent}/${calculatedTriangulacaoStats.positiveSequenceMax}` },
-             { label: 'Seq. Negativa', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedTriangulacaoStats.negativeSequenceCurrent}/${calculatedTriangulacaoStats.negativeSequenceMax}` }
-           ]}
-           colors={['bg-green-500', 'bg-red-500', 'bg-blue-500', 'bg-orange-500']}
-         />
-
-        {/* Card BET Terminais (agora na 1ª linha, posição do antigo Fusion) */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
           <div className="flex justify-between items-center mb-1 lg:mb-2">
             <h3 className="text-xs lg:text-sm font-semibold text-gray-800">BET Terminais</h3>
@@ -1348,34 +414,120 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
           </div>
         </div>
 
-        {/* Card Castelo (agora na 1ª linha) */}
-        <StatCard
-          title={
-            <div className="flex justify-between items-center w-full">
-              <span>Castelo</span>
-              <select
-                className="text-xs bg-gray-200 text-gray-700 rounded px-1 py-0.5"
-                value={windowCastelo}
-                onChange={(e) => setWindowCastelo(parseInt(e.target.value))}
-                title="Selecione a janela de números para Castelo"
-              >
-                <option value={0}>Todos</option>
-                <option value={10}>Últimos 10</option>
-                <option value={20}>Últimos 20</option>
-                <option value={30}>Últimos 30</option>
-                <option value={40}>Últimos 40</option>
-                <option value={50}>Últimos 50</option>
-              </select>
+        {/* Card BET Terminais (agora na 1ª linha, posição do antigo Fusion) */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
+          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Colunas</h3>
+          <div className="space-y-0.5 lg:space-y-1">
+            {[
+              { label: '3ª Coluna', value: statistics.columns.third, percentage: columnsPercentages.third, color: 'bg-blue-600', columnIndex: 3 },
+              { label: '2ª Coluna', value: statistics.columns.second, percentage: columnsPercentages.second, color: 'bg-violet-400', columnIndex: 2 },
+              { label: '1ª Coluna', value: statistics.columns.first, percentage: columnsPercentages.first, color: 'bg-yellow-600', columnIndex: 1 }
+            ].map((item) => (
+              <div key={item.label} className="flex items-center justify-between">
+                <div className="flex items-center gap-0.5 lg:gap-1">
+                  <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${item.color}`}></div>
+                  <span className="text-xs lg:text-xs text-gray-600 truncate">{item.label}</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-gray-800 text-xs lg:text-sm">{item.value}</div>
+                  <div className="text-xs lg:text-xs text-gray-500">{item.percentage}%</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Rodapé com lista horizontal de colunas chamadas */}
+          <div className="mt-2 pt-2 border-t border-gray-200">
+            <div className="flex overflow-x-auto ranking-scroll pr-1">
+              <div className="flex" style={{ minWidth: 'max-content' }}>
+                {lastNumbers
+                  .slice()
+                  .reverse() // Últimas colunas à esquerda
+                  .map((num, index) => {
+                    const col = getNumberColumnSafe(num);
+                    if (col === null) return null;
+                    const columnTextColors: Record<number, string> = {
+                      1: 'text-yellow-600',
+                      2: 'text-violet-600',
+                      3: 'text-blue-600'
+                    };
+                    return (
+                      <span
+                        key={`${num}-${index}`}
+                        className={`font-bold text-sm whitespace-nowrap ${columnTextColors[col]}`}
+                        style={{ marginRight: '5px' }}
+                      >
+                        {col}
+                      </span>
+                    );
+                  })
+                  .filter(Boolean)}
+              </div>
             </div>
-          }
-          data={[
-            { label: 'WIN', value: calculatedCasteloStats.wins, percentage: calculatedCasteloStats.total > 0 ? Math.round((calculatedCasteloStats.wins / calculatedCasteloStats.total) * 100) : 0 },
-            { label: 'LOSS', value: calculatedCasteloStats.losses, percentage: calculatedCasteloStats.total > 0 ? Math.round((calculatedCasteloStats.losses / calculatedCasteloStats.total) * 100) : 0 },
-            { label: 'Seq. Positiva', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedCasteloStats.positiveSequenceCurrent}/${calculatedCasteloStats.positiveSequenceMax}` },
-            { label: 'Seq. Negativa', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedCasteloStats.negativeSequenceCurrent}/${calculatedCasteloStats.negativeSequenceMax}` }
-          ]}
-          colors={['bg-green-500', 'bg-red-500', 'bg-blue-500', 'bg-orange-500']}
-        />
+          </div>
+        </div>
+
+        {/* Card Dúzias Customizado (movido da 3ª linha para 1ª linha) */}
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
+          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Dúzias</h3>
+          <div className="space-y-0.5 lg:space-y-1">
+            {[
+              { label: '1ª (1-12)', value: statistics.dozens.first, percentage: dozensPercentages.first, color: 'bg-yellow-600', dozenIndex: 1 },
+              { label: '2ª (13-24)', value: statistics.dozens.second, percentage: dozensPercentages.second, color: 'bg-violet-400', dozenIndex: 2 },
+              { label: '3ª (25-36)', value: statistics.dozens.third, percentage: dozensPercentages.third, color: 'bg-blue-600', dozenIndex: 3 }
+            ].map((item, index) => {
+              const isRepeated = animatingDozens.has(item.dozenIndex);
+              return (
+                <div key={item.label} className="flex items-center justify-between">
+                  <div className="flex items-center gap-0.5 lg:gap-1">
+                    <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${item.color}`}></div>
+                    <span className="text-xs lg:text-xs text-gray-600 truncate">{item.label}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className={`font-bold text-gray-800 text-xs lg:text-sm ${
+                      isRepeated ? 'animate-pulse-color-size' : ''
+                    }`}>
+                      {item.value}
+                    </div>
+                    <div className="text-xs lg:text-xs text-gray-500">{item.percentage}%</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* Rodapé com lista horizontal de dúzias chamadas */}
+          <div className="mt-2 pt-2 border-t border-gray-200">
+            <div className="flex overflow-x-auto ranking-scroll pr-1">
+              <div className="flex" style={{ minWidth: 'max-content' }}>
+                {lastNumbers
+                  .slice()
+                  .reverse() // Últimas dúzias à esquerda
+                  .map((num, index) => {
+                    const dozen = getNumberDozenSafe(num);
+                    if (dozen === null) return null;
+                    
+                    // Cores de texto fortes e visíveis em fundo cinza
+                    const dozenTextColors: Record<number, string> = {
+                      1: 'text-yellow-600',
+                      2: 'text-violet-600',
+                      3: 'text-blue-600'
+                    };
+                    
+                    return (
+                      <span
+                        key={`${num}-${index}`}
+                        className={`font-bold text-sm whitespace-nowrap ${dozenTextColors[dozen]}`}
+                        style={{ marginRight: '5px' }}
+                      >
+                        {dozen}
+                      </span>
+                    );
+                  })
+                  .filter(Boolean)}
+              </div>
+            </div>
+          </div>
+        </div>
 
         
       </div>
@@ -1448,17 +600,35 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
 
         {/* Colunas e Cores seguem após Castelo */}
 
-        <StatCard
-          title="Colunas"
-          containerClassName="min-h-[111px]"
-          data={[
-            { label: '3ª Coluna', value: statistics.columns.third, percentage: columnsPercentages.third },
-            { label: '2ª Coluna', value: statistics.columns.second, percentage: columnsPercentages.second },
-            { label: '1ª Coluna', value: statistics.columns.first, percentage: columnsPercentages.first }
-          ]}
-          colors={['bg-emerald-500', 'bg-teal-500', 'bg-lime-500']}
-          cardType="columns"
-        />
+        {/* Card Triangulação (substitui Coluna Combinada) */}
+         <StatCard
+           title={
+             <div className="flex items-center justify-between">
+               <span
+                 className="cursor-pointer hover:text-blue-600 transition-colors"
+                 onClick={() => setShowTriangulacaoModal(true)}
+                 title="Clique para ver cobertura e números expostos"
+               >
+                 Triangulação
+               </span>
+               <div className="flex items-center gap-1">
+                  {triangulacaoTriadDisplay.map(n => (
+                    <div key={n} className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs ${getRouletteColor(n)}`}>
+                      {n.toString().padStart(2, '0')}
+                    </div>
+                  ))}
+                </div>
+             </div>
+           }
+           containerClassName="min-h-[111px]"
+           data={[
+             { label: 'WIN', value: calculatedTriangulacaoStats.wins, percentage: calculatedTriangulacaoStats.winPercentage },
+             { label: 'LOSS', value: calculatedTriangulacaoStats.losses, percentage: calculatedTriangulacaoStats.lossPercentage },
+             { label: 'Seq. Positiva', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedTriangulacaoStats.positiveSequenceCurrent}/${calculatedTriangulacaoStats.positiveSequenceMax}` },
+             { label: 'Seq. Negativa', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedTriangulacaoStats.negativeSequenceCurrent}/${calculatedTriangulacaoStats.negativeSequenceMax}` }
+           ]}
+           colors={['bg-green-500', 'bg-red-500', 'bg-blue-500', 'bg-orange-500']}
+         />
         <StatCard
           title="Cores"
           data={[
@@ -1497,14 +667,14 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
           <div className="ranking-scroll max-h-[calc(8rem+19px)] overflow-y-auto">
             <div className="space-y-0.5">
               {lastNumbers.length > 0 ? (
-                calculateTerminaisStats.slice(0, 10).map(({ terminal, count, percentage, numbers }) => (
+                calculateTerminaisStats.slice(0, 10).map(({ terminal, count, percentage, numbers = [] }) => (
                   <div key={terminal} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
                     <div className="flex items-center space-x-1">
                       <div className="w-4 h-4 rounded-full bg-gray-600 flex items-center justify-center text-white font-bold text-[14px]">
                         {terminal}
                       </div>
                       <span className="text-xs text-gray-600 truncate">
-                        {numbers.map(n => n.toString().padStart(2, '0')).join(',')}
+                        {Array.isArray(numbers) ? numbers.map((n, idx) => n.toString().padStart(2, '0')).join(',') : ''}
                       </span>
                     </div>
                     <div className="text-right">
@@ -1569,16 +739,33 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
             </div>
           </div>
         </div>
-        {/* Card Dúzias (3º da 3ª linha) */}
+        {/* Card Castelo (movido da 1ª linha para 3ª linha) */}
         <StatCard
-          title="Dúzias"
+          title={
+            <div className="flex justify-between items-center w-full">
+              <span>Castelo</span>
+              <select
+                className="text-xs bg-gray-200 text-gray-700 rounded px-1 py-0.5"
+                value={windowCastelo}
+                onChange={(e) => setWindowCastelo(parseInt(e.target.value))}
+                title="Selecione a janela de números para Castelo"
+              >
+                <option value={0}>Todos</option>
+                <option value={10}>Últimos 10</option>
+                <option value={20}>Últimos 20</option>
+                <option value={30}>Últimos 30</option>
+                <option value={40}>Últimos 40</option>
+                <option value={50}>Últimos 50</option>
+              </select>
+            </div>
+          }
           data={[
-            { label: '1ª (1-12)', value: statistics.dozens.first, percentage: dozensPercentages.first },
-            { label: '2ª (13-24)', value: statistics.dozens.second, percentage: dozensPercentages.second },
-            { label: '3ª (25-36)', value: statistics.dozens.third, percentage: dozensPercentages.third }
+            { label: 'WIN', value: calculatedCasteloStats.wins, percentage: calculatedCasteloStats.total > 0 ? Math.round((calculatedCasteloStats.wins / calculatedCasteloStats.total) * 100) : 0 },
+            { label: 'LOSS', value: calculatedCasteloStats.losses, percentage: calculatedCasteloStats.total > 0 ? Math.round((calculatedCasteloStats.losses / calculatedCasteloStats.total) * 100) : 0 },
+            { label: 'Seq. Positiva', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedCasteloStats.positiveSequenceCurrent}/${calculatedCasteloStats.positiveSequenceMax}` },
+            { label: 'Seq. Negativa', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedCasteloStats.negativeSequenceCurrent}/${calculatedCasteloStats.negativeSequenceMax}` }
           ]}
-          colors={['bg-cyan-500', 'bg-indigo-500', 'bg-pink-500']}
-          cardType="dozens"
+          colors={['bg-green-500', 'bg-red-500', 'bg-blue-500', 'bg-orange-500']}
         />
 
         {/* Card Fusion - movido para a posição onde estava o Ranking */}
@@ -1595,10 +782,10 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
             </div>
           }
           data={[
-            { label: 'Entradas', value: calculatedFusionStats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedFusionStats.entradas / totalNumbers) * 100) : 0 },
-            { label: 'WIN', value: calculatedFusionStats.wins, percentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.wins / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0 },
-            { label: 'LOSS', value: calculatedFusionStats.losses, percentage: (calculatedFusionStats.wins + calculatedFusionStats.losses) > 0 ? Math.round((calculatedFusionStats.losses / (calculatedFusionStats.wins + calculatedFusionStats.losses)) * 100) : 0 },
-            { label: '> Seq. Negativa', value: calculatedFusionStats.maxNegativeSequence, percentage: calculatedFusionStats.entradas > 0 ? Math.round((calculatedFusionStats.maxNegativeSequence / calculatedFusionStats.entradas) * 100) : 0, hidePercentage: true }
+            { label: 'Entradas', value: fusionSafe.entradas, percentage: totalNumbers > 0 ? Math.round((fusionSafe.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: fusionSafe.wins, percentage: (fusionSafe.wins + fusionSafe.losses) > 0 ? Math.round((fusionSafe.wins / (fusionSafe.wins + fusionSafe.losses)) * 100) : 0 },
+            { label: 'LOSS', value: fusionSafe.losses, percentage: (fusionSafe.wins + fusionSafe.losses) > 0 ? Math.round((fusionSafe.losses / (fusionSafe.wins + fusionSafe.losses)) * 100) : 0 },
+            { label: '> Seq. Negativa', value: fusionSafe.maxNegativeSequence, percentage: fusionSafe.entradas > 0 ? Math.round((fusionSafe.maxNegativeSequence / fusionSafe.entradas) * 100) : 0, hidePercentage: true }
           ]}
           colors={['bg-purple-500', 'bg-green-500', 'bg-red-500', 'bg-blue-500']}
         />
@@ -1648,10 +835,10 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
           }
           containerClassName="min-h-[111px]"
           data={[
-            { label: 'Entradas', value: calculatedP2Stats.entradas, percentage: totalNumbers > 0 ? Math.round((calculatedP2Stats.entradas / totalNumbers) * 100) : 0 },
-            { label: 'WIN', value: calculatedP2Stats.wins, percentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.wins / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0 },
-            { label: 'LOSS', value: calculatedP2Stats.losses, percentage: (calculatedP2Stats.wins + calculatedP2Stats.losses) > 0 ? Math.round((calculatedP2Stats.losses / (calculatedP2Stats.wins + calculatedP2Stats.losses)) * 100) : 0 },
-            { label: '> Seq. Negativa', value: calculatedP2Stats.maxNegativeSequence, percentage: calculatedP2Stats.entradas > 0 ? Math.round((calculatedP2Stats.maxNegativeSequence / calculatedP2Stats.entradas) * 100) : 0, hidePercentage: true }
+            { label: 'Entradas', value: p2Safe.entradas, percentage: totalNumbers > 0 ? Math.round((p2Safe.entradas / totalNumbers) * 100) : 0 },
+            { label: 'WIN', value: p2Safe.wins, percentage: (p2Safe.wins + p2Safe.losses) > 0 ? Math.round((p2Safe.wins / (p2Safe.wins + p2Safe.losses)) * 100) : 0 },
+            { label: 'LOSS', value: p2Safe.losses, percentage: (p2Safe.wins + p2Safe.losses) > 0 ? Math.round((p2Safe.losses / (p2Safe.wins + p2Safe.losses)) * 100) : 0 },
+            { label: '> Seq. Negativa', value: p2Safe.maxNegativeSequence, percentage: p2Safe.entradas > 0 ? Math.round((p2Safe.maxNegativeSequence / p2Safe.entradas) * 100) : 0, hidePercentage: true }
           ]}
           colors={['bg-gray-500', 'bg-green-500', 'bg-red-500', 'bg-orange-500']}
         />
@@ -1677,7 +864,7 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
                   return (
                     <div key={number} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
                       <div className="flex items-center space-x-1">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs ${getRouletteColor(number)}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs ${getRouletteColorLocal(number)}`}>
                           {number.toString().padStart(2, '0')}
                         </div>
                       </div>
@@ -1710,24 +897,24 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
             
             <div className="space-y-4">
               <div className="flex justify-center space-x-3">
-                <RouletteBall number={3} />
-                <RouletteBall number={4} />
-                <RouletteBall number={7} />
-                <RouletteBall number={11} />
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(3)}`}>03</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(4)}`}>04</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(7)}`}>07</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(11)}`}>11</div>
               </div>
               
               <div className="flex justify-center space-x-3">
-                <RouletteBall number={15} />
-                <RouletteBall number={18} />
-                <RouletteBall number={21} />
-                <RouletteBall number={22} />
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(15)}`}>15</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(18)}`}>18</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(21)}`}>21</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(22)}`}>22</div>
               </div>
               
               <div className="flex justify-center space-x-3">
-                <RouletteBall number={25} />
-                <RouletteBall number={29} />
-                <RouletteBall number={33} />
-                <RouletteBall number={36} />
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(25)}`}>25</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(29)}`}>29</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(33)}`}>33</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(36)}`}>36</div>
               </div>
             </div>
             
@@ -1755,15 +942,15 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
             
             <div className="space-y-4">
               <div className="flex justify-center space-x-3">
-                <RouletteBall number={1} />
-                <RouletteBall number={2} />
-                <RouletteBall number={3} />
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(1)}`}>01</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(2)}`}>02</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(3)}`}>03</div>
               </div>
               
               <div className="flex justify-center space-x-3">
-                <RouletteBall number={34} />
-                <RouletteBall number={35} />
-                <RouletteBall number={36} />
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(34)}`}>34</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(35)}`}>35</div>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(36)}`}>36</div>
               </div>
             </div>
             
@@ -1796,7 +983,9 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
                 <p className="text-sm text-gray-600 mb-3">13 números que ativam o sistema Fusion</p>
                 <div className="flex flex-wrap gap-3 justify-center">
                   {[0, 32, 15, 19, 4, 21, 2, 25, 7, 29, 18, 22, 9].map(num => (
-                    <RouletteBall key={num} number={num} />
+                    <div key={num} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(num)}`}>
+                      {num.toString().padStart(2,'0')}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1914,7 +1103,9 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
                 <p className="text-sm text-gray-600 mb-2">Último número e offsets (+12, +24)</p>
                 <div className="flex items-center gap-3">
                   {triangulacaoTriadDisplay.map(num => (
-                    <RouletteBall key={num} number={num} />
+                    <div key={num} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(num)}`}>
+                      {num.toString().padStart(2,'0')}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1927,13 +1118,13 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
                     <div key={s.center} className="bg-gray-50 rounded p-2">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs text-gray-600">Centro</span>
-                        <RouletteBall number={s.center} />
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(s.center)}`}>{s.center.toString().padStart(2,'0')}</div>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-600 w-16">Esquerda</span>
                         <div className="flex flex-wrap gap-1">
                           {s.neighborsLeft.map(n => (
-                            <div key={`${s.center}-L-${n}`} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColor(n)}`}>{n.toString().padStart(2,'0')}</div>
+                            <div key={`${s.center}-L-${n}`} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(n)}`}>{n.toString().padStart(2,'0')}</div>
                           ))}
                         </div>
                       </div>
@@ -1941,7 +1132,7 @@ export function StatisticsCards({ statistics, rowOrder = 0, patternDetectedCount
                         <span className="text-xs text-gray-600 w-16">Direita</span>
                         <div className="flex flex-wrap gap-1">
                           {s.neighborsRight.map(n => (
-                            <div key={`${s.center}-R-${n}`} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColor(n)}`}>{n.toString().padStart(2,'0')}</div>
+                            <div key={`${s.center}-R-${n}`} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(n)}`}>{n.toString().padStart(2,'0')}</div>
                           ))}
                         </div>
                       </div>

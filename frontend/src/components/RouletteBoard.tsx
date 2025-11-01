@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '../utils/cn';
-import { StatisticsCards } from './StatisticsCards';
+import StatisticsCards from './StatisticsCards';
 import { BalanceManager } from './BalanceManager';
 import { useStatistics } from '../hooks/useStatistics';
 import { calculateStatistics } from '../utils/statisticsCalculator';
