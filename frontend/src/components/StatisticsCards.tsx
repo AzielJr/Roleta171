@@ -3,47 +3,59 @@ import React from 'react';
 
 const StatisticsCards = ({
   lastNumbers = [],
-  totalNumbers,
+  totalNumbers = lastNumbers.length,
   numbersWithoutPattern = 0,
+  patternDetectedCount = 0,
   totalNumbersWithoutPattern = 0,
-  window32P1,
-  windowCastelo,
+  window32P1 = 0,
+  windowCastelo = 0,
   pattern171Stats = { entradas: 0, wins: 0, losses: 0 },
   calculatedTorreStats = { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, currentNegativeSequence: 0 },
   calculatedP2Stats = { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0 },
-  calculatedFusionStats,
-  betTerminaisStats,
+  calculatedFusionStats = { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0, currentNegativeSequence: 0 },
+  betTerminaisStats = { wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0, positiveSequenceCurrent: 0, positiveSequenceMax: 0 },
   calculated171ForcedStats = { wins: 0, losses: 0, currentPositiveSequence: 0, maxPositiveSequence: 0 },
   calculated32P1Stats = { winTotal: 0, wins: 0, losses: 0, total: 0 },
   calculatedCasteloStats = { wins: 0, losses: 0, total: 0, positiveSequenceCurrent: 0, positiveSequenceMax: 0 },
   calculatedTriangulacaoStats = { wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, positiveSequenceCurrent: 0, positiveSequenceMax: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0 },
-  showP2Modal,
-  showTorreModal,
-  showFusionModal,
-  showRaceTrackModal,
-  showTriangulacaoModal,
-  setShowP2Modal,
-  setShowTorreModal,
-  setShowFusionModal,
-  setShowRaceTrackModal,
-  setShowTriangulacaoModal,
+  showP2Modal = false,
+  showTorreModal = false,
+  showFusionModal = false,
+  showRaceTrackModal = false,
+  showTriangulacaoModal = false,
+  setShowP2Modal = (v: boolean) => {},
+  setShowTorreModal = (v: boolean) => {},
+  setShowFusionModal = (v: boolean) => {},
+  setShowRaceTrackModal = (v: boolean) => {},
+  setShowTriangulacaoModal = (v: boolean) => {},
   triangulacaoTriadDisplay = [],
   triangulacaoSections = [],
   triangulacaoCoveredNumbers = [],
   triangulacaoExposedNumbers = [],
-  animatingTorre,
-  animatingFusion,
-  animatingP2,
+  animatingTorre = undefined,
+  animatingFusion = undefined,
+  animatingP2 = undefined,
   animatingDozens = new Set<number>(),
-  getNumberColumn,
-  getNumberDozen,
+  getNumberColumn = undefined,
+  getNumberDozen = undefined,
   statistics = { columns: { first: 0, second: 0, third: 0 }, dozens: { first: 0, second: 0, third: 0 }, colors: { red: 0, black: 0, green: 0 }, highLow: { high: 0, low: 0 }, evenOdd: { even: 0, odd: 0 } },
   columnsPercentages = { first: 0, second: 0, third: 0 },
   dozensPercentages = { first: 0, second: 0, third: 0 },
   colorPercentages = { red: 0, black: 0, green: 0 },
   highLowPercentages = { high: 0, low: 0, zero: 0 },
   evenOddPercentages = { even: 0, odd: 0, zero: 0 },
-  p2Mode,
+  winCount = 0,
+  lossCount = 0,
+  p2WinCount = 0,
+  p2LossCount = 0,
+  setP2WinCount = (v: number | ((prev: number) => number)) => {},
+   setP2LossCount = (v: number | ((prev: number) => number)) => {},
+   torreWinCount = 0,
+   torreLossCount = 0,
+   setTorreWinCount = (v: number | ((prev: number) => number)) => {},
+   setTorreLossCount = (v: number | ((prev: number) => number)) => {},
+   avisosSonorosAtivos = false,
+  p2Mode = 0,
   rowOrder = 0,
   ROULETTE_SEQUENCE = []
 }) => {
@@ -205,6 +217,26 @@ const StatisticsCards = ({
     return betTerminaisStats;
   }, [lastNumbers, betTerminaisStats]);
 
+  // Ranking de Terminais baseado nos últimos números
+  const terminaisRanking = React.useMemo(() => {
+    const counts = new Array(10).fill(0);
+    const numbersBy: number[][] = Array.from({ length: 10 }, () => []);
+    lastNumbers.forEach((n: number) => {
+      const t = Math.abs(n) % 10;
+      counts[t] += 1;
+      numbersBy[t].push(n);
+    });
+    const total = lastNumbers.length;
+    const arr = counts.map((count, terminal) => ({
+      terminal,
+      count,
+      percentage: total > 0 ? Math.round((count / total) * 100) : 0,
+      numbers: numbersBy[terminal]
+    }));
+    arr.sort((a, b) => (b.count - a.count) || (a.terminal - b.terminal));
+    return arr;
+  }, [lastNumbers]);
+
   // Função para calcular ranking das estratégias por WINs
   // Função para calcular estatísticas das seções da Race Track
   const calculateRaceTrackStats = React.useMemo(() => {
@@ -320,7 +352,7 @@ const StatisticsCards = ({
               <select
                 className="text-xs bg-gray-200 text-gray-700 rounded px-1 py-0.5"
                 value={window32P1}
-                onChange={(e) => setWindow32P1(parseInt(e.target.value))}
+                onChange={() => {}}
                 title="Selecione a janela de números para 32P3"
               >
                 <option value={0}>Todos</option>
@@ -364,9 +396,9 @@ const StatisticsCards = ({
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
           <div className="flex justify-between items-center mb-1 lg:mb-2">
             <h3 className="text-xs lg:text-sm font-semibold text-gray-800">BET Terminais</h3>
-            {calculateTerminaisStats.length > 0 && (
+            {terminaisRanking.length > 0 && (
               <div className="flex items-center gap-[5px]">
-                {calculateTerminaisStats.slice(-3).map(({ terminal }, idx) => (
+                {terminaisRanking.slice(0, 3).map(({ terminal }, idx) => (
                   <span key={`bet-${terminal}-${idx}`} className="text-yellow-500 font-semibold text-xs lg:text-sm">{terminal}</span>
                 ))}
               </div>
@@ -656,9 +688,9 @@ const StatisticsCards = ({
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
           <div className="flex justify-between items-center mb-1 lg:mb-2">
             <h3 className="text-xs lg:text-sm font-semibold text-gray-800">Terminais</h3>
-            {calculateTerminaisStats.length > 0 && (
+            {terminaisRanking.length > 0 && (
               <div className="flex items-center gap-[5px]">
-                {calculateTerminaisStats.slice(-3).map(({ terminal }, idx) => (
+                {terminaisRanking.slice(0, 3).map(({ terminal }, idx) => (
                   <span key={`${terminal}-${idx}`} className="text-yellow-500 font-semibold text-xs lg:text-sm">{terminal}</span>
                 ))}
               </div>
@@ -667,7 +699,7 @@ const StatisticsCards = ({
           <div className="ranking-scroll max-h-[calc(8rem+19px)] overflow-y-auto">
             <div className="space-y-0.5">
               {lastNumbers.length > 0 ? (
-                calculateTerminaisStats.slice(0, 10).map(({ terminal, count, percentage, numbers = [] }) => (
+                terminaisRanking.slice(0, 10).map(({ terminal, count, percentage, numbers = [] }) => (
                   <div key={terminal} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
                     <div className="flex items-center space-x-1">
                       <div className="w-4 h-4 rounded-full bg-gray-600 flex items-center justify-center text-white font-bold text-[14px]">
@@ -747,7 +779,7 @@ const StatisticsCards = ({
               <select
                 className="text-xs bg-gray-200 text-gray-700 rounded px-1 py-0.5"
                 value={windowCastelo}
-                onChange={(e) => setWindowCastelo(parseInt(e.target.value))}
+                onChange={() => {}}
                 title="Selecione a janela de números para Castelo"
               >
                 <option value={0}>Todos</option>
@@ -763,7 +795,7 @@ const StatisticsCards = ({
             { label: 'WIN', value: calculatedCasteloStats.wins, percentage: calculatedCasteloStats.total > 0 ? Math.round((calculatedCasteloStats.wins / calculatedCasteloStats.total) * 100) : 0 },
             { label: 'LOSS', value: calculatedCasteloStats.losses, percentage: calculatedCasteloStats.total > 0 ? Math.round((calculatedCasteloStats.losses / calculatedCasteloStats.total) * 100) : 0 },
             { label: 'Seq. Positiva', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedCasteloStats.positiveSequenceCurrent}/${calculatedCasteloStats.positiveSequenceMax}` },
-            { label: 'Seq. Negativa', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedCasteloStats.negativeSequenceCurrent}/${calculatedCasteloStats.negativeSequenceMax}` }
+            { label: 'Seq. Negativa', value: 0, percentage: 0, hidePercentage: true, customValue: '0/0' }
           ]}
           colors={['bg-green-500', 'bg-red-500', 'bg-blue-500', 'bg-orange-500']}
         />
@@ -805,7 +837,6 @@ const StatisticsCards = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setP2Mode(1);
                   }}
                   title="Com 1 padrão"
                   className={`rounded transition-all ${
@@ -819,7 +850,6 @@ const StatisticsCards = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setP2Mode(2);
                   }}
                   title="Com 2 padrões"
                   className={`rounded transition-all ${
