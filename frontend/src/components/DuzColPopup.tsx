@@ -38,7 +38,8 @@ function formatDateTimeLocal(date: Date): string {
   const dd = String(date.getDate()).padStart(2, '0');
   const HH = String(date.getHours()).padStart(2, '0');
   const MM = String(date.getMinutes()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}T${HH}:${MM}`;
+  const SS = String(date.getSeconds()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${HH}:${MM}:${SS}`;
 }
 
 function formatDateOnly(date: Date): string {
@@ -130,6 +131,7 @@ export default function DuzColPopup({ isOpen, onClose }: { isOpen: boolean; onCl
 
   useEffect(() => {
     if (isOpen) {
+      setDataInicial(formatDateTimeLocal(new Date()));
       const initial = (balance ?? 0).toLocaleString('pt-BR', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
@@ -171,7 +173,14 @@ export default function DuzColPopup({ isOpen, onClose }: { isOpen: boolean; onCl
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-white text-sm whitespace-nowrap">Data Inicial:</span>
-                  <span className="text-white text-sm">{new Date(dataInicial).toLocaleString('pt-BR')}</span>
+                  <span className="text-white text-sm">{new Date(dataInicial).toLocaleString('pt-BR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                  })}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-white text-sm whitespace-nowrap">Atual:</span>
