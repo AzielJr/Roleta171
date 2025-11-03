@@ -11,6 +11,7 @@ import { useBalance } from '../contexts/BalanceContext';
 import { HistoricoSaldos } from './HistoricoSaldos';
 import { MonthlyGraphModal } from './MonthlyGraphModal';
 import { soundGenerator } from '../utils/soundUtils';
+import DuzColPopup from './DuzColPopup';
 
 interface SelectedNumbers {
   numbers: number[];
@@ -55,6 +56,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   
   // Estado para controlar o modal de gráfico mensal
   const [showMonthlyGraphModal, setShowMonthlyGraphModal] = useState(false);
+  // Painel de Registro de Entradas (Dúzias e Colunas)
+  const [showDuzColPanel, setShowDuzColPanel] = useState(false);
   
   // Estados para os filtros do histórico (datas locais)
   const formatDateLocal = (d: Date) => {
@@ -2666,6 +2669,15 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           >
             📈
           </button>
+          {/* Novo botão Registro de Entradas (Dúzias e Colunas) */}
+          <button
+            onClick={() => setShowDuzColPanel(v => !v)}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
+            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+            title="Registro de Entradas (Dúzias e Colunas)"
+          >
+            📑
+          </button>
           <button
             onClick={() => forcePattern171()}
             className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
@@ -3449,8 +3461,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             </div>
           )}
 
-
-
+          {/* Painel de Registro de Entradas - Full width e empurra Estatísticas para baixo */}
+          {showDuzColPanel && (
+            <DuzColPopup isOpen={showDuzColPanel} onClose={() => setShowDuzColPanel(false)} />
+          )}
 
           {/* Container de Estatísticas - Sempre visível, empurrado para baixo quando Padrão Detectado estiver ativo */}
           <div 

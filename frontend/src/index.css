@@ -322,3 +322,14 @@
   border-radius: 8px;
   padding: 4px;
 }
+
+/* Remover spinners de inputs tipo number */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+}
