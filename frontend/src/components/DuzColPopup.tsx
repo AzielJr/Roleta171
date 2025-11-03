@@ -175,7 +175,14 @@ export default function DuzColPopup({ isOpen, onClose }: { isOpen: boolean; onCl
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-white text-sm whitespace-nowrap">Atual:</span>
-                  <span className="text-white text-sm">{new Date(dataAtual).toLocaleString('pt-BR')}</span>
+                  <span className="text-white text-sm">{new Date(dataAtual).toLocaleString('pt-BR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                  })}</span>
                 </div>
               </div>
              
