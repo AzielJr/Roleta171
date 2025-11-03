@@ -161,7 +161,7 @@ export const useSupabaseBalance = () => {
       console.error('Erro ao criar registro do dia:', error);
       // Criar um registro temporário para não quebrar a interface
       setCurrentSaldoRecord({
-        id: 'temp',
+        id: -1,
         id_senha: user.id,
         data: today,
         saldo_inicial: 0,

@@ -117,13 +117,24 @@ export default function DuzColPopup({ isOpen, onClose }: { isOpen: boolean; onCl
     setDataAtual(formatDateTimeLocal(new Date()));
   };
 
+  // Função para desfazer último clique
+  const undoLastEntry = () => {
+    if (entries.length === 0) {
+      alert('Nenhuma entrada para desfazer.');
+      return;
+    }
+    
+    setEntries(prev => prev.slice(1));
+    setDataAtual(formatDateTimeLocal(new Date()));
+  };
+
   useEffect(() => {
     if (isOpen) {
       const initial = (balance ?? 0).toLocaleString('pt-BR', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })
-      setSaldoInicial(initial)
+      setSaldoInicial(`R$ ${initial}`)
       setValorEntrada('R$ 1,00')
       setTimeout(() => valorEntradaRef.current?.focus(), 0)
     }
@@ -132,58 +143,70 @@ export default function DuzColPopup({ isOpen, onClose }: { isOpen: boolean; onCl
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}>
-      <div className="bg-gray-900 border border-gray-700 rounded-lg w-[95%] sm:w-[90%] md:w-[80%] max-w-3xl mx-auto max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }} translate="no">
+      <div className="bg-gray-900 border border-gray-700 rounded-lg w-[95%] sm:w-[90%] md:w-[80%] max-w-3xl mx-auto max-h-[92vh] overflow-y-auto" translate="no">
         {/* Cabeçalho compacto */}
         <div className="bg-gray-800 border-b border-gray-700 px-3 py-2 rounded-t-lg">
           <div className="flex justify-between items-center">
             <h2 className="text-white font-bold text-base sm:text-lg text-center flex-1">REGISTRO DE ENTRADAS</h2>
-            <button onClick={onClose} className="text-white bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-sm sm:text-base" aria-label="Fechar">✕</button>
-          </div>
-        </div>
+            <div className="flex gap-2">
+              <button 
+                 onClick={undoLastEntry} 
+                 disabled={entries.length === 0}
+                 className="text-white bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:opacity-50 px-2 py-1 rounded text-sm sm:text-base" 
+                 aria-label="Desfazer"
+                 title={entries.length === 0 ? 'Nenhuma entrada para desfazer' : 'Desfazer último clique (Ctrl+Z)'}
+               >
+                 ↶
+               </button>
+               <button onClick={onClose} className="text-white bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-sm sm:text-base" aria-label="Fechar">✕</button>
+             </div>
+           </div>
+         </div>
 
-        <div className="px-3 py-2">
-           {/* Campos compactos: label ao lado do input */}
-           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-1 mb-2">
+         <div className="px-3 py-2">
+            {/* Campos compactos: label ao lado do input */}
+            <div className="grid grid-cols-1 gap-x-2 gap-y-2 mb-2">
+              {/* Data Inicial e Atual sempre na mesma linha */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-white text-sm whitespace-nowrap">Data Inicial:</span>
+                  <span className="text-white text-sm">{new Date(dataInicial).toLocaleString('pt-BR')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-white text-sm whitespace-nowrap">Atual:</span>
+                  <span className="text-white text-sm">{new Date(dataAtual).toLocaleString('pt-BR')}</span>
+                </div>
+              </div>
+             
+             {/* Saldo Inicial: label e valor na mesma linha */}
              <div className="flex items-center gap-2">
-               <span className="text-white text-sm whitespace-nowrap">Data Inicial:</span>
-               <input type="datetime-local" value={dataInicial} onChange={e => setDataInicial(e.target.value)} className="flex-1 bg-gray-800 text-white border border-gray-700 rounded px-2 py-1 text-sm h-8 sm:h-6" />
+               <span className="text-white text-sm whitespace-nowrap">Saldo Inicial:</span>
+               <input type="text" value={saldoInicial} readOnly className="flex-1 bg-gray-800 text-white border border-gray-700 rounded px-2 py-1 text-sm h-9 sm:h-7 text-right" />
              </div>
-             <div className="flex items-center gap-2">
-               <span className="text-white text-sm whitespace-nowrap">Atual:</span>
-               <input type="datetime-local" value={dataAtual} onChange={e => setDataAtual(e.target.value)} className="flex-1 bg-gray-800 text-white border border-gray-700 rounded px-2 py-1 text-sm h-8 sm:h-6" />
-             </div>
-             <div className="col-span-2">
-               <div className="grid grid-cols-2 gap-2">
-                 {/* Esquerda: 50% Saldo Inicial */}
-                 <div className="flex items-center gap-2">
-                   <span className="text-white text-sm whitespace-nowrap">Saldo Inicial:</span>
-                   <span className="text-white text-sm">R$</span>
-                   <input type="text" value={saldoInicial} onChange={e => setSaldoInicial(e.target.value)} placeholder="0,00" className="w-full bg-gray-800 text-white border border-gray-700 rounded px-2 py-1 text-sm h-8 sm:h-6 text-right" />
-                 </div>
-                 {/* Direita: 50% dividido em duas metas */}
-                 <div className="grid grid-cols-2 gap-2 items-center">
-                   <div className="flex items-center gap-1">
-                     <span className="text-white text-sm whitespace-nowrap">Meta 5%:</span>
-                     <span className="text-green-300 text-sm font-semibold">{formatCurrency(meta5)}</span>
-                   </div>
-                   <div className="flex items-center gap-1">
-                     <span className="text-white text-sm whitespace-nowrap">Meta 10%:</span>
-                     <span className="text-green-300 text-sm font-semibold">{formatCurrency(meta10)}</span>
-                   </div>
-                 </div>
+             
+             {/* Metas 5% e 10% na mesma linha */}
+             <div className="grid grid-cols-2 gap-2">
+               <div className="flex items-center gap-1">
+                 <span className="text-white text-sm whitespace-nowrap">Meta 5%:</span>
+                 <span className="text-green-300 text-sm font-semibold">{formatCurrency(meta5)}</span>
+               </div>
+               <div className="flex items-center gap-1">
+                 <span className="text-white text-sm whitespace-nowrap">Meta 10%:</span>
+                 <span className="text-green-300 text-sm font-semibold">{formatCurrency(meta10)}</span>
                </div>
              </div>
-             <div className="flex items-center gap-2">
+             
+             <div className="flex items-center gap-2 flex-wrap">
                <span className="text-white text-sm whitespace-nowrap">Saldo Atual:</span>
-               <input type="text" value={formatCurrency(saldoAtualCalc)} readOnly className="flex-1 bg-gray-800 text-white border border-gray-700 rounded px-2 py-1 text-sm h-8 sm:h-6 text-right" />
+               <input type="text" value={formatCurrency(saldoAtualCalc)} readOnly className="flex-1 min-w-0 bg-gray-800 text-white border border-gray-700 rounded px-2 py-1 text-sm h-9 sm:h-7 text-right" />
              </div>
-             <div className="flex items-center gap-2">
+             <div className="flex items-center gap-2 flex-wrap">
                <span className="text-white text-sm whitespace-nowrap">Vlr. Entrada:</span>
-               <input ref={valorEntradaRef} type="text" value={valorEntrada} onChange={e => setValorEntrada(e.target.value)} placeholder="0,00" className="flex-1 bg-gray-800 text-white border border-gray-700 rounded px-2 py-1 text-sm h-8 sm:h-6 text-right" />
+               <input ref={valorEntradaRef} type="text" value={valorEntrada} onChange={e => setValorEntrada(e.target.value)} placeholder="0,00" className="flex-1 min-w-0 bg-gray-800 text-white border border-gray-700 rounded px-2 py-1 text-sm h-9 sm:h-7 text-right" />
              </div>
              {valorEntradaNum <= 0 && (
-               <div className="col-span-2 text-red-400 text-sm">Digite o Vlr. de Entrada para habilitar WIN/LOSS.</div>
+               <div className="text-red-400 text-sm">Digite o Vlr. de Entrada para habilitar WIN/LOSS.</div>
              )}
            </div>
 
@@ -197,7 +220,7 @@ export default function DuzColPopup({ isOpen, onClose }: { isOpen: boolean; onCl
               <div className="bg-gray-800 text-white text-center py-2 sm:py-1 font-bold border-b border-gray-700 text-sm">DÚZIAS - {String(stats.duzias.total).padStart(2, '0')}</div>
 
               {/* Cabeçalhos clicáveis */}
-              <div className="grid grid-cols-2 border-b border-gray-700">
+              <div className="grid grid-cols-2 border-b border-gray-700" translate="no">
                 <button
                   className="text-center py-2 sm:py-1 text-white font-semibold border-r border-gray-700 bg-green-800 text-sm select-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   disabled={valorEntradaNum <= 0}
@@ -234,7 +257,7 @@ export default function DuzColPopup({ isOpen, onClose }: { isOpen: boolean; onCl
               <div className="bg-gray-800 text-white text-center py-2 sm:py-1 font-bold border-b border-gray-700 text-sm">COLUNAS - {String(stats.colunas.total).padStart(2, '0')}</div>
 
               {/* Cabeçalhos clicáveis */}
-              <div className="grid grid-cols-2 border-b border-gray-700">
+              <div className="grid grid-cols-2 border-b border-gray-700" translate="no">
                 <button
                   className="text-center py-2 sm:py-1 text-white font-semibold border-r border-gray-700 bg-green-800 text-sm select-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   disabled={valorEntradaNum <= 0}

@@ -26,7 +26,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
       const hasRealData = currentSaldoRecord.saldo_inicial !== 0 ||
           currentSaldoRecord.saldo_atual !== 0 ||
           currentSaldoRecord.vlr_lucro !== 0 ||
-          (currentSaldoRecord.id && currentSaldoRecord.id !== 'temp');
+          (currentSaldoRecord.id && currentSaldoRecord.id !== -1);
       
       console.log('currentSaldoRecord:', currentSaldoRecord);
         console.log('hasRealData:', hasRealData);
@@ -122,7 +122,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
     setIsSaving(true);
     try {
       // Verificar se é um registro real (não temporário) e se não estamos no modo de criação
-      const isRealRecord = currentSaldoRecord && currentSaldoRecord.id !== 'temp' && !showCreateForm;
+      const isRealRecord = currentSaldoRecord && currentSaldoRecord.id !== -1 && !showCreateForm;
       
       if (isRealRecord) {
         // Atualizar registro existente
@@ -156,7 +156,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
         console.log('=== CRIANDO NOVO REGISTRO ===');
         console.log('Motivo da criação:', {
           'Não há registro atual': !currentSaldoRecord,
-          'Registro é temporário': currentSaldoRecord?.id === 'temp',
+          'Registro é temporário': currentSaldoRecord?.id === -1,
           'Modo criação ativo': showCreateForm
         });
         
