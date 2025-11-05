@@ -76,6 +76,25 @@ const StatisticsCards = ({
       if (num === 0) return null;
       return Math.ceil(num / 12);
     };
+
+    // LOSS helpers: conta apenas a primeira repetição por sequência,
+    // lendo do fim para o início, limitado aos últimos 60 números
+    const countLossRuns = (seq: Array<number | null>) => {
+      const filtered = seq.filter(v => v !== null) as number[];
+      const arr = filtered.slice(-60).reverse();
+      let loss = 0;
+      for (let i = 0; i < arr.length;) {
+        const current = arr[i];
+        let j = i + 1;
+        while (j < arr.length && arr[j] === current) j++;
+        if ((j - i) >= 2) loss++;
+        i = j;
+      }
+      return loss;
+    };
+
+    const columnsLoss = React.useMemo(() => countLossRuns(lastNumbers.map(getNumberColumnSafe)), [lastNumbers]);
+    const dozensLoss = React.useMemo(() => countLossRuns(lastNumbers.map(getNumberDozenSafe)), [lastNumbers]);
    const StatCard = ({
     title,
     data,
@@ -448,7 +467,10 @@ const StatisticsCards = ({
 
         {/* Card BET Terminais (agora na 1ª linha, posição do antigo Fusion) */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
-          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Colunas</h3>
+          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2 flex justify-between items-center">
+            <span>Colunas</span>
+            <span className="text-xs lg:text-xs text-gray-500 font-normal">LOSS: <span className="font-bold">{columnsLoss}</span></span>
+          </h3>
           <div className="space-y-0.5 lg:space-y-1">
             {[
               { label: '3ª Coluna', value: statistics.columns.third, percentage: columnsPercentages.third, color: 'bg-blue-600', columnIndex: 3 },
@@ -500,7 +522,10 @@ const StatisticsCards = ({
 
         {/* Card Dúzias Customizado (movido da 3ª linha para 1ª linha) */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
-          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Dúzias</h3>
+          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2 flex justify-between items-center">
+            <span>Dúzias</span>
+            <span className="text-xs lg:text-xs text-gray-500 font-normal">LOSS: <span className="font-bold">{dozensLoss}</span></span>
+          </h3>
           <div className="space-y-0.5 lg:space-y-1">
             {[
               { label: '1ª (1-12)', value: statistics.dozens.first, percentage: dozensPercentages.first, color: 'bg-yellow-600', dozenIndex: 1 },
