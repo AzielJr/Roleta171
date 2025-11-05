@@ -452,7 +452,7 @@ const StatisticsCards = ({
           <div className="space-y-0.5 lg:space-y-1">
             {[
               { label: '3ª Coluna', value: statistics.columns.third, percentage: columnsPercentages.third, color: 'bg-blue-600', columnIndex: 3 },
-              { label: '2ª Coluna', value: statistics.columns.second, percentage: columnsPercentages.second, color: 'bg-violet-400', columnIndex: 2 },
+              { label: '2ª Coluna', value: statistics.columns.second, percentage: columnsPercentages.second, color: 'bg-green-600', columnIndex: 2 },
               { label: '1ª Coluna', value: statistics.columns.first, percentage: columnsPercentages.first, color: 'bg-yellow-600', columnIndex: 1 }
             ].map((item) => (
               <div key={item.label} className="flex items-center justify-between">
@@ -479,7 +479,7 @@ const StatisticsCards = ({
                     if (col === null) return null;
                     const columnTextColors: Record<number, string> = {
                       1: 'text-yellow-600',
-                      2: 'text-violet-600',
+                      2: 'text-green-600',
                       3: 'text-blue-600'
                     };
                     return (
@@ -504,7 +504,7 @@ const StatisticsCards = ({
           <div className="space-y-0.5 lg:space-y-1">
             {[
               { label: '1ª (1-12)', value: statistics.dozens.first, percentage: dozensPercentages.first, color: 'bg-yellow-600', dozenIndex: 1 },
-              { label: '2ª (13-24)', value: statistics.dozens.second, percentage: dozensPercentages.second, color: 'bg-violet-400', dozenIndex: 2 },
+              { label: '2ª (13-24)', value: statistics.dozens.second, percentage: dozensPercentages.second, color: 'bg-green-600', dozenIndex: 2 },
               { label: '3ª (25-36)', value: statistics.dozens.third, percentage: dozensPercentages.third, color: 'bg-blue-600', dozenIndex: 3 }
             ].map((item, index) => {
               const isRepeated = animatingDozens.has(item.dozenIndex);
@@ -541,7 +541,7 @@ const StatisticsCards = ({
                     // Cores de texto fortes e visíveis em fundo cinza
                     const dozenTextColors: Record<number, string> = {
                       1: 'text-yellow-600',
-                      2: 'text-violet-600',
+                      2: 'text-green-600',
                       3: 'text-blue-600'
                     };
                     
