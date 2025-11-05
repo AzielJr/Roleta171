@@ -468,9 +468,9 @@ const StatisticsCards = ({
         {/* Card BET Terminais (agora na 1ª linha, posição do antigo Fusion) */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2 flex justify-between items-center">
-            <span>Colunas</span>
-            <span className="text-xs lg:text-xs text-gray-500 font-normal">LOSS: <span className="font-bold">{columnsLoss}</span></span>
-          </h3>
+             <span>Colunas</span>
+             <span className="text-[13px] lg:text-[15px] text-yellow-600 font-normal">LOSS: <span className="font-bold">{columnsLoss}</span></span>
+           </h3>
           <div className="space-y-0.5 lg:space-y-1">
             {[
               { label: '3ª Coluna', value: statistics.columns.third, percentage: columnsPercentages.third, color: 'bg-blue-600', columnIndex: 3 },
@@ -523,9 +523,9 @@ const StatisticsCards = ({
         {/* Card Dúzias Customizado (movido da 3ª linha para 1ª linha) */}
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2 flex justify-between items-center">
-            <span>Dúzias</span>
-            <span className="text-xs lg:text-xs text-gray-500 font-normal">LOSS: <span className="font-bold">{dozensLoss}</span></span>
-          </h3>
+             <span>Dúzias</span>
+             <span className="text-[13px] lg:text-[15px] text-yellow-600 font-normal">LOSS: <span className="font-bold">{dozensLoss}</span></span>
+           </h3>
           <div className="space-y-0.5 lg:space-y-1">
             {[
               { label: '1ª (1-12)', value: statistics.dozens.first, percentage: dozensPercentages.first, color: 'bg-yellow-600', dozenIndex: 1 },
