@@ -15,6 +15,7 @@ interface NovesForaCardProps {
 }
 
 const NovesForaCard: React.FC<NovesForaCardProps> = ({ novesForaStats, totalNumbers, animatingNovesFora }) => {
+  const [open, setOpen] = React.useState(false);
   return (
     <div className={`bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-[111px] ${
       animatingNovesFora === 'green'
@@ -23,7 +24,11 @@ const NovesForaCard: React.FC<NovesForaCardProps> = ({ novesForaStats, totalNumb
         ? 'animate-pulse-yellow-border'
         : ''
     }`}>
-      <h3 className="text-xs lg:text-sm font-semibold text-white mb-1 lg:mb-2">NovesFora</h3>
+      <h3 className="text-xs lg:text-sm font-semibold text-white mb-1 lg:mb-2">
+        <button type="button" onClick={() => setOpen(true)} className="cursor-pointer">
+          NovesFora
+        </button>
+      </h3>
       <div className="space-y-1">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
@@ -65,6 +70,21 @@ const NovesForaCard: React.FC<NovesForaCardProps> = ({ novesForaStats, totalNumb
           </div>
         </div>
       </div>
+      {open && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setOpen(false)}>
+          <div className="bg-white rounded-lg shadow-lg p-4 w-11/12 max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="text-sm font-semibold mb-2">NovesFora</div>
+            <div className="text-xs text-gray-700 mb-2">Gatilhos: 5, 8, 10, 15, 16, 21, 22, 23, 30</div>
+            <div className="text-xs text-gray-700 mb-1">Entrada: quando sai um número de gatilho, o campo Entradas incrementa imediatamente.</div>
+            <div className="text-xs text-gray-700 mb-1">WIN: na rodada seguinte, se o número não for de gatilho.</div>
+            <div className="text-xs text-gray-700 mb-3">LOSS: na rodada seguinte, se o número for de gatilho.</div>
+            <div className="text-xs text-gray-700 mb-3">Seq. Negativa: mostra atual/MAX de LOSS consecutivo; zera o atual ao ocorrer um WIN.</div>
+            <div className="flex justify-end">
+              <button type="button" className="text-xs bg-gray-800 text-white px-3 py-1 rounded" onClick={() => setOpen(false)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
