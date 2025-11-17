@@ -1340,23 +1340,41 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     console.log('📝 ANTES:', transcript);
     console.log('🔄 DEPOIS:', processedText);
 
-    // Extrair tokens numéricos e mesclar padrões "0 X" em um único dígito
+    // Extrair sequências de dígitos e dividir em pares de 2 dígitos
     const tokenMatches = processedText.match(/\d+/g) || [];
-    const mergedTokens: string[] = [];
+    const twoDigitPairs: string[] = [];
     for (let i = 0; i < tokenMatches.length; i++) {
       const t = tokenMatches[i];
-      const next = tokenMatches[i + 1];
-      if (t === '0' && next && /^[1-9]$/.test(next)) {
-        // Mesclar "0" + dígito em um único número (interpretação de "zero quatro" = 4)
-        mergedTokens.push(next);
-        i++; // pular o próximo
+      if (t.length === 1) {
+        // Tratar dígitos soltos como "0X" para manter dois dígitos
+        twoDigitPairs.push(('0' + t).slice(-2));
+      } else if (t.length === 2) {
+        twoDigitPairs.push(t);
       } else {
-        mergedTokens.push(t);
+        // Cortar sequências longas em pares: "2824" => ["28","24"]
+        for (let j = 0; j < t.length; j += 2) {
+          const pair = t.slice(j, j + 2);
+          twoDigitPairs.push(pair.length === 2 ? pair : ('0' + pair));
+        }
       }
     }
     
-    // Filtrar números válidos (0-36)
-    const numbers = mergedTokens.filter(t => {
+    // Mesclar padrão especial "0" seguido de dígito único quando vierem como tokens separados
+    // (casos como "zero quatro" transcritos em "0" e "4")
+    const mergedPairs: string[] = [];
+    for (let i = 0; i < twoDigitPairs.length; i++) {
+      const p = twoDigitPairs[i];
+      if (p === '00' && (i + 1) < twoDigitPairs.length && /^0[1-9]$/.test(twoDigitPairs[i + 1])) {
+        // "00" + "0X" => manter apenas "0X" (evita inserir "00" extra)
+        mergedPairs.push(twoDigitPairs[i + 1]);
+        i++;
+      } else {
+        mergedPairs.push(p);
+      }
+    }
+    
+    // Filtrar números válidos (00-36)
+    const numbers = mergedPairs.filter(t => {
       const n = parseInt(t);
       return !isNaN(n) && n >= 0 && n <= 36;
     });
