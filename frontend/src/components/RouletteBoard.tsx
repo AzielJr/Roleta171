@@ -448,6 +448,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<any | null>(null);
   const [voiceBuffer, setVoiceBuffer] = useState<string>(''); // Buffer para acumular dígitos falados
+  const lastAppendedPairsRef = useRef<string[]>([]); // Rastro dos últimos pares adicionados (evita duplicações no interim)
   
   // Estados para reconhecimento de voz da roleta
   const [isRouletteListening, setIsRouletteListening] = useState(false);
@@ -1241,13 +1242,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             console.log('⚡ INTERMEDIÁRIO:', result[0].transcript, 'Confiança:', result[0].confidence);
           }
         }
-        // Atualizar buffer de voz para feedback em tempo real
+        // Atualizar buffer de voz para feedback em tempo real e inserir números em tempo real
         if (interimTranscript.trim()) {
           setVoiceBuffer(interimTranscript.trim());
+          processVoiceInputContinuous(interimTranscript, 'interim');
         }
-        // Somente processar números quando houver parte final
+        // Confirmar números quando houver parte final
         if (finalTranscript.trim()) {
-          processVoiceInputContinuous(finalTranscript);
+          processVoiceInputContinuous(finalTranscript, 'final');
         }
       };
       
@@ -1288,8 +1290,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   }, [isListening]);
 
   // Função para processar entrada de voz contínua em tempo real
-  const processVoiceInputContinuous = (transcript: string) => {
-    console.log('🎤 RECEBIDO:', transcript);
+  const processVoiceInputContinuous = (transcript: string, commitMode: 'interim' | 'final' = 'final') => {
+    console.log('🎤 RECEBIDO:', transcript, 'commitMode:', commitMode);
     
     // Evitar processar transcripts vazios ou muito curtos
     if (!transcript || transcript.trim().length < 2) {
@@ -1393,15 +1395,30 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       
       // Adicionar números ao campo de texto se temos números válidos
       if (formattedNumbers.length > 0) {
+        // No interim, evitar duplicações simples contra os últimos pares adicionados
+        const toAppend = commitMode === 'interim'
+          ? formattedNumbers.filter(p => {
+              const recent = lastAppendedPairsRef.current.slice(-3);
+              return !recent.includes(p);
+            })
+          : formattedNumbers;
+        if (toAppend.length === 0) {
+          return;
+        }
         const currentInput = addNumbersInput;
-        const newNumbers = formattedNumbers.join(',');
+        const newNumbers = toAppend.join(',');
         
         // Adicionar ao final para manter ordem cronológica
         const newInput = currentInput ? `${currentInput},${newNumbers}` : newNumbers;
         
-        console.log('Números formatados:', formattedNumbers);
+        console.log('Números formatados:', toAppend);
         
         setAddNumbersInput(newInput);
+        // Atualizar rastro de pares adicionados
+        lastAppendedPairsRef.current.push(...toAppend);
+        if (lastAppendedPairsRef.current.length > 50) {
+          lastAppendedPairsRef.current = lastAppendedPairsRef.current.slice(-50);
+        }
         
         // Reinício preventivo desabilitado (evitar interrupções durante ditado longo)
         const totalNumbers = newInput.split(',').filter(n => n.trim()).length;
