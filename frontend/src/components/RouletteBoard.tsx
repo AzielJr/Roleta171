@@ -473,6 +473,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const P2_ENTRY_NUMBERS = [0, 3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
   const TORRE_ENTRY_NUMBERS = [1, 2, 3, 34, 35, 36];
   const TORRE_LOSS_SET = new Set<number>([0, 1, 2, 3, 34, 35, 36]);
+  const NOVES_FORA_ENTRY_SET = new Set<number>([5, 8, 10, 15, 16, 21, 22, 23, 30]);
   // Estados e animação da Torre
   const [torrePendingEntrada, setTorrePendingEntrada] = useState<boolean>(false);
   const [animatingTorre, setAnimatingTorre] = useState<'yellow' | 'green' | undefined>(undefined);
@@ -498,6 +499,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Estados e animação da P2
   const [p2PendingEntrada, setP2PendingEntrada] = useState<boolean>(false);
   const [animatingP2, setAnimatingP2] = useState<'yellow' | 'green' | undefined>(undefined);
+
+  const [novesForaPendingEntrada, setNovesForaPendingEntrada] = useState<boolean>(false);
+  const [animatingNovesFora, setAnimatingNovesFora] = useState<'yellow' | 'green' | undefined>(undefined);
 
   // UI da P2 controlada por estado; sem manipulação de DOM
   useEffect(() => {
@@ -2231,6 +2235,29 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       
       console.log('[DEBUG MAIN] Chamando evaluateP2Number para:', num);
       evaluateP2Number(num, p2PendingEntrada, setP2PendingEntrada, setAnimatingP2, setP2WinCount, setP2LossCount, prev, p2Mode);
+
+      // Avaliar NovesFora: ativa na entrada (número alvo) e classifica no próximo
+      if (!novesForaPendingEntrada) {
+        if (NOVES_FORA_ENTRY_SET.has(num)) {
+          setNovesForaPendingEntrada(true);
+          setAnimatingNovesFora('yellow');
+          if (avisosSonorosAtivos) {
+            try { soundGenerator.playBellSound(); } catch {}
+          }
+        }
+      } else {
+        if (NOVES_FORA_ENTRY_SET.has(num)) {
+          // LOSS: mantém pendência e borda amarela
+          setAnimatingNovesFora('yellow');
+        } else {
+          // WIN: mostra verde curto e encerra pendência
+          setAnimatingNovesFora('green');
+          setNovesForaPendingEntrada(false);
+          setTimeout(() => {
+            setAnimatingNovesFora(undefined);
+          }, 350);
+        }
+      }
       
       // evaluateP2(num, prev); // DESABILITADO - usando evaluateP2Number
       // Avaliar BET Terminais com a LISTA ANTERIOR (prev) para decidir Entrada,
@@ -3932,6 +3959,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             animatingBetTerminais={animatingBetTerminais}
             animatingTorre={animatingTorre}
             animatingP2={animatingP2}
+            animatingNovesFora={animatingNovesFora}
             p2Mode={p2Mode}
             setP2Mode={setP2Mode}
             betTerminaisStats={{

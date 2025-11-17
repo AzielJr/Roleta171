@@ -3,6 +3,7 @@ import RankingEstrategiasCard from './RankingEstrategiasCard';
 import TorreCard from './TorreCard';
 import BETTerminaisCard from './BETTerminaisCard';
 import ColunasCard from './ColunasCard';
+import NovesForaCard from './NovesForaCard';
 import { calculateDozenAbsences, calculateColumnAbsences } from '../utils/statisticsCalculator';
 
 const StatisticsCards = ({
@@ -17,22 +18,16 @@ const StatisticsCards = ({
   calculatedP2Stats = { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0 },
   betTerminaisStats = { entradas: 0, wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0, positiveSequenceCurrent: 0, positiveSequenceMax: 0 },
   calculated32P1Stats = { winTotal: 0, wins: 0, losses: 0, total: 0 },
-  calculatedTriangulacaoStats = { wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, positiveSequenceCurrent: 0, positiveSequenceMax: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0 },
   showP2Modal = false,
   showTorreModal = false,
   showRaceTrackModal = false,
-  showTriangulacaoModal = false,
   setShowP2Modal = (v: boolean) => {},
   setShowTorreModal = (v: boolean) => {},
   setShowRaceTrackModal = (v: boolean) => {},
-  setShowTriangulacaoModal = (v: boolean) => {},
-  triangulacaoTriadDisplay = [],
-  triangulacaoSections = [],
-  triangulacaoCoveredNumbers = [],
-  triangulacaoExposedNumbers = [],
   animatingTorre = undefined,
   animatingP2 = undefined,
   animatingBetTerminais = undefined,
+  animatingNovesFora = undefined,
   animatingDozens = new Set<number>(),
   getNumberColumn = undefined,
   getNumberDozen = undefined,
@@ -223,7 +218,7 @@ const StatisticsCards = ({
   }, [lastNumbers, ROULETTE_SEQUENCE]);
  
    // Stats de exibição para BET Terminais (zerar quando não há dados)
-   const betTerminaisStatsDisplay = React.useMemo(() => {
+  const betTerminaisStatsDisplay = React.useMemo(() => {
     if (!betTerminaisStats) {
       return { entradas: 0, wins: 0, losses: 0, winPercentage: 0, lossPercentage: 0, negativeSequenceCurrent: 0, negativeSequenceMax: 0, positiveSequenceCurrent: 0, positiveSequenceMax: 0 };
     }
@@ -232,6 +227,54 @@ const StatisticsCards = ({
     }
     return betTerminaisStats;
   }, [lastNumbers, betTerminaisStats]);
+
+  const novesForaStats = React.useMemo(() => {
+    const targets = new Set([5, 8, 10, 15, 16, 21, 22, 23, 30]);
+    let entradas = 0;
+    let wins = 0;
+    let losses = 0;
+    const results: ('WIN' | 'LOSS')[] = [];
+
+    for (let i = 0; i < lastNumbers.length; i++) {
+      const current = lastNumbers[i];
+      if (targets.has(current)) {
+        entradas++;
+        if (i + 1 < lastNumbers.length) {
+          const next = lastNumbers[i + 1];
+          if (targets.has(next)) {
+            losses++;
+            results.push('LOSS');
+          } else {
+            wins++;
+            results.push('WIN');
+          }
+        }
+      }
+    }
+
+    let negativeSequenceMax = 0;
+    let temp = 0;
+    for (const r of results) {
+      if (r === 'LOSS') {
+        temp++;
+        if (temp > negativeSequenceMax) negativeSequenceMax = temp;
+      } else {
+        temp = 0;
+      }
+    }
+
+    let negativeSequenceCurrent = 0;
+    for (let i = results.length - 1; i >= 0; i--) {
+      if (results[i] === 'LOSS') negativeSequenceCurrent++;
+      else break;
+    }
+
+    const totalEval = wins + losses;
+    const winPercentage = totalEval > 0 ? Math.round((wins / totalEval) * 100) : 0;
+    const lossPercentage = totalEval > 0 ? Math.round((losses / totalEval) * 100) : 0;
+
+    return { entradas, wins, losses, winPercentage, lossPercentage, negativeSequenceCurrent, negativeSequenceMax };
+  }, [lastNumbers]);
 
   // Ranking de Terminais baseado nos últimos números
   const terminaisRanking = React.useMemo(() => {
@@ -308,8 +351,9 @@ const StatisticsCards = ({
     const betWinPercentage = betTerminaisStatsDisplay?.winPercentage ?? 0;
     const patternWins = pattern171Stats?.wins ?? 0;
     const patternEntradas = pattern171Stats?.entradas ?? 0;
-    const triangWins = calculatedTriangulacaoStats?.wins ?? 0;
-    const triangWinPercentage = calculatedTriangulacaoStats?.winPercentage ?? 0;
+    const nfWins = novesForaStats.wins;
+    const nfTotal = novesForaStats.wins + novesForaStats.losses;
+    const nfWinPercentage = nfTotal > 0 ? Math.round((nfWins / nfTotal) * 100) : 0;
     const p32Total = calculated32P1Stats?.total ?? 0;
     const p32Wins = calculated32P1Stats?.wins ?? 0;
 
@@ -318,13 +362,13 @@ const StatisticsCards = ({
       { name: 'P2', wins: p2Wins, winPercentage: (p2Wins + p2Losses) > 0 ? Math.round((p2Wins / (p2Wins + p2Losses)) * 100) : 0 },
       { name: 'BET Terminais', wins: betWins, winPercentage: betWinPercentage },
       { name: '171', wins: patternWins, winPercentage: patternEntradas > 0 ? Math.round((patternWins / patternEntradas) * 100) : 0 },
-      { name: 'Triangulação', wins: triangWins, winPercentage: triangWinPercentage },
+      { name: 'NovesFora', wins: nfWins, winPercentage: nfWinPercentage },
       { name: '32P3', wins: p32Wins, winPercentage: p32Total > 0 ? Math.round((p32Wins / p32Total) * 100) : 0 },
     ];
     
     // Ordenar por percentual de vitórias (maior para menor)
     return strategies.sort((a, b) => b.winPercentage - a.winPercentage);
-  }, [calculatedTorreStats, calculatedP2Stats, betTerminaisStatsDisplay, pattern171Stats, calculatedTriangulacaoStats, calculated32P1Stats]);
+  }, [calculatedTorreStats, calculatedP2Stats, betTerminaisStatsDisplay, pattern171Stats, novesForaStats, calculated32P1Stats]);
 
   // Ordem fixa para exibição no card Ranking (sem rolagem)
   const displayStrategiesRanking = React.useMemo(() => {
@@ -357,94 +401,38 @@ const StatisticsCards = ({
           terminaisRanking={terminaisRanking} 
         />
 
-        <ColunasCard 
-          statistics={statistics} 
-          columnsPercentages={columnsPercentages} 
-          columnsLoss={columnsLoss} 
-          lastNumbers={lastNumbers} 
-          getNumberColumnSafe={getNumberColumnSafe} 
-          columnsAbsences={columnsAbsences}
+        <StatCard
+          title={
+            <div className="flex justify-between items-center w-full">
+              <span>32P3</span>
+              <select
+                className="text-xs bg-gray-200 text-gray-700 rounded px-1 py-0.5"
+                value={window32P1}
+                onChange={() => {}}
+                title="Selecione a janela de números para 32P3"
+              >
+                <option value={0}>Todos</option>
+                <option value={10}>Últimos 10</option>
+                <option value={20}>Últimos 20</option>
+                <option value={30}>Últimos 30</option>
+                <option value={40}>Últimos 40</option>
+                <option value={50}>Últimos 50</option>
+              </select>
+            </div>
+          }
+          data={[
+            { label: 'WIN TOTAL', value: calculated32P1Stats.winTotal, percentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.winTotal / calculated32P1Stats.total) * 100) : 0 },
+            { label: 'WIN', value: calculated32P1Stats.wins, percentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.wins / calculated32P1Stats.total) * 100) : 0 },
+            { label: 'LOSS', value: calculated32P1Stats.losses, percentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.losses / calculated32P1Stats.total) * 100) : 0 }
+          ]}
+          colors={['bg-blue-500', 'bg-green-500', 'bg-red-500']}
         />
 
-        {/* Card Dúzias Customizado (movido da 3ª linha para 1ª linha) */}
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
-          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2 flex justify-between items-center">
-             <span>Dúzias</span>
-             <span className="text-[13px] lg:text-[15px] text-yellow-600 font-normal">LOSS: <span className="font-bold">{dozensLoss}</span></span>
-           </h3>
-          <div className="space-y-0.5 lg:space-y-1">
-            {[
-              { label: '1ª (1-12)', value: statistics.dozens.first, percentage: dozensPercentages.first, color: 'bg-yellow-600', dozenIndex: 1, absences: dozensAbsences.first },
-              { label: '2ª (13-24)', value: statistics.dozens.second, percentage: dozensPercentages.second, color: 'bg-green-600', dozenIndex: 2, absences: dozensAbsences.second },
-              { label: '3ª (25-36)', value: statistics.dozens.third, percentage: dozensPercentages.third, color: 'bg-blue-600', dozenIndex: 3, absences: dozensAbsences.third }
-            ].map((item, index) => {
-              const isRepeated = animatingDozens.has(item.dozenIndex);
-              return (
-                <div key={item.label} className="grid items-center gap-1" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
-                  {/* Coluna 1: Identificação da Dúzia */}
-                  <div className="flex items-center gap-0.5 lg:gap-1">
-                    <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${item.color}`}></div>
-                    <span className="text-xs lg:text-xs text-gray-600">{item.label}</span>
-                  </div>
-                  
-                  {/* Coluna 2: Ausências (centralizada) */}
-                  <div className="text-center" style={{ marginLeft: '12px', marginRight: '12px' }}>
-                    <div 
-                      className="text-pink-400" 
-                      style={{ fontSize: '12px' }}
-                      title={`Ausências: ${item.absences.current} atual / ${item.absences.max} máxima consecutiva`}
-                    >
-                      {item.absences.current} / {item.absences.max}
-                    </div>
-                  </div>
-                  
-                  {/* Coluna 3: Total e Percentual (alinhada à direita) */}
-                  <div className="text-right">
-                    <div className={`font-bold text-gray-800 text-xs lg:text-sm ${
-                      isRepeated ? 'animate-pulse-color-size' : ''
-                    }`}>
-                      {item.value}
-                    </div>
-                    <div className="text-xs lg:text-xs text-gray-500">{item.percentage}%</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          
-          {/* Rodapé com lista horizontal de dúzias chamadas */}
-          <div className="mt-2 pt-2 border-t border-gray-200">
-            <div className="flex overflow-x-auto ranking-scroll pr-1">
-              <div className="flex" style={{ minWidth: 'max-content' }}>
-                {lastNumbers
-                  .slice()
-                  .reverse() // Últimas dúzias à esquerda
-                  .map((num, index) => {
-                    const dozen = getNumberDozenSafe(num);
-                    if (dozen === null) return null;
-                    
-                    // Cores de texto fortes e visíveis em fundo cinza
-                    const dozenTextColors: Record<number, string> = {
-                      1: 'text-yellow-600',
-                      2: 'text-green-600',
-                      3: 'text-blue-600'
-                    };
-                    
-                    return (
-                      <span
-                        key={`${num}-${index}`}
-                        className={`font-bold text-sm whitespace-nowrap ${dozenTextColors[dozen]}`}
-                        style={{ marginRight: '5px' }}
-                      >
-                        {dozen}
-                      </span>
-                    );
-                  })
-                  .filter(Boolean)}
-              </div>
-            </div>
-          </div>
-        </div>
+        <NovesForaCard 
+          novesForaStats={novesForaStats}
+          totalNumbers={totalNumbers}
+          animatingNovesFora={animatingNovesFora}
+        />
 
         
       </div>
@@ -477,33 +465,41 @@ const StatisticsCards = ({
 
         {/* Colunas e Cores seguem após Castelo */}
 
-        {/* Novo card 32P3 (apenas rótulo; lógica permanece 32P1) */}
-        <StatCard
-          title={
-            <div className="flex justify-between items-center w-full">
-              <span>32P3</span>
-              <select
-                className="text-xs bg-gray-200 text-gray-700 rounded px-1 py-0.5"
-                value={window32P1}
-                onChange={() => {}}
-                title="Selecione a janela de números para 32P3"
-              >
-                <option value={0}>Todos</option>
-                <option value={10}>Últimos 10</option>
-                <option value={20}>Últimos 20</option>
-                <option value={30}>Últimos 30</option>
-                <option value={40}>Últimos 40</option>
-                <option value={50}>Últimos 50</option>
-              </select>
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full">
+          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Números (Max 50)</h3>
+          <div className="ranking-scroll max-h-[calc(8rem+16px)] overflow-y-auto">
+            <div className="space-y-0.5">
+              {React.useMemo(() => {
+                const numberCounts: { [key: number]: number } = {};
+                lastNumbers.forEach(num => {
+                  numberCounts[num] = (numberCounts[num] || 0) + 1;
+                });
+
+                const sortedNumbers = Object.entries(numberCounts)
+                  .map(([num, count]) => ({ number: parseInt(num), count }))
+                  .sort((a, b) => b.count - a.count)
+                  .slice(0, 50);
+
+                return sortedNumbers.map(({ number, count }) => {
+                  const percentage = totalNumbers > 0 ? Math.round((count / totalNumbers) * 100) : 0;
+                  return (
+                    <div key={number} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
+                      <div className="flex items-center space-x-1">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(number)}`}>
+                          {number.toString().padStart(2, '0')}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-gray-800 text-xs">{count}</div>
+                        <div className="text-xs text-gray-500">{percentage}%</div>
+                      </div>
+                    </div>
+                  );
+                });
+              }, [lastNumbers, totalNumbers])}
             </div>
-          }
-          data={[
-            { label: 'WIN TOTAL', value: calculated32P1Stats.winTotal, percentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.winTotal / calculated32P1Stats.total) * 100) : 0 },
-            { label: 'WIN', value: calculated32P1Stats.wins, percentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.wins / calculated32P1Stats.total) * 100) : 0 },
-            { label: 'LOSS', value: calculated32P1Stats.losses, percentage: calculated32P1Stats.total > 0 ? Math.round((calculated32P1Stats.losses / calculated32P1Stats.total) * 100) : 0 }
-          ]}
-          colors={['bg-blue-500', 'bg-green-500', 'bg-red-500']}
-        />
+          </div>
+        </div>
 
 
         <StatCard
@@ -669,70 +665,80 @@ const StatisticsCards = ({
           cardType="colors"
         />
 
-        {/* Card - Números (Max 50) (agora na posição onde estava o Ranking) */}
-        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full">
-          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2">Números (Max 50)</h3>
-          <div className="ranking-scroll max-h-[calc(8rem+16px)] overflow-y-auto">
-            <div className="space-y-0.5">
-              {React.useMemo(() => {
-                const numberCounts: { [key: number]: number } = {};
-                lastNumbers.forEach(num => {
-                  numberCounts[num] = (numberCounts[num] || 0) + 1;
-                });
-
-                const sortedNumbers = Object.entries(numberCounts)
-                  .map(([num, count]) => ({ number: parseInt(num), count }))
-                  .sort((a, b) => b.count - a.count)
-                  .slice(0, 50);
-
-                return sortedNumbers.map(({ number, count }) => {
-                  const percentage = totalNumbers > 0 ? Math.round((count / totalNumbers) * 100) : 0;
-                  return (
-                    <div key={number} className="flex justify-between items-center px-1 py-0.5 rounded text-xs">
-                      <div className="flex items-center space-x-1">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(number)}`}>
-                          {number.toString().padStart(2, '0')}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold text-gray-800 text-xs">{count}</div>
-                        <div className="text-xs text-gray-500">{percentage}%</div>
-                      </div>
+        <ColunasCard 
+          statistics={statistics}
+          columnsPercentages={columnsPercentages}
+          columnsLoss={columnsLoss}
+          lastNumbers={lastNumbers}
+          getNumberColumnSafe={getNumberColumnSafe}
+          columnsAbsences={columnsAbsences}
+        />
+        <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
+          <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2 flex justify-between items-center">
+             <span>Dúzias</span>
+             <span className="text-[13px] lg:text-[15px] text-yellow-600 font-normal">LOSS: <span className="font-bold">{dozensLoss}</span></span>
+           </h3>
+          <div className="space-y-0.5 lg:space-y-1">
+            {[
+              { label: '1ª (1-12)', value: statistics.dozens.first, percentage: dozensPercentages.first, color: 'bg-yellow-600', dozenIndex: 1, absences: dozensAbsences.first },
+              { label: '2ª (13-24)', value: statistics.dozens.second, percentage: dozensPercentages.second, color: 'bg-green-600', dozenIndex: 2, absences: dozensAbsences.second },
+              { label: '3ª (25-36)', value: statistics.dozens.third, percentage: dozensPercentages.third, color: 'bg-blue-600', dozenIndex: 3, absences: dozensAbsences.third }
+            ].map((item) => {
+              const isRepeated = animatingDozens.has(item.dozenIndex);
+              return (
+                <div key={item.label} className="grid items-center gap-1" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
+                  <div className="flex items-center gap-0.5 lg:gap-1">
+                    <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${item.color}`}></div>
+                    <span className="text-xs lg:text-xs text-gray-600">{item.label}</span>
+                  </div>
+                  <div className="text-center" style={{ marginLeft: '12px', marginRight: '12px' }}>
+                    <div 
+                      className="text-pink-400" 
+                      style={{ fontSize: '12px' }}
+                      title={`Ausências: ${item.absences.current} atual / ${item.absences.max} máxima consecutiva`}
+                    >
+                      {item.absences.current} / {item.absences.max}
                     </div>
-                  );
-                });
-              }, [lastNumbers, totalNumbers])}
+                  </div>
+                  <div className="text-right">
+                    <div className={`font-bold text-gray-800 text-xs lg:text-sm ${isRepeated ? 'animate-pulse-color-size' : ''}`}>
+                      {item.value}
+                    </div>
+                    <div className="text-xs lg:text-xs text-gray-500">{item.percentage}%</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-2 pt-2 border-t border-gray-200">
+            <div className="flex overflow-x-auto ranking-scroll pr-1">
+              <div className="flex" style={{ minWidth: 'max-content' }}>
+                {lastNumbers
+                  .slice()
+                  .reverse()
+                  .map((num, index) => {
+                    const dozen = getNumberDozenSafe(num);
+                    if (dozen === null) return null;
+                    const dozenTextColors: Record<number, string> = {
+                      1: 'text-yellow-600',
+                      2: 'text-green-600',
+                      3: 'text-blue-600'
+                    };
+                    return (
+                      <span
+                        key={`${num}-${index}`}
+                        className={`font-bold text-sm whitespace-nowrap ${dozenTextColors[dozen]}`}
+                        style={{ marginRight: '5px' }}
+                      >
+                        {dozen}
+                      </span>
+                    );
+                  })
+                  .filter(Boolean)}
+              </div>
             </div>
           </div>
         </div>
-         <StatCard
-           title={
-             <div className="flex items-center justify-between">
-               <span
-                 className="cursor-pointer hover:text-blue-600 transition-colors"
-                 onClick={() => setShowTriangulacaoModal(true)}
-                 title="Clique para ver cobertura e números expostos"
-               >
-                 Triangulação
-               </span>
-               <div className="flex items-center gap-1">
-                  {triangulacaoTriadDisplay.map(n => (
-                    <div key={n} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColor(n)}`}>
-                      {n.toString().padStart(2,'0')}
-                    </div>
-                  ))}
-                </div>
-             </div>
-           }
-           containerClassName="min-h-[111px]"
-           data={[
-             { label: 'WIN', value: calculatedTriangulacaoStats.wins, percentage: calculatedTriangulacaoStats.winPercentage },
-             { label: 'LOSS', value: calculatedTriangulacaoStats.losses, percentage: calculatedTriangulacaoStats.lossPercentage },
-             { label: 'Seq. Positiva', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedTriangulacaoStats.positiveSequenceCurrent}/${calculatedTriangulacaoStats.positiveSequenceMax}` },
-             { label: 'Seq. Negativa', value: 0, percentage: 0, hidePercentage: true, customValue: `${calculatedTriangulacaoStats.negativeSequenceCurrent}/${calculatedTriangulacaoStats.negativeSequenceMax}` }
-           ]}
-           colors={['bg-green-500', 'bg-red-500', 'bg-blue-500', 'bg-orange-500']}
-         />
       </div>
 
       {/* Modal P2 - Números Gatilho */}
@@ -894,99 +900,6 @@ const StatisticsCards = ({
         </div>
       )}
 
-      {/* Modal Triangulação */}
-      {showTriangulacaoModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowTriangulacaoModal(false)}>
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-gray-800">Triangulação</h2>
-              <button 
-                onClick={() => setShowTriangulacaoModal(false)}
-                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="border-l-4 border-blue-500 pl-3">
-                <h3 className="font-semibold text-blue-700">Tríade atual</h3>
-                <p className="text-sm text-gray-600 mb-2">Último número e offsets (+12, +24)</p>
-                <div className="flex items-center gap-3">
-                  {triangulacaoTriadDisplay.map(num => (
-                    <div key={num} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColor(num)}`}>
-                      {num.toString().padStart(2,'0')}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="border-l-4 border-teal-500 pl-3">
-                <h3 className="font-semibold text-teal-700">Vizinhos por centro</h3>
-                <p className="text-sm text-gray-600 mb-2">4 vizinhos à esquerda e à direita</p>
-                <div className="space-y-2">
-                  {triangulacaoSections.map(s => (
-                    <div key={s.center} className="bg-gray-50 rounded p-2">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs text-gray-600">Centro</span>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(s.center)}`}>{s.center.toString().padStart(2,'0')}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-600 w-16">Esquerda</span>
-                        <div className="flex flex-wrap gap-1">
-                          {s.neighborsLeft.map(n => (
-                            <div key={`${s.center}-L-${n}`} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(n)}`}>{n.toString().padStart(2,'0')}</div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs text-gray-600 w-16">Direita</span>
-                        <div className="flex flex-wrap gap-1">
-                          {s.neighborsRight.map(n => (
-                            <div key={`${s.center}-R-${n}`} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${getRouletteColorLocal(n)}`}>{n.toString().padStart(2,'0')}</div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="border-l-4 border-indigo-500 pl-3">
-                <h3 className="font-semibold text-indigo-700">Cobertura</h3>
-                <p className="text-sm text-gray-600 mb-2">Números cobertos e expostos</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-xs text-gray-600 mb-1">Cobertos ({triangulacaoCoveredNumbers.length})</div>
-                    <div className="flex flex-wrap gap-1">
-                      {triangulacaoCoveredNumbers.map(n => (
-                        <span key={`cov-${n}`} className={`px-2 py-1 rounded text-xs font-medium text-white ${getRouletteColor(n)}`}>{n.toString().padStart(2,'0')}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-600 mb-1">Expostos ({triangulacaoExposedNumbers.length})</div>
-                    <div className="flex flex-wrap gap-1">
-                      {triangulacaoExposedNumbers.map(n => (
-                        <span key={`exp-${n}`} className="px-2 py-1 rounded text-xs font-medium bg-gray-200 text-gray-800">{n.toString().padStart(2,'0')}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 text-center">
-              <button 
-                onClick={() => setShowTriangulacaoModal(false)}
-                className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
