@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { evaluateTorreNumber } from '../utils/torreEvaluator';
+import { evaluateBetTerminaisNumber } from '../utils/betTerminaisEvaluator';
+import { evaluateP2Number } from '../utils/p2Evaluator';
 import { cn } from '../utils/cn';
 import StatisticsCards from './StatisticsCards';
 import { BalanceManager } from './BalanceManager';
@@ -12,6 +15,7 @@ import { HistoricoSaldos } from './HistoricoSaldos';
 import { MonthlyGraphModal } from './MonthlyGraphModal';
 import { soundGenerator } from '../utils/soundUtils';
 import DuzColPopup from './DuzColPopup';
+import AreasRoleta from './AreasRoleta';
 
 interface SelectedNumbers {
   numbers: number[];
@@ -58,6 +62,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [showMonthlyGraphModal, setShowMonthlyGraphModal] = useState(false);
   // Painel de Registro de Entradas (Dúzias e Colunas)
   const [showDuzColPanel, setShowDuzColPanel] = useState(false);
+  
+  // Container Áreas da Roleta
+  const [showAreasRoleta, setShowAreasRoleta] = useState(false);
   
   // Estados para os filtros do histórico (datas locais)
   const formatDateLocal = (d: Date) => {
@@ -457,62 +464,426 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [betTerminaisNegSeqMax, setBetTerminaisNegSeqMax] = useState(0);
   const [betTerminaisPosSeqCurrent, setBetTerminaisPosSeqCurrent] = useState(0);
   const [betTerminaisPosSeqMax, setBetTerminaisPosSeqMax] = useState(0);
+  const [betTerminaisEntradas, setBetTerminaisEntradas] = useState(0);
+  const [betTerminaisPendingEntrada, setBetTerminaisPendingEntrada] = useState(false);
+  const [animatingBetTerminais, setAnimatingBetTerminais] = useState<'yellow' | 'green' | undefined>(undefined);
+  
+  // ===== Calculadoras de Estatísticas: P2 e Torre =====
+  const P2_ENTRY_NUMBERS = [0, 3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
+  const TORRE_ENTRY_NUMBERS = [1, 2, 3, 34, 35, 36];
+  const TORRE_LOSS_SET = new Set<number>([0, 1, 2, 3, 34, 35, 36]);
+  // Estados e animação da Torre
+  const [torrePendingEntrada, setTorrePendingEntrada] = useState<boolean>(false);
+  const [animatingTorre, setAnimatingTorre] = useState<'yellow' | 'green' | undefined>(undefined);
+   // Garantia removida: limpeza controlada por evaluateTorre com timeout
+   useEffect(() => {
+     // noop
+   }, [torrePendingEntrada]);
+   // UI da Torre controlada exclusivamente por estado (sem manipulação de DOM)
+   useEffect(() => {
+     // Nada aqui: StatisticsCards aplica/removerá bordas via animatingTorre
+   }, [animatingTorre]);
+
+   // UI da Torre é aplicada pelo container em StatisticsCards; sem manipulação de DOM aqui
+   useEffect(() => {
+     // Sem ação: animatingTorre dirige a borda no componente StatCard
+   }, [animatingTorre]);
+
+  // Helper: limpar visuais da Torre apenas por estado
+  const clearTorreVisuals = () => {
+    setAnimatingTorre(undefined);
+    setTorrePendingEntrada(false);
+  };
+  // Estados e animação da P2
+  const [p2PendingEntrada, setP2PendingEntrada] = useState<boolean>(false);
+  const [animatingP2, setAnimatingP2] = useState<'yellow' | 'green' | undefined>(undefined);
+
+  // UI da P2 controlada por estado; sem manipulação de DOM
+  useEffect(() => {
+    // Nada aqui: StatisticsCards aplica/removerá bordas via animatingP2
+  }, [animatingP2]);
+
+  // Sem manipulação de DOM para P2; animatingP2 dirige a UI no StatisticsCards
+  useEffect(() => {
+    // Nenhuma ação necessária
+  }, [animatingP2]);
+
+  const [p2Mode, setP2Mode] = useState<number>(1);
+
+  const calculatedP2Stats = React.useMemo(() => {
+    let entradas = 0, wins = 0, losses = 0;
+    let maxNegativeSequence = 0, currentNegativeSequence = 0;
+
+    if (p2Mode === 1) {
+      // Percorrer do início ao fim e classificar o número IMEDIATAMENTE SEGUINTE ao gatilho
+      for (let i = 0; i < lastNumbers.length; i++) {
+        const number = lastNumbers[i];
+        if (P2_ENTRY_NUMBERS.includes(number)) {
+          // Entradas: somar na ativação
+          entradas++;
+          if (i + 1 < lastNumbers.length) {
+            const nextNumber = lastNumbers[i + 1];
+            if (P2_ENTRY_NUMBERS.includes(nextNumber)) {
+              // LOSS: somar também em Entradas
+              losses++;
+              entradas++;
+              currentNegativeSequence++;
+              if (currentNegativeSequence > maxNegativeSequence) {
+                maxNegativeSequence = currentNegativeSequence;
+              }
+            } else {
+              // WIN: não soma Entradas adicional
+              wins++;
+              currentNegativeSequence = 0;
+            }
+          }
+        }
+      }
+    } else {
+      // Modo 2: considerar entrada somente quando há DOIS gatilhos consecutivos (i e i+1)
+      for (let i = 0; i <= lastNumbers.length - 2; i++) {
+        const n0 = lastNumbers[i];
+        const n1 = lastNumbers[i + 1];
+        if (P2_ENTRY_NUMBERS.includes(n0) && P2_ENTRY_NUMBERS.includes(n1)) {
+          // Entradas: somar na ativação (dois gatilhos consecutivos)
+          entradas++;
+          if (i + 2 < lastNumbers.length) {
+            const nextNumber = lastNumbers[i + 2];
+            if (P2_ENTRY_NUMBERS.includes(nextNumber)) {
+              // LOSS: somar também em Entradas
+              losses++;
+              entradas++;
+              currentNegativeSequence++;
+              if (currentNegativeSequence > maxNegativeSequence) {
+                maxNegativeSequence = currentNegativeSequence;
+              }
+            } else {
+              // WIN: não soma Entradas adicional
+              wins++;
+              currentNegativeSequence = 0;
+            }
+          }
+        }
+      }
+    }
+
+    return { entradas, wins, losses, maxNegativeSequence };
+  }, [lastNumbers, p2Mode]);
+
+  const calculatedTorreStats = React.useMemo(() => {
+    let entradas = 0, wins = 0, losses = 0;
+    let maxNegativeSequence = 0, currentNegativeSequence = 0;
+
+    let pending = false;
+    for (let i = 0; i < lastNumbers.length; i++) {
+      const number = lastNumbers[i];
+      if (!pending) {
+        if (TORRE_ENTRY_NUMBERS.includes(number)) {
+          entradas++;
+          pending = true;
+        }
+      } else {
+         // Classificar apenas quando existir um próximo número
+         if (number === 0) {
+           // LOSS por zero: não incrementa Entradas
+           losses++;
+           currentNegativeSequence++;
+           if (currentNegativeSequence > maxNegativeSequence) {
+             maxNegativeSequence = currentNegativeSequence;
+           }
+           // continua pendente
+         } else if (TORRE_ENTRY_NUMBERS.includes(number)) {
+           // LOSS por novo gatilho: incrementa Entradas e mantém pendente
+           entradas++;
+           losses++;
+           currentNegativeSequence++;
+           if (currentNegativeSequence > maxNegativeSequence) {
+             maxNegativeSequence = currentNegativeSequence;
+           }
+           // continua pendente
+         } else {
+           // WIN: encerra pendência
+           wins++;
+           currentNegativeSequence = 0;
+           pending = false;
+         }
+       }
+    }
+
+    return { entradas, wins, losses, maxNegativeSequence, currentNegativeSequence };
+  }, [lastNumbers]);
+  // ===== Fim calculadoras =====
+  // Janela e cálculo 32P1 para card 32P3
+  const [window32P1, setWindow32P1] = useState<number>(0);
+
+  const calculated32P1Stats = React.useMemo(() => {
+    const source = window32P1 > 0 ? lastNumbers.slice(-window32P1) : lastNumbers;
+    const total = source.length;
+    let wins = 0, losses = 0;
+    for (const n of source) {
+      if (n === 0) { losses++; continue; }
+      if (n % 3 === 0) wins++; else losses++;
+    }
+    const winTotal = wins;
+    return { winTotal, wins, losses, total };
+  }, [lastNumbers, window32P1]);
   
   // Controle para evitar duplicação de avaliação BET Terminais
   const lastEvaluatedBetTerminais = useRef<string>('');
+  // Controle para evitar duplicação de avaliação Torre
+  const lastEvaluatedTorre = useRef<string>('');
+  // Controle para evitar duplicação de avaliação P2
+  const lastEvaluatedP2 = useRef<string>('');
 
-  // Avaliar BET Terminais ANTES de atualizar a lista de terminais
-  const evaluateBetTerminais = (selectedNumber: number, currentNumbers: number[]) => {
-    const snapshot = currentNumbers; // usar lista atual (SEM o novo número)
+  // Avaliar BET Terminais APÓS atualizar a lista (ativação) e ANTES para classificação - DESABILITADO
+  const evaluateBetTerminais_OLD_DISABLED = (selectedNumber: number, currentNumbers: number[]) => {
+    const snapshotBefore = currentNumbers; // lista ANTES do novo número
+    const snapshotAfter = [...currentNumbers, selectedNumber]; // lista APÓS o novo número
 
-    // Criar chave única para evitar duplicação
-    const evaluationKey = `${selectedNumber}-${snapshot.length}`;
+    // Criar chave única para evitar duplicação (considera estado pendente e último número anterior)
+    const lastPrevNumber = snapshotBefore[snapshotBefore.length - 1] ?? 'none';
+    const evaluationKey = `${selectedNumber}-${snapshotBefore.length}-${lastPrevNumber}-${betTerminaisPendingEntrada ? 'pending' : 'idle'}`;
     if (lastEvaluatedBetTerminais.current === evaluationKey) {
-      console.log(`🚫 BET TERMINAIS - Avaliação duplicada evitada para ${selectedNumber}`);
+      console.log(`🚫 BET TERMINAIS - Avaliação duplicada evitada para ${selectedNumber} com chave ${evaluationKey}`);
       return;
     }
     lastEvaluatedBetTerminais.current = evaluationKey;
 
-    // Regra de cálculo quando pelo menos 8 dos 10 terminais têm algum valor nos últimos 50
-    const last50 = snapshot.slice(-50);
-    const counts = Array(10).fill(0);
-    last50.forEach(n => {
-      counts[n % 10]++;
-    });
-    const terminalsWithValues = counts.filter(c => c > 0).length;
-    
-    if (terminalsWithValues < 8) {
-      return; // não calcular BET Terminais se menos de 8 terminais têm valores
+    // Contagens ANTES e APÓS
+    const countsBefore = Array(10).fill(0);
+    snapshotBefore.forEach(n => { countsBefore[Math.abs(n) % 10]++; });
+    const countsAfter = Array(10).fill(0);
+    snapshotAfter.forEach(n => { countsAfter[Math.abs(n) % 10]++; });
+
+    // Ordenar terminais por frequência
+    const terminaisBefore = countsBefore.map((count, terminal) => ({ terminal, count }))
+      .sort((a, b) => b.count - a.count || a.terminal - b.terminal);
+    const terminaisAfter = countsAfter.map((count, terminal) => ({ terminal, count }))
+      .sort((a, b) => b.count - a.count || a.terminal - b.terminal);
+
+    const leastThreeBefore = terminaisBefore.slice(-3).map(t => t.terminal);
+    const leastThreeAfter = terminaisAfter.slice(-3).map(t => t.terminal);
+
+    const terminal = Math.abs(selectedNumber) % 10;
+
+    // Fase de ATIVAÇÃO: só ativa se, APÓS atualizar a lista, o terminal do número selecionado
+    // faz parte dos 3 menos frequentes atualizados
+    if (!betTerminaisPendingEntrada) {
+      if (leastThreeAfter.includes(terminal)) {
+        setBetTerminaisPendingEntrada(true);
+        setAnimatingBetTerminais('yellow');
+        // Contabiliza Entrada na ativação da borda
+        setBetTerminaisEntradas(prev => prev + 1);
+        if (avisosSonorosAtivos) {
+          try { soundGenerator.playBellSound(); } catch {}
+        }
+      }
+      // Não classifica WIN/LOSS neste mesmo número
+      return;
     }
 
-    // Construir lista de Terminais ordenada por frequência (desc) e pegar os 3 últimos itens (menos frequentes)
-    const terminaisData = counts.map((count, terminal) => ({ terminal, count }));
-    terminaisData.sort((a, b) => b.count - a.count);
-    const lastThreeFromList = terminaisData.slice(-3).map(t => t.terminal);
+    // Fase de CLASSIFICAÇÃO: comparar número atual com os 3 menos frequentes ANTES dele
+    const inLeastThreeBefore = leastThreeBefore.includes(terminal);
 
-    const terminal = selectedNumber % 10;
-    const isLoss = lastThreeFromList.includes(terminal);
-    
-    if (isLoss) {
+    if (inLeastThreeBefore) {
+      // LOSS enquanto o padrão estiver ativo
       setBetTerminaisLosses(prev => prev + 1);
+      // Contabiliza Entrada sempre que LOSS é incrementado
+      setBetTerminaisEntradas(prev => prev + 1);
       setBetTerminaisNegSeqCurrent(prev => {
         const next = prev + 1;
         setBetTerminaisNegSeqMax(m => Math.max(m, next));
         return next;
       });
-      // LOSS: resetar sequência positiva
       setBetTerminaisPosSeqCurrent(0);
+      // Mantém a borda ativa e continua aguardando WIN
     } else {
+      // WIN: remover borda e encerrar padrão
       setBetTerminaisWins(prev => prev + 1);
       setBetTerminaisNegSeqCurrent(0);
-      // WIN: incrementar sequência positiva
       setBetTerminaisPosSeqCurrent(prev => {
         const next = prev + 1;
         setBetTerminaisPosSeqMax(m => Math.max(m, next));
         return next;
       });
+      setAnimatingBetTerminais(undefined);
+      setBetTerminaisPendingEntrada(false);
     }
   };
+
+  // Recalcular BET Terminais a partir de lastNumbers (após cargas em lote/simulações)
+  const recalculateBetTerminaisFromLastNumbers = () => {
+    // Passo determinístico: computa Entradas/WIN/LOSS sem depender de estados incrementais
+    let wins = 0;
+    let losses = 0;
+    let entradas = 0;
+    let negSeqCurrent = 0;
+    let negSeqMax = 0;
+    let posSeqCurrent = 0;
+    let posSeqMax = 0;
+    let pending = false;
+
+    const countTerminalsAsc = (nums: number[]) => {
+      const counts = Array(10).fill(0);
+      for (const n of nums) counts[Math.abs(n) % 10]++;
+      return counts.map((count, terminal) => ({ terminal, count }))
+        .sort((a, b) => a.count - b.count || a.terminal - b.terminal);
+    };
+
+    for (let i = 0; i < lastNumbers.length; i++) {
+      const selected = lastNumbers[i];
+      const terminal = Math.abs(selected) % 10;
+      const before = lastNumbers.slice(0, i);
+      const after = lastNumbers.slice(0, i + 1);
+
+      const leastThreeBefore = countTerminalsAsc(before).slice(0, 3).map(t => t.terminal);
+      const leastThreeAfter = countTerminalsAsc(after).slice(0, 3).map(t => t.terminal);
+
+      if (!pending) {
+        if (leastThreeAfter.includes(terminal)) {
+          pending = true;
+          entradas++;
+        }
+      } else {
+        const inLeastBefore = leastThreeBefore.includes(terminal);
+        if (inLeastBefore) {
+          losses++;
+          entradas++;
+          negSeqCurrent++;
+          if (negSeqCurrent > negSeqMax) negSeqMax = negSeqCurrent;
+          posSeqCurrent = 0;
+        } else {
+          wins++;
+          negSeqCurrent = 0;
+          posSeqCurrent++;
+          if (posSeqCurrent > posSeqMax) posSeqMax = posSeqCurrent;
+          pending = false;
+        }
+      }
+    }
+
+    setBetTerminaisWins(wins);
+    setBetTerminaisLosses(losses);
+    setBetTerminaisEntradas(entradas);
+    setBetTerminaisNegSeqCurrent(negSeqCurrent);
+    setBetTerminaisNegSeqMax(negSeqMax);
+    setBetTerminaisPosSeqCurrent(posSeqCurrent);
+    setBetTerminaisPosSeqMax(posSeqMax);
+    setBetTerminaisPendingEntrada(pending);
+    setAnimatingBetTerminais(pending ? 'yellow' : undefined);
+
+    lastEvaluatedBetTerminais.current = '';
+  };
+
+  // Avaliar Torre: ativa borda nos números de entrada e classifica próximo(s) números
+  const evaluateTorre = (selectedNumber: number, currentNumbersSnapshot?: number[]) => {
+    const snapshot = currentNumbersSnapshot ?? lastNumbers;
+    const lastPrevNumber = snapshot[snapshot.length - 1] ?? 'none';
+    const evaluationKey = `torre-${selectedNumber}-${snapshot.length}-${lastPrevNumber}-${torrePendingEntrada ? 'pending' : 'idle'}`;
+    if (lastEvaluatedTorre.current === evaluationKey) {
+      return;
+    }
+    lastEvaluatedTorre.current = evaluationKey;
+
+    if (!torrePendingEntrada) {
+      if (TORRE_ENTRY_NUMBERS.includes(selectedNumber)) {
+        setTorrePendingEntrada(true);
+        setAnimatingTorre('yellow');
+        // Sem manipulação de DOM: StatisticsCards aplica borda ao container
+        if (avisosSonorosAtivos) {
+          try { soundGenerator.playBellSound(); } catch {}
+        }
+      }
+      return;
+    }
+
+    // Padrão ativo: LOSS se número for 0,1,2,3,34,35,36; WIN caso contrário
+    if (TORRE_LOSS_SET.has(selectedNumber)) {
+      setTorreLossCount(prev => prev + 1);
+      // manter borda ativa até que ocorra um WIN
+    } else {
+      setTorreWinCount(prev => prev + 1);
+      // Mostrar verde breve no WIN e limpar após pequeno atraso
+      setAnimatingTorre('green');
+      setTorrePendingEntrada(false);
+      setTimeout(() => {
+        clearTorreVisuals();
+      }, 350);
+    }
+  };
+
+  // Recalcular Torre a partir de lastNumbers (após cargas em lote/simulações)
+  const recalculateTorreFromLastNumbers = () => {
+    let wins = 0;
+    let losses = 0;
+    let pending = false;
+
+    for (let i = 0; i < lastNumbers.length; i++) {
+      const n = lastNumbers[i];
+      if (!pending) {
+        if (TORRE_ENTRY_NUMBERS.includes(n)) {
+          pending = true;
+        }
+      } else {
+        if (TORRE_LOSS_SET.has(n)) {
+          losses++;
+        } else {
+          wins++;
+          pending = false;
+        }
+      }
+    }
+
+    setTorreWinCount(wins);
+    setTorreLossCount(losses);
+    setTorrePendingEntrada(pending);
+    setAnimatingTorre(pending ? 'yellow' : undefined);
+
+    // UI totalmente driven por estado via animatingTorre/torrePendingEntrada
+    if (!pending) {
+      clearTorreVisuals();
+    }
+  };
+
+  // Avaliar P2 com modos 1 (um gatilho) e 2 (dois gatilhos consecutivos)
+  const evaluateP2 = (selectedNumber: number, currentNumbersSnapshot: number[]) => {
+    const lastPrevNumber = currentNumbersSnapshot[currentNumbersSnapshot.length - 1] ?? 'none';
+    const evaluationKey = `p2-${selectedNumber}-${currentNumbersSnapshot.length}-${lastPrevNumber}-${p2PendingEntrada ? 'pending' : 'idle'}-${p2Mode}`;
+    if (lastEvaluatedP2.current === evaluationKey) return;
+    lastEvaluatedP2.current = evaluationKey;
+
+    const isEntry = P2_ENTRY_NUMBERS.includes(selectedNumber);
+    const prev = currentNumbersSnapshot[currentNumbersSnapshot.length - 1];
+    const prevIsEntry = P2_ENTRY_NUMBERS.includes(prev);
+
+    if (!p2PendingEntrada) {
+      const shouldActivate = p2Mode === 1 ? isEntry : (isEntry && prevIsEntry);
+      if (shouldActivate) {
+        setP2PendingEntrada(true);
+        setAnimatingP2('yellow');
+        if (avisosSonorosAtivos) {
+          try { soundGenerator.playBellSound(); } catch {}
+        }
+        return; // aguarda próximo para classificar
+      }
+      return;
+    }
+
+    // Já pendente: classificar próximo número
+    if (P2_ENTRY_NUMBERS.includes(selectedNumber)) {
+      setP2LossCount(c => c + 1);
+      setAnimatingP2('yellow');
+    } else {
+      setP2WinCount(c => c + 1);
+      // Mostrar verde breve no WIN e limpar após pequeno atraso
+      setAnimatingP2('green');
+      setP2PendingEntrada(false);
+      setTimeout(() => {
+        setAnimatingP2(undefined);
+      }, 350);
+    }
+  };
+
   const [voiceTranscript, setVoiceTranscript] = useState<string>('');
   const [voiceDigits, setVoiceDigits] = useState<string>('');
   
@@ -614,6 +985,22 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   }, [lastNumbers, espanholEnabled, espanholValorInicial, espanholModulo1X, espanholModulo2X, espanholModulo3X, espanholLocked, apostandoEspanhol]);
 
 
+  // Garantir atualização do BET Terminais e Torre em TODOS os fluxos de adição
+  useEffect(() => {
+    const prevLen = prevLastNumbersLenRef.current;
+    if (lastNumbers.length <= prevLen) {
+      prevLastNumbersLenRef.current = lastNumbers.length;
+      return;
+    }
+    for (let i = prevLen; i < lastNumbers.length; i++) {
+      const num = lastNumbers[i];
+      const prevSnapshot = lastNumbers.slice(0, i);
+      // evaluateTorre(num); // DESABILITADO - usando evaluateTorreNumber
+      // evaluateP2(num, prevSnapshot); // DESABILITADO - usando evaluateP2Number
+      // evaluateBetTerminais(num, prevSnapshot); // DESABILITADO - usando evaluateBetTerminaisNumber
+    }
+    prevLastNumbersLenRef.current = lastNumbers.length;
+  }, [lastNumbers]);
 
   // Limpa estados do recurso Espanhol
   const clearEspanhol = () => {
@@ -640,16 +1027,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     }
   }, [apostandoEspanhol]);
 
-  // Estado para controlar padrão forçado
-  const [forcedPattern, setForcedPattern] = useState<{
-    exposedNumbers: number[];
-    remainingNumbers: number[];
-    baseNumbers: number[];
-  } | null>(null);
-  
-  // Estado para controlar o toggle automático do padrão 171
-  const [isAutoPattern171Active, setIsAutoPattern171Active] = useState(false);
-  
   // Estados para destacar números na race quando popup aparecer
   const [highlightedBetNumbers, setHighlightedBetNumbers] = useState<number[]>([]);
   const [highlightedRiskNumbers, setHighlightedRiskNumbers] = useState<number[]>([]);
@@ -709,6 +1086,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Estados para contar WIN e LOSS Torre (persistentes)
   const [torreWinCount, setTorreWinCount] = useState<number>(0);
   const [torreLossCount, setTorreLossCount] = useState<number>(0);
+  // Evitar limpeza imediata: evaluateTorre controla transição verde->clear
+  useEffect(() => {
+    // noop
+  }, [torreWinCount, torrePendingEntrada]);
 
   // (Removido) Estados para o modal do Padrão 32
 
@@ -807,29 +1188,66 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     };
   }, [patternAlert, avisosSonorosAtivos]);
 
-  // useEffect para inicializar o reconhecimento de voz
+  // useEffect para inicializar o reconhecimento de voz - VERSÃO ORIGINAL QUE FUNCIONAVA
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognitionInstance = new SpeechRecognition();
       
-      recognitionInstance.continuous = true; // Mudança para contínuo
-      recognitionInstance.interimResults = true; // Permitir resultados intermediários
+      recognitionInstance.continuous = true;
+      recognitionInstance.interimResults = true;
       recognitionInstance.lang = 'pt-BR';
+      recognitionInstance.maxAlternatives = 3;
+
+      // Opcional: adicionar gramática com vocabulário de números para melhorar acurácia
+      try {
+        const SpeechGrammarList = (window as any).SpeechGrammarList || (window as any).webkitSpeechGrammarList;
+        if (SpeechGrammarList) {
+          const grammarList = new SpeechGrammarList();
+          const palavras = [
+            'zero','um','dois','três','tres','quatro','cinco','seis','sete','oito','nove','dez','onze','doze',
+            'treze','quatorze','catorze','quinze','dezesseis','dezessete','dezoito','dezenove',
+            'vinte','vinte e um','vinte um','vinte e dois','vinte dois','vinte e três','vinte tres','vinte três',
+            'vinte e quatro','vinte quatro','vinte e cinco','vinte cinco','vinte e seis','vinte seis','vinte e sete','vinte sete',
+            'vinte e oito','vinte oito','vinte e nove','vinte nove',
+            'trinta','trinta e um','trinta um','trinta e dois','trinta dois','trinta e três','trinta tres','trinta três',
+            'trinta e quatro','trinta quatro','trinta e cinco','trinta cinco','trinta e seis','trinta seis'
+          ];
+          const jsgf = `#JSGF V1.0; grammar numeros; public <numero> = ${palavras.join(' | ')} ;`;
+          grammarList.addFromString(jsgf, 1);
+          recognitionInstance.grammars = grammarList;
+        }
+      } catch (e) {
+        console.warn('Gramática de voz não suportada, continuando sem ela');
+      }
+      
+      // Configurações para ser mais tolerante a pausas
+      if ('webkitSpeechRecognition' in window) {
+        recognitionInstance.webkitContinuous = true;
+        recognitionInstance.webkitInterimResults = true;
+      }
       
       recognitionInstance.onresult = (event: any) => {
-        let transcript = '';
-        // Processar tanto resultados finais quanto intermediários para tempo real
+        let finalTranscript = '';
+        let interimTranscript = '';
+        // Processar resultados finais e também intermediários com confiança moderada
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            transcript += event.results[i][0].transcript;
-          } else {
-            // Também processar resultados intermediários para tempo real
-            transcript += event.results[i][0].transcript;
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript;
+            console.log('✅ FINAL:', result[0].transcript);
+          } else if (result[0].confidence >= 0.4) {
+            interimTranscript += result[0].transcript;
+            console.log('⚡ INTERMEDIÁRIO:', result[0].transcript, 'Confiança:', result[0].confidence);
           }
         }
-        if (transcript) {
-          processVoiceInputContinuous(transcript);
+        // Atualizar buffer de voz para feedback em tempo real
+        if (interimTranscript.trim()) {
+          setVoiceBuffer(interimTranscript.trim());
+        }
+        // Somente processar números quando houver parte final
+        if (finalTranscript.trim()) {
+          processVoiceInputContinuous(finalTranscript);
         }
       };
       
@@ -848,11 +1266,20 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       };
       
       recognitionInstance.onend = () => {
-        // Reiniciar automaticamente se ainda estiver no modo listening
+        console.log('Reconhecimento terminou');
+        // Reiniciar com delay curto para capturar todos os números
+        // mas permitir pausas naturais na fala
         if (isListening) {
           setTimeout(() => {
-            recognitionInstance.start();
-          }, 100);
+            if (isListening) {
+              try {
+                recognitionInstance.start();
+                console.log('Reconhecimento reiniciado');
+              } catch (error) {
+                console.error('Erro ao reiniciar:', error);
+              }
+            }
+          }, 500); // 0.5 segundos - reinicia rápido sem perder números
         }
       };
       
@@ -862,77 +1289,181 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
   // Função para processar entrada de voz contínua em tempo real
   const processVoiceInputContinuous = (transcript: string) => {
-    // Converter palavras em números
+    console.log('🎤 RECEBIDO:', transcript);
+    
+    // Evitar processar transcripts vazios ou muito curtos
+    if (!transcript || transcript.trim().length < 2) {
+      console.log('❌ Transcript muito curto, ignorando');
+      return;
+    }
+    
+    // Contar quantos números já foram processados para reiniciar preventivamente
+    const currentNumbers = addNumbersInput.split(',').filter(n => n.trim()).length;
+    console.log(`📊 NÚMEROS JÁ PROCESSADOS: ${currentNumbers}`);
+    
+    // Converter palavras em números - cobre variações com/sem acento e com/sem "e"
     const wordToNumber: { [key: string]: string } = {
-      'zero': '0', 'um': '1', 'dois': '2', 'três': '3', 'quatro': '4', 'cinco': '5',
+      // Números compostos com zero primeiro (mais específicos)
+      'zero um': '1', 'zero dois': '2', 'zero três': '3', 'zero tres': '3', 'zero quatro': '4', 
+      'zero cinco': '5', 'zero seis': '6', 'zero sete': '7', 'zero oito': '8', 'zero nove': '9',
+      
+      // Números simples
+      'zero': '0', 'um': '1', 'dois': '2', 'três': '3', 'tres': '3', 'quatro': '4', 'cinco': '5',
       'seis': '6', 'sete': '7', 'oito': '8', 'nove': '9', 'dez': '10',
-      'onze': '11', 'doze': '12', 'treze': '13', 'quatorze': '14', 'quinze': '15',
+      'onze': '11', 'doze': '12', 'treze': '13', 'quatorze': '14', 'catorze': '14', 'quinze': '15',
       'dezesseis': '16', 'dezessete': '17', 'dezoito': '18', 'dezenove': '19',
-      'vinte': '20', 'vinte e um': '21', 'vinte e dois': '22', 'vinte e três': '23',
+      
+      // Vinte com variações de ligação
+      'vinte': '20', 'vinte e um': '21', 'vinte e dois': '22', 'vinte e três': '23', 'vinte e tres': '23',
       'vinte e quatro': '24', 'vinte e cinco': '25', 'vinte e seis': '26',
       'vinte e sete': '27', 'vinte e oito': '28', 'vinte e nove': '29',
-      'trinta': '30', 'trinta e um': '31', 'trinta e dois': '32', 'trinta e três': '33',
-      'trinta e quatro': '34', 'trinta e cinco': '35', 'trinta e seis': '36'
+      'vinte um': '21', 'vinte dois': '22', 'vinte tres': '23', 'vinte três': '23', 'vinte quatro': '24',
+      'vinte cinco': '25', 'vinte seis': '26', 'vinte sete': '27', 'vinte oito': '28', 'vinte nove': '29',
+      
+      // Trinta
+      'trinta': '30', 'trinta e um': '31', 'trinta e dois': '32', 'trinta e três': '33', 'trinta e tres': '33',
+      'trinta e quatro': '34', 'trinta e cinco': '35', 'trinta e seis': '36',
+      'trinta um': '31', 'trinta dois': '32', 'trinta tres': '33', 'trinta três': '33', 'trinta quatro': '34',
+      'trinta cinco': '35', 'trinta seis': '36'
     };
 
     let processedText = transcript.toLowerCase().trim();
     
-    // Substituir palavras por números
-    Object.keys(wordToNumber).forEach(word => {
-      const regex = new RegExp(`\\b${word}\\b`, 'g');
-      processedText = processedText.replace(regex, wordToNumber[word]);
-    });
-
-    // Extrair apenas dígitos individuais
-    const digits = processedText.match(/\d/g);
-    
-    if (digits) {
-      // Adicionar cada dígito ao buffer
-      let newBuffer = voiceBuffer;
-      digits.forEach(digit => {
-        newBuffer += digit;
+    // Primeiro, substituir números compostos (mais específicos primeiro)
+    Object.keys(wordToNumber)
+      .sort((a, b) => b.length - a.length) // Ordenar por tamanho decrescente
+      .forEach(word => {
+        const regex = new RegExp(`\\b${word}\\b`, 'g');
+        processedText = processedText.replace(regex, wordToNumber[word]);
       });
-      
-      // Processar buffer para formar números de 2 dígitos
-      let formattedNumbers: string[] = [];
-      let currentBuffer = newBuffer;
-      
-      while (currentBuffer.length >= 2) {
-        const twoDigits = currentBuffer.substring(0, 2);
-        const number = parseInt(twoDigits);
-        
-        if (number >= 0 && number <= 36) {
-          formattedNumbers.push(twoDigits);
-          currentBuffer = currentBuffer.substring(2);
-        } else {
-          // Se o número não é válido, tentar com apenas 1 dígito
-          const oneDigit = currentBuffer.substring(0, 1);
-          const singleNumber = parseInt(oneDigit);
-          if (singleNumber >= 0 && singleNumber <= 9) {
-            formattedNumbers.push('0' + oneDigit);
-            currentBuffer = currentBuffer.substring(1);
-          } else {
-            currentBuffer = currentBuffer.substring(1);
-          }
-        }
+
+    console.log('📝 ANTES:', transcript);
+    console.log('🔄 DEPOIS:', processedText);
+
+    // Extrair tokens numéricos e mesclar padrões "0 X" em um único dígito
+    const tokenMatches = processedText.match(/\d+/g) || [];
+    const mergedTokens: string[] = [];
+    for (let i = 0; i < tokenMatches.length; i++) {
+      const t = tokenMatches[i];
+      const next = tokenMatches[i + 1];
+      if (t === '0' && next && /^[1-9]$/.test(next)) {
+        // Mesclar "0" + dígito em um único número (interpretação de "zero quatro" = 4)
+        mergedTokens.push(next);
+        i++; // pular o próximo
+      } else {
+        mergedTokens.push(t);
       }
+    }
+    
+    // Filtrar números válidos (0-36)
+    const numbers = mergedTokens.filter(t => {
+      const n = parseInt(t);
+      return !isNaN(n) && n >= 0 && n <= 36;
+    });
+    
+    if (numbers.length > 0) {
+      console.log('🔢 NÚMEROS ENCONTRADOS:', numbers);
       
-      // Atualizar o buffer com os dígitos restantes
-      setVoiceBuffer(currentBuffer);
+      // Formatar números para 2 dígitos e adicionar vírgula
+      const formattedNumbers = numbers.map(num => {
+        const number = parseInt(num);
+        if (number >= 0 && number <= 36) {
+          return number.toString().padStart(2, '0');
+        }
+        return null;
+      }).filter(Boolean) as string[];
       
-      // Atualizar o campo de texto se temos números formatados - INSERIR NO INÍCIO
+      // Adicionar números ao campo de texto se temos números válidos
       if (formattedNumbers.length > 0) {
         const currentInput = addNumbersInput;
         const newNumbers = formattedNumbers.join(',');
-        // Inserir no INÍCIO do campo (ordem reversa)
-        const newInput = currentInput ? `${newNumbers},${currentInput}` : newNumbers;
+        
+        // Adicionar ao final para manter ordem cronológica
+        const newInput = currentInput ? `${currentInput},${newNumbers}` : newNumbers;
+        
+        console.log('Números formatados:', formattedNumbers);
+        
         setAddNumbersInput(newInput);
+        
+        // Reinício preventivo desabilitado (evitar interrupções durante ditado longo)
+        const totalNumbers = newInput.split(',').filter(n => n.trim()).length;
+        if (totalNumbers > 0 && totalNumbers % 100 === 0 && recognition && isListening) {
+          console.log(`🔄 REINÍCIO PREVENTIVO (raro) após ${totalNumbers} números`);
+          setTimeout(() => {
+            if (recognition && isListening) {
+              try {
+                recognition.stop();
+                setTimeout(() => {
+                  if (isListening) {
+                    recognition.start();
+                    console.log('✅ Reconhecimento reiniciado preventivamente');
+                  }
+                }, 200);
+              } catch (error) {
+                console.error('Erro no reinício preventivo:', error);
+              }
+            }
+          }, 200);
+        }
       }
     }
   };
 
-  // Função para iniciar/parar reconhecimento de voz
-  const toggleVoiceRecognition = () => {
+  // Função para detectar se é dispositivo móvel
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
+  // Função para verificar permissão de microfone específica para modal
+  const checkModalMicrophonePermission = async () => {
+    try {
+      console.log('Verificando permissão de microfone para modal...');
+      
+      // Para dispositivos móveis, verificar permissões explicitamente
+      if (isMobileDevice()) {
+        const permission = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        console.log('Status da permissão:', permission.state);
+        
+        if (permission.state === 'denied') {
+          alert('Permissão de microfone negada. Vá em Configurações > Site > Permissões e permita o acesso ao microfone.');
+          return false;
+        }
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 44100
+        } 
+      });
+      console.log('Permissão de microfone concedida para modal');
+      
+      // Parar o stream imediatamente após verificar a permissão
+      stream.getTracks().forEach(track => track.stop());
+      return true;
+    } catch (error) {
+      console.error('Erro ao verificar permissão de microfone para modal:', error);
+      
+      let errorMessage = 'Erro ao acessar microfone: ';
+      if (error.name === 'NotAllowedError') {
+        errorMessage += 'Permissão negada. Permita o acesso ao microfone nas configurações do navegador.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage += 'Microfone não encontrado.';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage += 'Microfone está sendo usado por outro aplicativo.';
+      } else {
+        errorMessage += error.message;
+      }
+      
+      alert(errorMessage);
+      return false;
+    }
+  };
+
+  // Função para iniciar/parar reconhecimento de voz - VERSÃO ORIGINAL
+  const toggleVoiceRecognition = async () => {
     if (!recognition) {
       alert('Reconhecimento de voz não suportado neste navegador');
       return;
@@ -941,9 +1472,20 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     if (isListening) {
       recognition.stop();
       setIsListening(false);
+      setVoiceBuffer('');
     } else {
-      recognition.start();
-      setIsListening(true);
+      // Verificar permissão de microfone antes de iniciar
+      const hasPermission = await checkMicrophonePermission();
+      if (!hasPermission) {
+        return;
+      }
+      try {
+        recognition.start();
+        setIsListening(true);
+      } catch (error: any) {
+        console.error('Erro ao iniciar reconhecimento:', error);
+        alert('Erro ao iniciar reconhecimento de voz: ' + (error?.message || 'desconhecido'));
+      }
     }
   };
 
@@ -1104,34 +1646,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       
       recognitionInstance.onstart = () => {
         console.log('Reconhecimento de voz iniciado com sucesso');
-        setVoiceTranscript('Escutando...');
-      };
-      
-      recognitionInstance.onresult = (event) => {
-        console.log('Evento onresult disparado:', event);
-        console.log('Número de resultados:', event.results.length);
-        
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          const transcript = result[0].transcript.trim();
-          const confidence = result[0].confidence;
-          const isFinal = result.isFinal;
-          
-          console.log('Resultado:', {
-            transcript,
-            confidence,
-            isFinal,
-            resultIndex: i
-          });
-          
-          if (transcript) {
-            setVoiceTranscript(transcript);
-            if (isFinal) {
-              console.log('Processando transcript final:', transcript);
-              processRouletteVoiceInputContinuous(transcript);
-            }
-          }
-        }
       };
       
       recognitionInstance.onerror = (event) => {
@@ -1475,7 +1989,19 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       waitingForNextNumberRef.current = true;
       lastPatternNumbersRef.current = { covered: coveredNumbers, risk: allRiskNumbers };
 
-      // NÃO mostrar popup nem destacar números - apenas computar estatísticas
+      // Só mostrar popup e destacar números se NÃO estiver simulando
+      if (!isSimulatingRef.current) {
+        setPatternAlert(pattern);
+        setHighlightedBetNumbers(betNumbers);
+
+        // Ordenar números de risco pela sequência da Race (ROULETTE_SEQUENCE)
+        const sortedRiskNumbers = allRiskNumbers.sort((a, b) => {
+          return ROULETTE_SEQUENCE.indexOf(a) - ROULETTE_SEQUENCE.indexOf(b);
+        });
+        
+        // Destacar TODOS os números de risco, não apenas primeiro e último
+        setHighlightedRiskNumbers(sortedRiskNumbers);
+      }
     } else {
       // Se não detectou padrão, incrementar contador
       setNumbersWithoutPattern((prev) => prev + 1);
@@ -1586,6 +2112,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     // Resetar BET Terminais
     setBetTerminaisWins(0);
     setBetTerminaisLosses(0);
+    setBetTerminaisEntradas(0);
     setBetTerminaisNegSeqCurrent(0);
     setBetTerminaisNegSeqMax(0);
     setBetTerminaisPosSeqCurrent(0);
@@ -1628,6 +2155,12 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
   // Função para adicionar número aos últimos sorteados
   const addToLastNumbers = (num: number) => {
+    // Se devemos limpar a borda de BET Terminais na próxima jogada (após WIN), faça agora
+    if ((window as any).betTerminaisClearOnNext || false) {
+      setAnimatingBetTerminais(undefined);
+      (window as any).betTerminaisClearOnNext = false;
+    }
+
     // CRÍTICO: Verificar WIN do Padrão Detectado ANTES de adicionar o número
     if (patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && patternAlert.betNumbers) {
       if (patternAlert.betNumbers.includes(num)) {
@@ -1641,11 +2174,33 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     }
     
     setLastNumbers(prev => {
-      // Avaliar BET Terminais ANTES de adicionar o número na lista (usando lista atual)
-      evaluateBetTerminais(num, prev);
-      
       const newList = [...prev, num]; // CORREÇÃO: Adicionar no FINAL - ordem cronológica correta
       const updatedList = newList.slice(-60); // Manter apenas os últimos 60
+      
+      // Avaliar P2, TORRE e BET Terminais antes de atualizar demais lógicas
+      // evaluateTorre(num, prev); // DESABILITADO TEMPORARIAMENTE
+      console.log('[DEBUG MAIN] Chamando evaluateTorreNumber para:', num);
+      evaluateTorreNumber(num, torrePendingEntrada, setTorrePendingEntrada, setAnimatingTorre, setTorreWinCount, setTorreLossCount, clearTorreVisuals);
+      
+      // FORÇA ADICIONAL: Se WIN detectado, forçar remoção direta
+      if (torrePendingEntrada && ![0, 1, 2, 3, 34, 35, 36].includes(num)) {
+        console.log('[DEBUG MAIN] WIN detectado - forçando remoção direta');
+        setTimeout(() => {
+          setAnimatingTorre(undefined);
+          setTorrePendingEntrada(false);
+        }, 10);
+      }
+      
+      console.log('[DEBUG MAIN] Chamando evaluateBetTerminaisNumber para:', num);
+      evaluateBetTerminaisNumber(num, betTerminaisPendingEntrada, setBetTerminaisPendingEntrada, setAnimatingBetTerminais, setBetTerminaisWins, setBetTerminaisLosses, setBetTerminaisEntradas, setBetTerminaisNegSeqCurrent, setBetTerminaisNegSeqMax, setBetTerminaisPosSeqCurrent, setBetTerminaisPosSeqMax, prev);
+      
+      console.log('[DEBUG MAIN] Chamando evaluateP2Number para:', num);
+      evaluateP2Number(num, p2PendingEntrada, setP2PendingEntrada, setAnimatingP2, setP2WinCount, setP2LossCount, prev, p2Mode);
+      
+      // evaluateP2(num, prev); // DESABILITADO - usando evaluateP2Number
+      // Avaliar BET Terminais com a LISTA ANTERIOR (prev) para decidir Entrada,
+      // e classificar WIN/LOSS no número atual com base nos 3 menos frequentes antes dele
+      // evaluateBetTerminais(num, prev) // DESABILITADO - usando evaluateBetTerminaisNumber
       
       // SOLUÇÃO DEFINITIVA: Verificar sequência específica 18-15-10 EXATA
       let specialSequenceDetected = false;
@@ -1675,66 +2230,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           // Forçar incremento de WIN para P2
           setP2WinCount(prev => prev + 1);
           
-          // Aplicar animação laranja imediatamente
-          document.querySelectorAll('.p2-card, [data-card-id="p2-card"], #p2-card').forEach(el => {
-            el.classList.remove('border-yellow-500', 'border-green-500', 'border-red-500');
-            el.classList.add('border-orange-500', 'animate-pulse-orange-border');
-          });
-          
-          // Remover a animação após 2 segundos - SOLUÇÃO FINAL SEM LOOPS
-          setTimeout(() => {
-            console.log("🧹 REMOÇÃO FINAL DA BORDA LARANJA (ESPECIAL) - SEM LOOPS");
-            
-            // Múltiplos seletores para garantir que encontramos todos os elementos P2
-            const selectors = [
-              '.p2-card',
-              '[data-card-id="p2-card"]',
-              '[class*="p2"]',
-              '.animate-pulse-orange-border',
-              '.animate-pulse-green-border',
-              '.animate-pulse-yellow-border'
-            ];
-            
-            const finalRemoval = () => {
-              selectors.forEach(selector => {
-                const elements = document.querySelectorAll(selector);
-                elements.forEach((element: any) => {
-                  console.log(`🧹 REMOVENDO FINAL: ${selector}`, element);
-                  
-                  // 1. Adicionar classe CSS override
-                  element.classList.add('force-no-animation');
-                  
-                  // 2. Remover todas as classes de animação e borda
-                  element.classList.remove(
-                    'animate-pulse-orange-border',
-                    'animate-pulse-green-border', 
-                    'animate-pulse-yellow-border',
-                    'border-orange-500',
-                    'border-green-500',
-                    'border-yellow-500',
-                    'border-gray-200'
-                  );
-                  
-                  // 3. RESTAURAR ESTADO ORIGINAL - REMOVER TODAS AS PROPRIEDADES
-                  element.style.removeProperty('border');
-                  element.style.removeProperty('border-color');
-                  element.style.removeProperty('border-width');
-                  element.style.removeProperty('animation');
-                  element.style.removeProperty('box-shadow');
-                  element.style.removeProperty('background-color');
-                  element.style.removeProperty('background');
-                  
-                  console.log(`✅ REMOVIDO FINAL: ${selector}`);
-                });
-              });
-            };
-            
-            // Executar remoção ÚNICA - SEM LOOPS
-            finalRemoval();
-            
-            console.log("✅✅✅ REMOÇÃO FINAL COMPLETADA (ESPECIAL) - SEM LOOPS!");
-          }, 2000);
-          
+          // Sequência especial detectada: apenas incrementa WIN e retorna
+          // UI da P2 permanece totalmente controlada por estado no StatisticsCards
           return updatedList; // RETORNAR IMEDIATAMENTE para evitar execução da detecção radical
         }
       }
@@ -1753,14 +2250,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     
     // Adicionar ao histórico para detecção de padrões (COM popup na seleção manual)
     addToHistory(num);
-    
-    // Se o toggle automático estiver ativo, aplicar o padrão 171
-    if (isAutoPattern171Active) {
-      // Usar setTimeout para garantir que o estado seja atualizado primeiro
-      setTimeout(() => {
-        forcePattern171(num); // Passar o número atual diretamente
-      }, 10);
-    }
     
     setSelected(prev => ({
       ...prev,
@@ -1823,6 +2312,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       if (index >= validNumbers.length) {
         clearInterval(interval);
         isSimulatingRef.current = false; // Resetar flag após processar todos os números
+        // Recalcular BET Terminais ao final de cargas em lote - DESABILITADO
+        // recalculateBetTerminaisFromLastNumbers();
+        // Recalcular Torre ao final de cargas em lote - DESABILITADO
+        // recalculateTorreFromLastNumbers();
         return;
       }
       
@@ -1872,125 +2365,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     }));
   };
 
-  // Função para forçar padrão 171
-  const forcePattern171 = (specificNumber?: number) => {
-    // Usar o número específico passado ou o último número sorteado
-    let targetNumber: number;
-    
-    if (specificNumber !== undefined) {
-      targetNumber = specificNumber;
-    } else {
-      // Verificar se há pelo menos um número sorteado
-      if (lastNumbers.length === 0) {
-        alert('É necessário ter pelo menos um número sorteado para aplicar o Padrão 171.');
-        return;
-      }
-      targetNumber = lastNumbers[0]; // Último número sorteado
-    }
-
-    const position = ROULETTE_SEQUENCE.indexOf(targetNumber);
-    
-    if (position === -1) {
-      alert('Erro: número não encontrado na sequência da roleta.');
-      return;
-    }
-
-    // Calcular os 7 números expostos conforme documentação: voltar 3 posições e contar 7
-    const startIndex = (position - 3 + 37) % 37;
-    const exposedNumbers: number[] = [];
-    
-    for (let i = 0; i < 7; i++) {
-      const index = (startIndex + i) % 37;
-      exposedNumbers.push(ROULETTE_SEQUENCE[index]);
-    }
-
-    // Calcular os 30 números restantes (não expostos)
-    const remainingNumbers = ROULETTE_SEQUENCE.filter(num => !exposedNumbers.includes(num));
-    
-    // Função para obter vizinhos de um número (7 de cada lado = 15 números total incluindo o próprio)
-    const getNeighborsFor15Coverage = (num: number): number[] => {
-      const pos = ROULETTE_SEQUENCE.indexOf(num);
-      if (pos === -1) return [];
-      
-      const neighbors: number[] = [];
-      
-      // Adicionar o próprio número
-      neighbors.push(num);
-      
-      // Adicionar 7 vizinhos de cada lado
-      for (let i = 1; i <= 7; i++) {
-        // Vizinho à esquerda
-        const leftPos = (pos - i + 37) % 37;
-        neighbors.push(ROULETTE_SEQUENCE[leftPos]);
-        
-        // Vizinho à direita
-        const rightPos = (pos + i) % 37;
-        neighbors.push(ROULETTE_SEQUENCE[rightPos]);
-      }
-      
-      return neighbors;
-    };
-
-    // Encontrar os 2 números ideais que cobrem os 30 números restantes
-    let bestCoverageNumbers: number[] = [];
-    let maxCoverage = 0;
-
-    // Testar todas as combinações possíveis de 2 números
-    for (let i = 0; i < ROULETTE_SEQUENCE.length; i++) {
-      for (let j = i + 1; j < ROULETTE_SEQUENCE.length; j++) {
-        const num1 = ROULETTE_SEQUENCE[i];
-        const num2 = ROULETTE_SEQUENCE[j];
-        
-        // Obter cobertura de ambos os números
-        const coverage1 = getNeighborsFor15Coverage(num1);
-        const coverage2 = getNeighborsFor15Coverage(num2);
-        
-        // Combinar coberturas (sem duplicatas)
-        const totalCoverage = [...new Set([...coverage1, ...coverage2])];
-        
-        // Verificar quantos dos 30 números restantes são cobertos
-        const coveredRemainingNumbers = remainingNumbers.filter(num => totalCoverage.includes(num));
-        
-        // Se cobrir exatamente os 30 números restantes (ou o máximo possível)
-        if (coveredRemainingNumbers.length > maxCoverage) {
-          maxCoverage = coveredRemainingNumbers.length;
-          bestCoverageNumbers = [num1, num2];
-        }
-      }
-    }
-
-    // Limpar padrão detectado automaticamente apenas se não for chamada pelo toggle automático
-    if (!specificNumber) {
-      setPatternAlert(null);
-    }
-    
-    // Configurar padrão forçado
-    setForcedPattern({
-      exposedNumbers,
-      remainingNumbers,
-      baseNumbers: bestCoverageNumbers
-    });
-    
-    // Destacar números conforme documentação do Padrão Forçado:
-    // - 7 números expostos como risco (mantêm cor original, primeiro e último com borda especial)
-    setHighlightedRiskNumbers(exposedNumbers);
-    
-    // - 30 números restantes para apostar (amarelo)
-    setHighlightedBetNumbers(remainingNumbers);
-    
-    // - 2 números base (azul com borda branca)
-    setHighlightedBaseNumbers(bestCoverageNumbers);
-    
-    // Acumular o valor atual antes de zerar
-    setTotalNumbersWithoutPattern((prev) => prev + numbersWithoutPattern);
-    
-    // Mostrar informação do padrão aplicado
-    console.log(`Padrão 171 Forçado aplicado baseado no número ${targetNumber}`);
-    console.log(`Números expostos (7):`, exposedNumbers);
-    console.log(`Números para apostar (30):`, remainingNumbers);
-    console.log(`Números base (2):`, bestCoverageNumbers);
-    console.log(`Cobertura: ${maxCoverage} de 30 números restantes`);
-  };
+  // Padrão 171 forçado removido
 
   // Função para calcular lucro
   const calculateProfit = () => {
@@ -2268,6 +2643,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       setIsSimulating(false);
       isSimulatingRef.current = false;
       setLastDrawnNumber(null); // Limpar borda ao finalizar
+      // Recalcular BET Terminais ao finalizar simulação - DESABILITADO
+      // recalculateBetTerminaisFromLastNumbers()
+      // Recalcular Torre ao finalizar simulação - DESABILITADO
+      // recalculateTorreFromLastNumbers()
     } else {
       setIsSimulating(true);
       isSimulatingRef.current = true;
@@ -2279,10 +2658,15 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           setIsSimulating(false);
           isSimulatingRef.current = false;
           setLastDrawnNumber(null); // Limpar borda ao finalizar
+          // Recalcular BET Terminais ao finalizar simulação - DESABILITADO
+          // recalculateBetTerminaisFromLastNumbers();
+          // Recalcular Torre ao finalizar simulação - DESABILITADO
+          // recalculateTorreFromLastNumbers();
           return;
         }
         
         const randomNum = Math.floor(Math.random() * 37); // 0-36
+        console.log('[DEBUG SIMULAÇÃO] Adicionando número via simulação:', randomNum);
         addToLastNumbers(randomNum);
         addToHistoryWithoutPopup(randomNum); // Usar função sem popup para simulações automáticas
         setLastDrawnNumber(randomNum); // Marcar número atual com borda
@@ -2369,8 +2753,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
           setHighlightedRiskNumbers(raceResult.riskNumbers); // Números de risco (borda especial)
           setHighlightedBaseNumbers(raceResult.raceNumbers); // Números base para apostar (azul)
           
-          // Limpar padrão forçado para dar prioridade ao padrão principal
-          setForcedPattern(null);
         }
       } else {
         // Limpar destaques se não há padrão (SEMPRE, mesmo durante simulação)
@@ -2454,6 +2836,37 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 Digite os números separados por vírgula (ex: 01,36,00,16,17)
               </p>
               
+              {/* Informações de diagnóstico para dispositivos móveis */}
+              {isMobileDevice() && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-800 text-center mb-3">
+                    <strong>Tablet/Mobile detectado:</strong> Se o microfone não funcionar, verifique:
+                    <br />• Permissões do Chrome para este site
+                    <br />• Configurações de microfone do dispositivo
+                    <br />• Tente falar mais próximo ao microfone
+                  </p>
+                  
+                  {/* Botão de teste de microfone */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        console.log('Testando microfone...');
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        console.log('Microfone funcionando:', stream);
+                        alert('✅ Microfone funcionando! Stream de áudio capturado com sucesso.');
+                        stream.getTracks().forEach(track => track.stop());
+                      } catch (error) {
+                        console.error('Erro no teste de microfone:', error);
+                        alert('❌ Erro no microfone: ' + error.message);
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-xs rounded transition-colors"
+                  >
+                    🎤 Testar Microfone
+                  </button>
+                </div>
+              )}
+              
               <div className="relative">
                 <textarea
                   ref={(el) => {
@@ -2502,6 +2915,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                   )}
                 </button>
               </div>
+              
+              {/* Feedback em tempo real do reconhecimento */}
+              {isListening && voiceBuffer && (
+                <div className="mt-2 text-xs text-gray-600 flex items-center gap-2">
+                  <span className="inline-flex w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span>Reconhecendo: {voiceBuffer}</span>
+                </div>
+              )}
               
               <div className="flex gap-3 mt-6">
                 <button
@@ -2679,27 +3100,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             📑
           </button>
           <button
-            onClick={() => forcePattern171()}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
-            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
-            title="Forçar padrão 171: marcar 7 números expostos baseado no último número sorteado"
-          >
-            🎯
-          </button>
-          <button
-            onClick={() => setIsAutoPattern171Active(!isAutoPattern171Active)}
-            className={cn(
-              "text-xs rounded transition-colors font-semibold flex items-center justify-center",
-              isAutoPattern171Active 
-                ? "bg-red-500 hover:bg-red-600 text-white ring-2 ring-red-300 animate-pulse" 
-                : "bg-red-400 hover:bg-red-500 text-white"
-            )}
-            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
-            title={isAutoPattern171Active ? "Toggle ATIVO: Padrão 171 será aplicado automaticamente a cada número selecionado" : "Toggle INATIVO: Clique para ativar aplicação automática do padrão 171"}
-          >
-            ↻
-          </button>
-          <button
             onClick={simulateAutoDrawing}
             className={cn(
                "text-black text-xs rounded transition-colors font-semibold flex items-center justify-center",
@@ -2708,7 +3108,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                  : "bg-gray-400 hover:bg-gray-500"
              )}
             style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
-            title="Simular Número"
+            title="Simular vários Números"
           >
             {isSimulating ? (
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -2722,6 +3122,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 <path d="M10 6l2 2-2 2-2-2z"/>
               </svg>
             )}
+          </button>
+          <button
+            onClick={() => setShowAreasRoleta(v => !v)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
+            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+            title="Áreas da Roleta - Visualizar distribuição por cores"
+          >
+            🎯
           </button>
           <button
             onClick={clearScreen}
@@ -2756,7 +3164,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               onClick={simulateDrawing}
               className="text-blue-400 hover:text-blue-300 transition-colors"
               style={{height: '22px', fontSize: '13px'}}
-              title="Simular Número"
+              title="Simular um número"
             >
               🎲
             </button>
@@ -2876,12 +3284,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                           ? patternAlert.baseNumbers?.includes(num) || false
                           : highlightedBaseNumbers.includes(num);
                         
-                        // Verificar se é padrão forçado
-                        const isForcedPattern = forcedPattern !== null;
-                        
-                        // Verificar se é primeiro ou último número exposto no padrão forçado
-                        const isFirstExposed = isForcedPattern && forcedPattern?.exposedNumbers[0] === num;
-                        const isLastExposed = isForcedPattern && forcedPattern?.exposedNumbers[forcedPattern.exposedNumbers.length - 1] === num;
                         
                         // Verificar se é um dos 2 números para apostar no Padrão Detectado
                         const isDetectedBetNumber = patternAlert?.type === 'race' && alertaPadrao171Ativo && patternAlert?.betNumbers?.includes(num);
@@ -2942,11 +3344,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                               patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
                               patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : 
                               (patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
-                              // Padrão Forçado 171 (APENAS quando NÃO há padrão principal ativo)
-                              !patternAlert && isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
-                              !patternAlert && isForcedPattern && isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                              !patternAlert && isForcedPattern && isHighlightedRisk ? 'scale-110 shadow-lg' : '',
-                              !patternAlert && isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : '',
                             )}
                             style={
                               (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? {
@@ -2981,12 +3378,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                             ? patternAlert.baseNumbers?.includes(num) || false
                             : highlightedBaseNumbers.includes(num);
                           
-                          // Verificar se é padrão forçado
-                          const isForcedPattern = forcedPattern !== null;
-                          
-                          // Verificar se é primeiro ou último número exposto no padrão forçado
-                          const isFirstExposed = isForcedPattern && forcedPattern?.exposedNumbers[0] === num;
-                          const isLastExposed = isForcedPattern && forcedPattern?.exposedNumbers[forcedPattern.exposedNumbers.length - 1] === num;
                           
                           // Verificar se é um dos 2 números para apostar no Padrão Detectado
                           const isDetectedBetNumber = patternAlert?.type === 'race' && alertaPadrao171Ativo && patternAlert?.betNumbers?.includes(num);
@@ -3014,11 +3405,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                 patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
                                 patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : 
                                 (patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
-                                // Padrão Forçado 171 (APENAS quando NÃO há padrão principal ativo)
-                                !patternAlert && isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
-                                !patternAlert && isForcedPattern && isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                                !patternAlert && isForcedPattern && isHighlightedRisk ? 'scale-110 shadow-lg' : '',
-                                !patternAlert && isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : '',
                               )}
                               title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                             >
@@ -3047,12 +3433,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                             ? patternAlert.baseNumbers?.includes(num) || false
                             : highlightedBaseNumbers.includes(num);
                           
-                          // Verificar se é padrão forçado
-                          const isForcedPattern = forcedPattern !== null;
-                          
-                          // Verificar se é primeiro ou último número exposto no padrão forçado
-                          const isFirstExposed = isForcedPattern && forcedPattern?.exposedNumbers[0] === num;
-                          const isLastExposed = isForcedPattern && forcedPattern?.exposedNumbers[forcedPattern.exposedNumbers.length - 1] === num;
                           
                           // Verificar se é um dos 2 números para apostar no Padrão Detectado
                           const isDetectedBetNumber = patternAlert?.type === 'race' && alertaPadrao171Ativo && patternAlert?.betNumbers?.includes(num);
@@ -3080,11 +3460,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                                 patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
                                 patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : 
                                 (patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
-                                // Padrão Forçado 171 (APENAS quando NÃO há padrão principal ativo)
-                                !patternAlert && isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
-                                !patternAlert && isForcedPattern && isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                                !patternAlert && isForcedPattern && isHighlightedRisk ? 'scale-110 shadow-lg' : '',
-                                !patternAlert && isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : '',
                               )}
                               title={`Posição ${ROULETTE_SEQUENCE.indexOf(num) + 1} na roleta: ${num}`}
                             >
@@ -3110,12 +3485,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                           ? patternAlert.baseNumbers?.includes(num) || false
                           : highlightedBaseNumbers.includes(num);
                         
-                        // Verificar se é padrão forçado
-                        const isForcedPattern = forcedPattern !== null;
-                        
-                        // Verificar se é primeiro ou último número exposto no padrão forçado
-                        const isFirstExposed = isForcedPattern && forcedPattern?.exposedNumbers[0] === num;
-                        const isLastExposed = isForcedPattern && forcedPattern?.exposedNumbers[forcedPattern.exposedNumbers.length - 1] === num;
                         
                         // Verificar se é um dos 2 números para apostar no Padrão Detectado
                         const isDetectedBetNumber = patternAlert?.type === 'race' && alertaPadrao171Ativo && patternAlert?.betNumbers?.includes(num);
@@ -3145,11 +3514,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                               patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
                               patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && isHighlightedBet && !isHighlightedBase ? 'bg-yellow-400 text-black ring-1 ring-yellow-500' : 
                               (patternAlert && patternAlert.type === 'race' && alertaPadrao171Ativo && isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? 'ring-2 ring-white border-2 border-white animate-pulse shadow-white shadow-md' : '',
-                              // Padrão Forçado 171 (APENAS quando NÃO há padrão principal ativo)
-                              !patternAlert && isForcedPattern && isHighlightedBet ? 'bg-yellow-400 text-black' : '',
-                              !patternAlert && isForcedPattern && isHighlightedRisk && (isFirstExposed || isLastExposed) ? 'ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : 
-                              !patternAlert && isForcedPattern && isHighlightedRisk ? 'scale-110 shadow-lg' : '',
-                              !patternAlert && isForcedPattern && isHighlightedBase ? 'bg-blue-500 text-white ring-2 ring-white border-white scale-110 shadow-lg animate-pulse' : '',
                             )}
                             style={
                               (isHighlightedRisk && (isFirstRiskDetected || isLastRiskDetected)) ? {
@@ -3338,6 +3702,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             </div>
           )}
           
+          {/* Container Áreas da Roleta */}
+          <AreasRoleta
+            isOpen={showAreasRoleta}
+            onClose={() => setShowAreasRoleta(false)}
+            lastNumbers={lastNumbers}
+            avisosSonorosAtivos={avisosSonorosAtivos}
+          />
+          
           {/* Container Espanhol */}
           {espanholEnabled && (
             <div 
@@ -3522,17 +3894,27 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               losses: lossCount
             }}
             avisosSonorosAtivos={avisosSonorosAtivos}
+            animatingBetTerminais={animatingBetTerminais}
+            animatingTorre={animatingTorre}
+            animatingP2={animatingP2}
+            p2Mode={p2Mode}
+            setP2Mode={setP2Mode}
             betTerminaisStats={{
-              wins: betTerminaisWins,
-              losses: betTerminaisLosses,
-              winPercentage: (betTerminaisWins + betTerminaisLosses) > 0 ? Math.round((betTerminaisWins / (betTerminaisWins + betTerminaisLosses)) * 100) : 0,
-              lossPercentage: (betTerminaisWins + betTerminaisLosses) > 0 ? Math.round((betTerminaisLosses / (betTerminaisWins + betTerminaisLosses)) * 100) : 0,
-              negativeSequenceCurrent: betTerminaisNegSeqCurrent,
-              negativeSequenceMax: betTerminaisNegSeqMax,
-              positiveSequenceCurrent: betTerminaisPosSeqCurrent,
-              positiveSequenceMax: betTerminaisPosSeqMax
-            }}
-          />
+                entradas: betTerminaisEntradas,
+                wins: betTerminaisWins,
+                losses: betTerminaisLosses,
+                winPercentage: (betTerminaisWins + betTerminaisLosses) > 0 ? Math.round((betTerminaisWins / (betTerminaisWins + betTerminaisLosses)) * 100) : 0,
+                lossPercentage: (betTerminaisWins + betTerminaisLosses) > 0 ? Math.round((betTerminaisLosses / (betTerminaisWins + betTerminaisLosses)) * 100) : 0,
+                negativeSequenceCurrent: betTerminaisNegSeqCurrent,
+                negativeSequenceMax: betTerminaisNegSeqMax,
+                positiveSequenceCurrent: betTerminaisPosSeqCurrent,
+                positiveSequenceMax: betTerminaisPosSeqMax
+              }}
+              calculatedP2Stats={calculatedP2Stats}
+              calculatedTorreStats={calculatedTorreStats}
+              window32P1={window32P1}
+              calculated32P1Stats={calculated32P1Stats}
+           />
         </div>
 
         {/* Card de Saldo Atual - Movido para depois das estatísticas */}
