@@ -1,4 +1,5 @@
 import React from 'react';
+import { useStatistics } from '../hooks/useStatistics';
 import RankingEstrategiasCard from './RankingEstrategiasCard';
 import TorreCard from './TorreCard';
 import BETTerminaisCard from './BETTerminaisCard';
@@ -54,6 +55,8 @@ const StatisticsCards = ({
   ROULETTE_SEQUENCE = []
 }) => {
 
+    const { totalNumbers: derivedTotalNumbers, colorPercentages: derivedColorPercentages, evenOddPercentages: derivedEvenOddPercentages, highLowPercentages: derivedHighLowPercentages, dozensPercentages: derivedDozensPercentages, columnsPercentages: derivedColumnsPercentages } = useStatistics(statistics);
+
     const p2Safe = calculatedP2Stats ?? { entradas: 0, wins: 0, losses: 0, maxNegativeSequence: 0 };
     const getNumberColumnSafe = (num: number) => {
       if (getNumberColumn) return getNumberColumn(num);
@@ -105,20 +108,27 @@ const StatisticsCards = ({
           {title}
         </h3>
         <div className="space-y-0.5 lg:space-y-1">
-          {data.map((item, idx) => (
-            <div key={`${typeof title === 'string' ? title : 'stat'}-${item.label}-${idx}`} className="flex items-center justify-between">
-              <div className="flex items-center gap-0.5 lg:gap-1">
-                {colors[idx] ? <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${colors[idx]}`}></div> : null}
-                <span className="text-xs lg:text-xs text-gray-600 truncate">{item.label}</span>
+          {data.map((item, idx) => {
+            const total = data.reduce((sum, it) => sum + (it.value || 0), 0);
+            const computed = total > 0 ? Math.round(((item.value || 0) / total) * 100) : 0;
+            const displayPercentage = !item.hidePercentage && item.percentage !== undefined
+              ? (item.percentage === 0 && (item.value || 0) > 0 && total > 0 ? computed : item.percentage)
+              : (!item.hidePercentage ? computed : undefined);
+            return (
+              <div key={`${typeof title === 'string' ? title : 'stat'}-${item.label}-${idx}`} className="flex items-center justify-between">
+                <div className="flex items-center gap-0.5 lg:gap-1">
+                  {colors[idx] ? <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${colors[idx]}`}></div> : null}
+                  <span className="text-xs lg:text-xs text-gray-600 truncate">{item.label}</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-gray-800 text-xs lg:text-sm">{item.customValue ?? item.value}</div>
+                  {displayPercentage !== undefined ? (
+                    <div className="text-xs lg:text-xs text-yellow-400 font-semibold">{displayPercentage}%</div>
+                  ) : null}
+                </div>
               </div>
-              <div className="text-right">
-                <div className="font-bold text-gray-800 text-xs lg:text-sm">{item.customValue ?? item.value}</div>
-                {!item.hidePercentage && item.percentage !== undefined ? (
-                  <div className="text-xs lg:text-xs text-gray-500">{item.percentage}%</div>
-                ) : null}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -229,7 +239,7 @@ const StatisticsCards = ({
   }, [lastNumbers, betTerminaisStats]);
 
   const novesForaStats = React.useMemo(() => {
-    const targets = new Set([5, 8, 10, 15, 16, 21, 22, 23, 30]);
+    const targets = new Set([5, 8, 10, 16, 23, 30]);
     let entradas = 0;
     let wins = 0;
     let losses = 0;
@@ -272,6 +282,7 @@ const StatisticsCards = ({
     const totalEval = wins + losses;
     const winPercentage = totalEval > 0 ? Math.round((wins / totalEval) * 100) : 0;
     const lossPercentage = totalEval > 0 ? Math.round((losses / totalEval) * 100) : 0;
+    console.log('[NF:compute] lastNumbers', lastNumbers.length, { entradas, wins, losses, totalEval, winPercentage, lossPercentage });
 
     return { entradas, wins, losses, winPercentage, lossPercentage, negativeSequenceCurrent, negativeSequenceMax };
   }, [lastNumbers]);
@@ -358,12 +369,12 @@ const StatisticsCards = ({
     const p32Wins = calculated32P1Stats?.wins ?? 0;
 
     const strategies = [
-      { name: 'Torre', wins: torreWins, winPercentage: (torreWins + torreLosses) > 0 ? Math.round((torreWins / (torreWins + torreLosses)) * 100) : 0 },
-      { name: 'P2', wins: p2Wins, winPercentage: (p2Wins + p2Losses) > 0 ? Math.round((p2Wins / (p2Wins + p2Losses)) * 100) : 0 },
-      { name: 'BET Terminais', wins: betWins, winPercentage: betWinPercentage },
-      { name: '171', wins: patternWins, winPercentage: patternEntradas > 0 ? Math.round((patternWins / patternEntradas) * 100) : 0 },
-      { name: 'NovesFora', wins: nfWins, winPercentage: nfWinPercentage },
-      { name: '32P3', wins: p32Wins, winPercentage: p32Total > 0 ? Math.round((p32Wins / p32Total) * 100) : 0 },
+      { name: 'Torre', wins: torreWins, losses: torreLosses, total: (torreWins + torreLosses), winPercentage: (torreWins + torreLosses) > 0 ? Math.round((torreWins / (torreWins + torreLosses)) * 100) : 0 },
+      { name: 'P2', wins: p2Wins, losses: p2Losses, total: (p2Wins + p2Losses), winPercentage: (p2Wins + p2Losses) > 0 ? Math.round((p2Wins / (p2Wins + p2Losses)) * 100) : 0 },
+      { name: 'BET Terminais', wins: betWins, losses: betTerminaisStatsDisplay?.losses ?? 0, total: (betWins + (betTerminaisStatsDisplay?.losses ?? 0)), winPercentage: betWinPercentage },
+      { name: '171', wins: patternWins, losses: pattern171Stats?.losses ?? 0, total: patternEntradas, winPercentage: patternEntradas > 0 ? Math.round((patternWins / patternEntradas) * 100) : 0 },
+      { name: 'NovesFora', wins: nfWins, losses: (novesForaStats.losses ?? 0), total: nfTotal, winPercentage: nfWinPercentage },
+      { name: '32P3', wins: p32Wins, losses: (p32Total - p32Wins), total: p32Total, winPercentage: p32Total > 0 ? Math.round((p32Wins / p32Total) * 100) : 0 },
     ];
     
     // Ordenar por percentual de vitórias (maior para menor)
@@ -577,7 +588,11 @@ const StatisticsCards = ({
                   </div>
                   <div className="text-right">
                     <div className="font-bold text-gray-800 text-xs">{section.count}</div>
-                    <div className="text-xs text-gray-500">{section.percentage}%</div>
+                    {(() => {
+                      const fallback = totalNumbers > 0 ? Math.round((section.count / totalNumbers) * 100) : 0;
+                      const display = section.percentage === 0 && section.count > 0 ? Math.max(1, fallback) : section.percentage;
+                      return <div className="text-xs text-yellow-400 font-semibold">{display}%</div>;
+                    })()}
                   </div>
                 </div>
               ))}
@@ -612,7 +627,7 @@ const StatisticsCards = ({
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-gray-800 text-xs">{count}</div>
-                      <div className="text-xs text-gray-500">{percentage}%</div>
+                      <div className="text-xs text-yellow-400 font-semibold">{percentage}%</div>
                     </div>
                   </div>
                 ))
@@ -635,9 +650,9 @@ const StatisticsCards = ({
         <StatCard
           title="Par/Ímpar"
           data={[
-            { label: 'Par', value: statistics.evenOdd.even, percentage: evenOddPercentages.even },
-            { label: 'Ímpar', value: statistics.evenOdd.odd, percentage: evenOddPercentages.odd },
-            { label: 'Zero', value: statistics.colors.green, percentage: evenOddPercentages.zero }
+            { label: 'Par', value: statistics.evenOdd.even, percentage: derivedEvenOddPercentages.even },
+            { label: 'Ímpar', value: statistics.evenOdd.odd, percentage: derivedEvenOddPercentages.odd },
+            { label: 'Zero', value: statistics.colors.green, percentage: derivedEvenOddPercentages.zero }
           ]}
           colors={['bg-blue-500', 'bg-orange-500', 'bg-green-500']}
           cardType="evenOdd"
@@ -646,9 +661,9 @@ const StatisticsCards = ({
         <StatCard
           title="Alto/Baixo"
           data={[
-            { label: 'Alto (19-36)', value: statistics.highLow.high, percentage: highLowPercentages.high },
-            { label: 'Baixo (1-18)', value: statistics.highLow.low, percentage: highLowPercentages.low },
-            { label: 'Zero', value: statistics.colors.green, percentage: highLowPercentages.zero }
+            { label: 'Alto (19-36)', value: statistics.highLow.high, percentage: derivedHighLowPercentages.high },
+            { label: 'Baixo (1-18)', value: statistics.highLow.low, percentage: derivedHighLowPercentages.low },
+            { label: 'Zero', value: statistics.colors.green, percentage: derivedHighLowPercentages.zero }
           ]}
           colors={['bg-purple-500', 'bg-yellow-500', 'bg-green-500']}
           cardType="highLow"
@@ -657,9 +672,9 @@ const StatisticsCards = ({
         <StatCard
           title="Cores"
           data={[
-            { label: 'Vermelho', value: statistics.colors.red, percentage: colorPercentages.red },
-            { label: 'Preto', value: statistics.colors.black, percentage: colorPercentages.black },
-            { label: 'Verde (0)', value: statistics.colors.green, percentage: colorPercentages.green }
+            { label: 'Vermelho', value: statistics.colors.red, percentage: derivedColorPercentages.red },
+            { label: 'Preto', value: statistics.colors.black, percentage: derivedColorPercentages.black },
+            { label: 'Verde (0)', value: statistics.colors.green, percentage: derivedColorPercentages.green }
           ]}
           colors={['bg-red-500', 'bg-gray-800', 'bg-green-500']}
           cardType="colors"
@@ -667,7 +682,7 @@ const StatisticsCards = ({
 
         <ColunasCard 
           statistics={statistics}
-          columnsPercentages={columnsPercentages}
+          columnsPercentages={derivedColumnsPercentages}
           columnsLoss={columnsLoss}
           lastNumbers={lastNumbers}
           getNumberColumnSafe={getNumberColumnSafe}
@@ -680,9 +695,9 @@ const StatisticsCards = ({
            </h3>
           <div className="space-y-0.5 lg:space-y-1">
             {[
-              { label: '1ª (1-12)', value: statistics.dozens.first, percentage: dozensPercentages.first, color: 'bg-yellow-600', dozenIndex: 1, absences: dozensAbsences.first },
-              { label: '2ª (13-24)', value: statistics.dozens.second, percentage: dozensPercentages.second, color: 'bg-green-600', dozenIndex: 2, absences: dozensAbsences.second },
-              { label: '3ª (25-36)', value: statistics.dozens.third, percentage: dozensPercentages.third, color: 'bg-blue-600', dozenIndex: 3, absences: dozensAbsences.third }
+              { label: '1ª (1-12)', value: statistics.dozens.first, percentage: derivedDozensPercentages.first, color: 'bg-yellow-600', dozenIndex: 1, absences: dozensAbsences.first },
+              { label: '2ª (13-24)', value: statistics.dozens.second, percentage: derivedDozensPercentages.second, color: 'bg-green-600', dozenIndex: 2, absences: dozensAbsences.second },
+              { label: '3ª (25-36)', value: statistics.dozens.third, percentage: derivedDozensPercentages.third, color: 'bg-blue-600', dozenIndex: 3, absences: dozensAbsences.third }
             ].map((item) => {
               const isRepeated = animatingDozens.has(item.dozenIndex);
               return (
@@ -700,12 +715,16 @@ const StatisticsCards = ({
                       {item.absences.current} / {item.absences.max}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className={`font-bold text-gray-800 text-xs lg:text-sm ${isRepeated ? 'animate-pulse-color-size' : ''}`}>
-                      {item.value}
+                    <div className="text-right">
+                      <div className={`font-bold text-gray-800 text-xs lg:text-sm ${isRepeated ? 'animate-pulse-color-size' : ''}`}>{item.value}</div>
+                      {(() => {
+                        const total = (statistics.dozens.first || 0) + (statistics.dozens.second || 0) + (statistics.dozens.third || 0);
+                        const computed = total > 0 ? Math.round(((item.value || 0) / total) * 100) : 0;
+                        const provided = Number(item.percentage) || 0;
+                        const display = ((provided === 0) && (item.value || 0) > 0 && total > 0) ? computed : provided;
+                        return <div className="text-xs lg:text-xs text-yellow-400 font-semibold">{display}%</div>;
+                      })()}
                     </div>
-                    <div className="text-xs lg:text-xs text-gray-500">{item.percentage}%</div>
-                  </div>
                 </div>
               );
             })}
