@@ -95,7 +95,7 @@ const NovesForaCard: React.FC<NovesForaCardProps> = ({ novesForaStats, totalNumb
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setOpen(false)}>
           <div className="bg-white rounded-lg shadow-lg p-4 w-11/12 max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="text-sm font-semibold mb-2">NovesFora</div>
-            <div className="text-xs text-gray-700 mb-2">Gatilhos: 5, 8, 10, 16, 23, 30</div>
+            <div className="text-xs text-gray-700 mb-2">Gatilhos: 5, 8, 16, 23, 25, 30</div>
             <div className="text-xs text-gray-700 mb-1">Entrada: quando sai um número de gatilho, o campo Entradas incrementa imediatamente.</div>
             <div className="text-xs text-gray-700 mb-1">WIN: na rodada seguinte, se o número não for de gatilho.</div>
             <div className="text-xs text-gray-700 mb-3">LOSS: na rodada seguinte, se o número for de gatilho.</div>

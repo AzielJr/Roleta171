@@ -473,7 +473,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const P2_ENTRY_NUMBERS = [0, 3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
   const TORRE_ENTRY_NUMBERS = [1, 2, 3, 34, 35, 36];
   const TORRE_LOSS_SET = new Set<number>([0, 1, 2, 3, 34, 35, 36]);
-  const NOVES_FORA_ENTRY_SET = new Set<number>([5, 8, 10, 16, 23, 30]);
+  const NOVES_FORA_ENTRY_SET = new Set<number>([5, 8, 16, 23, 25, 30]);
   // Estados e animação da Torre
   const [torrePendingEntrada, setTorrePendingEntrada] = useState<boolean>(false);
   const [animatingTorre, setAnimatingTorre] = useState<'yellow' | 'green' | undefined>(undefined);

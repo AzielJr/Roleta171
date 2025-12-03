@@ -239,7 +239,7 @@ const StatisticsCards = ({
   }, [lastNumbers, betTerminaisStats]);
 
   const novesForaStats = React.useMemo(() => {
-    const targets = new Set([5, 8, 10, 16, 23, 30]);
+    const targets = new Set([5, 8, 16, 23, 25, 30]);
     let entradas = 0;
     let wins = 0;
     let losses = 0;
