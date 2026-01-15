@@ -184,7 +184,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   if (!isOpen) return null;
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4" style={{marginBottom: '5px'}}>
+    <div className="bg-white rounded-lg shadow-lg p-4" style={{marginTop: '-15px', marginBottom: '20px'}}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-bold text-gray-800">Progressão de Cores</h3>
         <div className="flex items-center gap-2">
