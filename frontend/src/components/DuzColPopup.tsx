@@ -59,7 +59,7 @@ export default function DuzColPopup({ isOpen, onClose }: { isOpen: boolean; onCl
   // const [dataFinal, setDataFinal] = useState<string>(formatDateOnly(new Date())); // removido
   const [saldoInicial, setSaldoInicial] = useState<string>('');
   const [valorEntrada, setValorEntrada] = useState<string>('')
-  // Aceita ponto (.) e vírgula (,) como separador decimal
+  // Aceita ponto (.) e vírgula (,) como separador decimal - v1.0.2
   const valorEntradaNum = (() => {
     const cleaned = valorEntrada.replace(/[^\d,.-]/g, '');
     if (cleaned.includes(',')) {
@@ -68,6 +68,13 @@ export default function DuzColPopup({ isOpen, onClose }: { isOpen: boolean; onCl
     return parseFloat(cleaned) || 0;
   })();
   const valorEntradaRef = useRef<HTMLInputElement>(null)
+  
+  // Log version for debugging
+  useEffect(() => {
+    if (isOpen && BUILD_VERSION) {
+      console.log('DuzColPopup version:', BUILD_VERSION);
+    }
+  }, [isOpen]);
 
   // Registros
   const [entries, setEntries] = useState<EntryRecord[]>([]);
