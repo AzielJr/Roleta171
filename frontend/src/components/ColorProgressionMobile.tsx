@@ -54,7 +54,7 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
     const goals = [
       { percentage: 2.34, label: '2,34%' },
       { percentage: 3.73, label: '3,73%' },
-      { percentage: 7.73, label: '7,73%' },
+      { percentage: 4.73, label: '4,73%' },
       { percentage: 10.00, label: '10,00%' }
     ];
 
