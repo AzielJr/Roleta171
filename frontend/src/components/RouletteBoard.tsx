@@ -19,6 +19,7 @@ import AreasRoleta from './AreasRoleta';
 import MobileMenu from './MobileMenu';
 import FourColorsMobile from './FourColorsMobile';
 import ColorProgressionMobile from './ColorProgressionMobile';
+import ColorProgressionDesktop from './ColorProgressionDesktop';
 import { supabase } from '../lib/supabase';
 import { detectSequenceAlerts } from '../utils/sequenceAlerts';
 import { LogOut } from 'lucide-react';
@@ -121,6 +122,9 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showFourColorsMobile, setShowFourColorsMobile] = useState(false);
   const [showColorProgressionMobile, setShowColorProgressionMobile] = useState(false);
+  
+  // Estado para Progressão de Cores Desktop
+  const [showColorProgressionDesktop, setShowColorProgressionDesktop] = useState(false);
   
   // Estados para os filtros do histórico (datas locais)
   const formatDateLocal = (d: Date) => {
@@ -3865,6 +3869,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             📑
           </button>
           <button
+            onClick={() => setShowColorProgressionDesktop(v => !v)}
+            className="bg-teal-600 hover:bg-teal-700 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
+            style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
+            title="Progressão de Cores"
+          >
+            🎨
+          </button>
+          <button
             onClick={simulateAutoDrawing}
             className={cn(
                "text-black text-xs rounded transition-colors font-semibold flex items-center justify-center",
@@ -4607,11 +4619,20 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             />
           )}
 
+          {/* Progressão de Cores Desktop - Empurra Estatísticas para baixo */}
+          {showColorProgressionDesktop && (
+            <ColorProgressionDesktop 
+              isOpen={showColorProgressionDesktop} 
+              onClose={() => setShowColorProgressionDesktop(false)} 
+              lastNumbers={lastNumbers}
+            />
+          )}
+
           {/* Container de Estatísticas - Sempre visível, empurrado para baixo quando Padrão Detectado estiver ativo */}
           <div 
             className="bg-gray-800 rounded-lg p-3 h-fit transform-gpu transition-all duration-300"
             style={{
-              marginTop: showDuzColPanel ? '0px' : (patternAlert || espanholEnabled) ? '-21px' : '-26px',
+              marginTop: showColorProgressionDesktop ? '0px' : showDuzColPanel ? '0px' : (patternAlert || espanholEnabled) ? '-21px' : '-26px',
               willChange: 'transform, opacity, filter'
             }}
           >

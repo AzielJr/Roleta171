@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useBalance } from '../contexts/BalanceContext';
 
-const BUILD_VERSION = '1.0.2';
+const BUILD_VERSION = '1.0.3';
 
 interface EntryRecord {
   id: number;

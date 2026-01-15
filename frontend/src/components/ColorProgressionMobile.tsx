@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 import { useBalance } from '../contexts/BalanceContext';
 
 interface ColorProgressionMobileProps {
@@ -23,6 +23,7 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
     wasWin: boolean;
     betColor: 'red' | 'black' | null;
   }>>([]);
+  const [showNumberPopup, setShowNumberPopup] = useState<boolean>(false);
 
   const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
   const blackNumbers = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
@@ -47,9 +48,13 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
 
   const progression = calculateProgression();
 
-  const handleNumberClick = (num: number) => {
+  const handleNumberClick = (num: number, closePopup: boolean = false) => {
     const newSelectedNumbers = [num, ...selectedNumbers];
     setSelectedNumbers(newSelectedNumbers);
+    
+    if (closePopup) {
+      setShowNumberPopup(false);
+    }
 
     if (num === 0) {
       const betValue = progression[currentPosition];
@@ -203,7 +208,16 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
             </div>
 
             <div className="bg-white rounded-lg p-2 shadow">
-              <div className="text-[10px] text-gray-500 mb-1">Roleta Europeia</div>
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-[10px] text-gray-500">Roleta Europeia</div>
+                <button
+                  onClick={() => setShowNumberPopup(true)}
+                  className="text-green-600 hover:text-green-700 active:text-green-800 p-1 rounded-full hover:bg-green-50 transition-colors"
+                  title="Seleção ampliada"
+                >
+                  <Plus size={20} />
+                </button>
+              </div>
               <div className="w-full">
                 <div className="mb-1">
                   <button
@@ -399,6 +413,137 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
           </div>
         </div>
       </div>
+
+      {showNumberPopup && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/70 z-[60]"
+            onClick={() => setShowNumberPopup(false)}
+          />
+          
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-auto">
+              <div className="sticky top-0 bg-green-700 p-4 flex items-center justify-between rounded-t-xl">
+                <h3 className="text-white font-bold text-lg">Selecionar Número</h3>
+                <button
+                  onClick={() => setShowNumberPopup(false)}
+                  className="text-white hover:text-green-300 transition-colors p-1"
+                  title="Fechar"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="p-4 space-y-3">
+                <div className="mb-2">
+                  <button
+                    onClick={() => handleNumberClick(0, true)}
+                    className="w-full h-16 flex items-center justify-center text-white font-bold text-2xl rounded-lg bg-green-600 hover:bg-green-700 active:bg-green-800 shadow-md transition-colors"
+                  >
+                    0
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {[1, 2, 3, 4, 5, 6].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleNumberClick(num, true)}
+                      className={`aspect-square flex items-center justify-center text-white font-bold text-xl rounded-lg shadow-md transition-colors ${
+                        getNumberColor(num) === 'red' 
+                          ? 'bg-red-600 hover:bg-red-700 active:bg-red-800' 
+                          : 'bg-gray-800 hover:bg-gray-900 active:bg-black'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {[7, 8, 9, 10, 11, 12].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleNumberClick(num, true)}
+                      className={`aspect-square flex items-center justify-center text-white font-bold text-xl rounded-lg shadow-md transition-colors ${
+                        getNumberColor(num) === 'red' 
+                          ? 'bg-red-600 hover:bg-red-700 active:bg-red-800' 
+                          : 'bg-gray-800 hover:bg-gray-900 active:bg-black'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {[13, 14, 15, 16, 17, 18].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleNumberClick(num, true)}
+                      className={`aspect-square flex items-center justify-center text-white font-bold text-xl rounded-lg shadow-md transition-colors ${
+                        getNumberColor(num) === 'red' 
+                          ? 'bg-red-600 hover:bg-red-700 active:bg-red-800' 
+                          : 'bg-gray-800 hover:bg-gray-900 active:bg-black'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {[19, 20, 21, 22, 23, 24].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleNumberClick(num, true)}
+                      className={`aspect-square flex items-center justify-center text-white font-bold text-xl rounded-lg shadow-md transition-colors ${
+                        getNumberColor(num) === 'red' 
+                          ? 'bg-red-600 hover:bg-red-700 active:bg-red-800' 
+                          : 'bg-gray-800 hover:bg-gray-900 active:bg-black'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {[25, 26, 27, 28, 29, 30].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleNumberClick(num, true)}
+                      className={`aspect-square flex items-center justify-center text-white font-bold text-xl rounded-lg shadow-md transition-colors ${
+                        getNumberColor(num) === 'red' 
+                          ? 'bg-red-600 hover:bg-red-700 active:bg-red-800' 
+                          : 'bg-gray-800 hover:bg-gray-900 active:bg-black'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {[31, 32, 33, 34, 35, 36].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleNumberClick(num, true)}
+                      className={`aspect-square flex items-center justify-center text-white font-bold text-xl rounded-lg shadow-md transition-colors ${
+                        getNumberColor(num) === 'red' 
+                          ? 'bg-red-600 hover:bg-red-700 active:bg-red-800' 
+                          : 'bg-gray-800 hover:bg-gray-900 active:bg-black'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 };
