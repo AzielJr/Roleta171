@@ -57,7 +57,13 @@ export default function DuzColPopup({ isOpen, onClose }: { isOpen: boolean; onCl
   // const [dataFinal, setDataFinal] = useState<string>(formatDateOnly(new Date())); // removido
   const [saldoInicial, setSaldoInicial] = useState<string>('');
   const [valorEntrada, setValorEntrada] = useState<string>('')
-  const valorEntradaNum = parseFloat(valorEntrada.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')) || 0
+  const valorEntradaNum = (() => {
+    const cleaned = valorEntrada.replace(/[^\d,.-]/g, '');
+    if (cleaned.includes(',')) {
+      return parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+    }
+    return parseFloat(cleaned) || 0;
+  })();
   const valorEntradaRef = useRef<HTMLInputElement>(null)
 
   // Registros
