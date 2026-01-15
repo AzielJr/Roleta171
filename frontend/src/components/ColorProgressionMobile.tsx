@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Target } from 'lucide-react';
 import { useBalance } from '../contexts/BalanceContext';
 
 interface ColorProgressionMobileProps {
@@ -24,6 +24,7 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
     betColor: 'red' | 'black' | null;
   }>>([]);
   const [showNumberPopup, setShowNumberPopup] = useState<boolean>(false);
+  const [showGoalsPopup, setShowGoalsPopup] = useState<boolean>(false);
 
   const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
   const blackNumbers = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
@@ -47,6 +48,26 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
   };
 
   const progression = calculateProgression();
+
+  const calculateGoals = () => {
+    const currentBalance = balance;
+    const goals = [
+      { percentage: 2.34, label: '2,34%' },
+      { percentage: 3.73, label: '3,73%' },
+      { percentage: 7.73, label: '7,73%' },
+      { percentage: 10.00, label: '10,00%' }
+    ];
+
+    return goals.map(goal => {
+      const amountToWin = currentBalance * (goal.percentage / 100);
+      const targetTotal = currentBalance + amountToWin;
+      return {
+        ...goal,
+        amountToWin,
+        targetTotal
+      };
+    });
+  };
 
   const handleNumberClick = (num: number, closePopup: boolean = false) => {
     const newSelectedNumbers = [num, ...selectedNumbers];
@@ -153,13 +174,22 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
         <div className="min-h-screen pb-20">
           <div className="bg-green-700 p-3 flex items-center justify-between sticky top-0 z-10">
             <h2 className="text-white font-bold text-lg">Progressão de Cores</h2>
-            <button
-              onClick={onClose}
-              className="text-white hover:text-green-300 transition-colors p-1"
-              title="Fechar"
-            >
-              <X size={24} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowGoalsPopup(true)}
+                className="text-white hover:text-green-300 transition-colors p-1"
+                title="Projeções de Metas"
+              >
+                <Target size={24} />
+              </button>
+              <button
+                onClick={onClose}
+                className="text-white hover:text-green-300 transition-colors p-1"
+                title="Fechar"
+              >
+                <X size={24} />
+              </button>
+            </div>
           </div>
 
           <div className="p-3 space-y-3">
@@ -413,6 +443,75 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
           </div>
         </div>
       </div>
+
+      {showGoalsPopup && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/70 z-[60]"
+            onClick={() => setShowGoalsPopup(false)}
+          />
+          
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-auto">
+              <div className="sticky top-0 bg-green-700 p-4 flex items-center justify-between rounded-t-xl">
+                <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                  <Target size={24} />
+                  Projeções de Metas
+                </h3>
+                <button
+                  onClick={() => setShowGoalsPopup(false)}
+                  className="text-white hover:text-green-300 transition-colors p-1"
+                  title="Fechar"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="p-4 space-y-3">
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <div className="text-sm text-gray-600">Saldo Atual</div>
+                  <div className="text-2xl font-bold text-blue-600">R$ {balance.toFixed(2)}</div>
+                </div>
+
+                <div className="space-y-3">
+                  {calculateGoals().map((goal, index) => {
+                    const greenShades = [
+                      { bg: 'from-green-50 to-green-100', border: 'border-green-200', text: 'text-green-700', badge: 'bg-green-500', borderColor: 'border-green-300' },
+                      { bg: 'from-green-100 to-green-200', border: 'border-green-300', text: 'text-green-800', badge: 'bg-green-600', borderColor: 'border-green-400' },
+                      { bg: 'from-green-200 to-green-300', border: 'border-green-400', text: 'text-green-900', badge: 'bg-green-700', borderColor: 'border-green-500' },
+                      { bg: 'from-green-300 to-green-400', border: 'border-green-500', text: 'text-green-950', badge: 'bg-green-800', borderColor: 'border-green-600' }
+                    ];
+                    const shade = greenShades[index];
+                    
+                    return (
+                      <div key={index} className={`bg-gradient-to-br ${shade.bg} rounded-lg p-3 border-2 ${shade.border}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className={`text-base font-bold ${shade.text}`}>Meta {goal.label}</div>
+                          <div className={`${shade.badge} text-white px-2 py-1 rounded-full text-xs font-bold`}>
+                            {goal.percentage}%
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-700">Valor a Ganhar:</span>
+                            <span className={`text-sm font-bold ${shade.text}`}>R$ {goal.amountToWin.toFixed(2)}</span>
+                          </div>
+                          
+                          <div className={`flex justify-between items-center pt-1 border-t ${shade.borderColor}`}>
+                            <span className="text-xs text-gray-700">Total a Atingir:</span>
+                            <span className={`text-base font-bold ${shade.text}`}>R$ {goal.targetTotal.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {showNumberPopup && (
         <>

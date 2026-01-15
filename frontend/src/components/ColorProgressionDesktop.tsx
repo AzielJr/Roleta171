@@ -228,28 +228,38 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {calculateGoals().map((goal, index) => (
-                <div key={index} className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border-2 border-green-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-lg font-bold text-green-800">Meta {goal.label}</div>
-                    <div className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-bold">
-                      {goal.percentage}%
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Valor a Ganhar:</span>
-                      <span className="text-base font-bold text-green-700">R$ {goal.amountToWin.toFixed(2)}</span>
+              {calculateGoals().map((goal, index) => {
+                const greenShades = [
+                  { bg: 'from-green-50 to-green-100', border: 'border-green-200', text: 'text-green-700', badge: 'bg-green-500', borderColor: 'border-green-300' },
+                  { bg: 'from-green-100 to-green-200', border: 'border-green-300', text: 'text-green-800', badge: 'bg-green-600', borderColor: 'border-green-400' },
+                  { bg: 'from-green-200 to-green-300', border: 'border-green-400', text: 'text-green-900', badge: 'bg-green-700', borderColor: 'border-green-500' },
+                  { bg: 'from-green-300 to-green-400', border: 'border-green-500', text: 'text-green-950', badge: 'bg-green-800', borderColor: 'border-green-600' }
+                ];
+                const shade = greenShades[index];
+                
+                return (
+                  <div key={index} className={`bg-gradient-to-br ${shade.bg} rounded-lg p-4 border-2 ${shade.border}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className={`text-lg font-bold ${shade.text}`}>Meta {goal.label}</div>
+                      <div className={`${shade.badge} text-white px-3 py-1 rounded-full text-sm font-bold`}>
+                        {goal.percentage}%
+                      </div>
                     </div>
                     
-                    <div className="flex justify-between items-center pt-2 border-t border-green-300">
-                      <span className="text-sm text-gray-600">Total a Atingir:</span>
-                      <span className="text-lg font-bold text-green-800">R$ {goal.targetTotal.toFixed(2)}</span>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-700">Valor a Ganhar:</span>
+                        <span className={`text-base font-bold ${shade.text}`}>R$ {goal.amountToWin.toFixed(2)}</span>
+                      </div>
+                      
+                      <div className={`flex justify-between items-center pt-2 border-t ${shade.borderColor}`}>
+                        <span className="text-sm text-gray-700">Total a Atingir:</span>
+                        <span className={`text-lg font-bold ${shade.text}`}>R$ {goal.targetTotal.toFixed(2)}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
