@@ -57,6 +57,7 @@ export default function DuzColPopup({ isOpen, onClose }: { isOpen: boolean; onCl
   // const [dataFinal, setDataFinal] = useState<string>(formatDateOnly(new Date())); // removido
   const [saldoInicial, setSaldoInicial] = useState<string>('');
   const [valorEntrada, setValorEntrada] = useState<string>('')
+  // Aceita ponto (.) e vírgula (,) como separador decimal
   const valorEntradaNum = (() => {
     const cleaned = valorEntrada.replace(/[^\d,.-]/g, '');
     if (cleaned.includes(',')) {

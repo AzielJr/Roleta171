@@ -37,34 +37,25 @@ export const evaluateTorreNumber = (
     setTorreLossCount(prev => prev + 1);
     // manter borda ativa até que ocorra um WIN
   } else {
-    console.log('[DEBUG TORRE RADICAL] *** WIN DETECTADO - REMOÇÃO RADICAL DA BORDA ***');
+    console.log('[DEBUG TORRE RADICAL] *** WIN DETECTADO - MANTENDO BORDA VERDE POR 5 SEGUNDOS ***');
     setTorreWinCount(prev => prev + 1);
     
-    // FORÇAR estado global
+    // Configurar estado visual para VERDE
     globalTorreState.pending = false;
-    globalTorreState.animating = undefined;
+    globalTorreState.animating = 'green';
     
-    // MÚLTIPLAS tentativas de remoção
-    console.log('[DEBUG TORRE RADICAL] Tentativa 1 - Removendo borda');
-    setAnimatingTorre(undefined);
+    // Aplicar visual verde imediatamente
+    setAnimatingTorre('green');
     setTorrePendingEntrada(false);
     
+    // Agendar limpeza após 5 segundos
     setTimeout(() => {
-      console.log('[DEBUG TORRE RADICAL] Tentativa 2 - Forçando remoção');
-      setAnimatingTorre(undefined);
-      setTorrePendingEntrada(false);
-    }, 50);
-    
-    setTimeout(() => {
-      console.log('[DEBUG TORRE RADICAL] Tentativa 3 - Garantindo remoção');
-      setAnimatingTorre(undefined);
-      setTorrePendingEntrada(false);
-    }, 100);
-    
-    setTimeout(() => {
-      console.log('[DEBUG TORRE RADICAL] Tentativa 4 - Limpeza final');
-      setAnimatingTorre(undefined);
-      setTorrePendingEntrada(false);
-    }, 200);
+      // Verificar se não iniciou uma nova entrada neste meio tempo
+      if (globalTorreState.animating === 'green') {
+        console.log('[DEBUG TORRE RADICAL] Limpeza final após 5 segundos');
+        setAnimatingTorre(undefined);
+        globalTorreState.animating = undefined;
+      }
+    }, 5000);
   }
 };

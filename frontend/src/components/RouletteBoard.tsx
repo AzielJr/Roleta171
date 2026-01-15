@@ -14,8 +14,59 @@ import { useBalance } from '../contexts/BalanceContext';
 import { HistoricoSaldos } from './HistoricoSaldos';
 import { MonthlyGraphModal } from './MonthlyGraphModal';
 import { soundGenerator } from '../utils/soundUtils';
-import DuzColPopup from './DuzColPopup';
+import FourColorsPanel from './FourColorsPanel';
 import AreasRoleta from './AreasRoleta';
+import MobileMenu from './MobileMenu';
+import FourColorsMobile from './FourColorsMobile';
+import ColorProgressionMobile from './ColorProgressionMobile';
+import { supabase } from '../lib/supabase';
+import { detectSequenceAlerts } from '../utils/sequenceAlerts';
+import { LogOut } from 'lucide-react';
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Tooltip,
+  Legend
+} from 'chart.js';
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+const valueLabelPlugin = {
+  id: 'valueLabel',
+  afterDatasetsDraw(chart: any) {
+    const { ctx } = chart;
+    const dataset = chart.data.datasets[0] as any;
+    const meta = chart.getDatasetMeta(0);
+    const profits: number[] = Array.isArray(dataset?.profits) ? dataset.profits : [];
+    ctx.save();
+    meta.data.forEach((element: any, index: number) => {
+      const val = Number(dataset.data[index] || 0);
+      const pos = element.tooltipPosition();
+      // Valor acima da barra (saldo)
+      ctx.fillStyle = '#1f2937';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(
+        val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        pos.x,
+        pos.y - 2
+      );
+      // Lucro dentro do topo da barra (discreto em verde escuro)
+      const profitVal = Number(profits[index] ?? 0);
+      ctx.fillStyle = '#064e3b';
+      ctx.textBaseline = 'top';
+      ctx.fillText(
+        profitVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        pos.x,
+        pos.y + 6
+      );
+    });
+    ctx.restore();
+  }
+};
+ChartJS.register(valueLabelPlugin);
 
 interface SelectedNumbers {
   numbers: number[];
@@ -42,7 +93,7 @@ interface RouletteProps {
 const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Hooks para autenticação e saldo
   const { user } = useAuth();
-  const { balance, currentSaldoRecord, adjustBalance, updateSaldoRecord, createSaldoRecord } = useBalance();
+  const { balance, currentSaldoRecord, lastSaldoRecord, adjustBalance, updateSaldoRecord, createSaldoRecord, refreshBalance } = useBalance();
   
   // Ref para controlar duplicação de detecção P2 WIN
   const lastProcessedP2Key = useRef<string>('');
@@ -65,6 +116,11 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   
   // Container Áreas da Roleta
   const [showAreasRoleta, setShowAreasRoleta] = useState(false);
+  
+  // Estados para menu mobile e 4 Cores mobile
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showFourColorsMobile, setShowFourColorsMobile] = useState(false);
+  const [showColorProgressionMobile, setShowColorProgressionMobile] = useState(false);
   
   // Estados para os filtros do histórico (datas locais)
   const formatDateLocal = (d: Date) => {
@@ -423,6 +479,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   
   // Estado para histórico de números sorteados (para detecção de padrões)
   const [drawnHistory, setDrawnHistory] = useState<number[]>([]);
+  
+  // Estados para alertas de sequência de 3 números seguidos
+  const [sequenceAlerts, setSequenceAlerts] = useState<Array<{type: string, category: string, message: string}>>([]);
+  const [dozenSequenceCount, setDozenSequenceCount] = useState<{dozen: number, count: number} | null>(null);
+  const [columnSequenceCount, setColumnSequenceCount] = useState<{column: number, count: number} | null>(null);
+  const [colorSequence, setColorSequence] = useState<{color: string, count: number} | null>(null);
+  const [highLowSequence, setHighLowSequence] = useState<{type: string, count: number} | null>(null);
+  const [evenOddSequence, setEvenOddSequence] = useState<{type: string, count: number} | null>(null);
 
   // Estados do recurso Espanhol
   const [espanholChamados, setEspanholChamados] = useState<number[]>([]);
@@ -471,8 +535,13 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   
   // ===== Calculadoras de Estatísticas: P2 e Torre =====
   const P2_ENTRY_NUMBERS = [0, 3, 4, 7, 11, 15, 18, 21, 22, 25, 29, 33, 36];
-  const TORRE_ENTRY_NUMBERS = [1, 2, 3, 34, 35, 36];
-  const TORRE_LOSS_SET = new Set<number>([0, 1, 2, 3, 34, 35, 36]);
+  const TORRE_STREETS: { [key: number]: number[] } = {
+    1: [1, 2, 3, 4, 5, 6],
+    2: [7, 8, 9, 10, 11, 12],
+    3: [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+    4: [25, 26, 27, 28, 29, 30],
+    5: [31, 32, 33, 34, 35, 36]
+  };
   const NOVES_FORA_ENTRY_SET = new Set<number>([5, 8, 16, 23, 25, 30]);
   // Estados e animação da Torre
   const [torrePendingEntrada, setTorrePendingEntrada] = useState<boolean>(false);
@@ -578,41 +647,32 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const calculatedTorreStats = React.useMemo(() => {
     let entradas = 0, wins = 0, losses = 0;
     let maxNegativeSequence = 0, currentNegativeSequence = 0;
+    let exposedNumbers: number[] = [];
 
-    let pending = false;
     for (let i = 0; i < lastNumbers.length; i++) {
       const number = lastNumbers[i];
-      if (!pending) {
-        if (TORRE_ENTRY_NUMBERS.includes(number)) {
-          entradas++;
-          pending = true;
+      
+      if (exposedNumbers.length > 0) {
+        entradas++;
+        if (exposedNumbers.includes(number) || number === 0) {
+          losses++;
+          currentNegativeSequence++;
+          if (currentNegativeSequence > maxNegativeSequence) {
+            maxNegativeSequence = currentNegativeSequence;
+          }
+        } else {
+          wins++;
+          currentNegativeSequence = 0;
         }
-      } else {
-         // Classificar apenas quando existir um próximo número
-         if (number === 0) {
-           // LOSS por zero: não incrementa Entradas
-           losses++;
-           currentNegativeSequence++;
-           if (currentNegativeSequence > maxNegativeSequence) {
-             maxNegativeSequence = currentNegativeSequence;
-           }
-           // continua pendente
-         } else if (TORRE_ENTRY_NUMBERS.includes(number)) {
-           // LOSS por novo gatilho: incrementa Entradas e mantém pendente
-           entradas++;
-           losses++;
-           currentNegativeSequence++;
-           if (currentNegativeSequence > maxNegativeSequence) {
-             maxNegativeSequence = currentNegativeSequence;
-           }
-           // continua pendente
-         } else {
-           // WIN: encerra pendência
-           wins++;
-           currentNegativeSequence = 0;
-           pending = false;
-         }
-       }
+      }
+
+      exposedNumbers = [];
+      for (const key in TORRE_STREETS) {
+        if (TORRE_STREETS[key].includes(number)) {
+          exposedNumbers = TORRE_STREETS[key];
+          break;
+        }
+      }
     }
 
     return { entradas, wins, losses, maxNegativeSequence, currentNegativeSequence };
@@ -783,37 +843,60 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Avaliar Torre: ativa borda nos números de entrada e classifica próximo(s) números
   const evaluateTorre = (selectedNumber: number, currentNumbersSnapshot?: number[]) => {
     const snapshot = currentNumbersSnapshot ?? lastNumbers;
-    const lastPrevNumber = snapshot[snapshot.length - 1] ?? 'none';
-    const evaluationKey = `torre-${selectedNumber}-${snapshot.length}-${lastPrevNumber}-${torrePendingEntrada ? 'pending' : 'idle'}`;
+    // Recriar o estado de exposição baseado no último número
+    const lastNumber = snapshot[snapshot.length - 1];
+    
+    // Evitar avaliação duplicada para o mesmo número e snapshot
+    const evaluationKey = `torre-${selectedNumber}-${snapshot.length}-${lastNumber ?? 'none'}`;
     if (lastEvaluatedTorre.current === evaluationKey) {
       return;
     }
     lastEvaluatedTorre.current = evaluationKey;
 
-    if (!torrePendingEntrada) {
-      if (TORRE_ENTRY_NUMBERS.includes(selectedNumber)) {
-        setTorrePendingEntrada(true);
-        setAnimatingTorre('yellow');
-        // Sem manipulação de DOM: StatisticsCards aplica borda ao container
-        if (avisosSonorosAtivos) {
-          try { soundGenerator.playBellSound(); } catch {}
+    // 1. Verificar se havia aposta pendente (baseado no último número)
+    let exposedNumbers: number[] = [];
+    if (lastNumber !== undefined) {
+      for (const key in TORRE_STREETS) {
+        if (TORRE_STREETS[key].includes(lastNumber)) {
+          exposedNumbers = TORRE_STREETS[key];
+          break;
         }
       }
-      return;
     }
 
-    // Padrão ativo: LOSS se número for 0,1,2,3,34,35,36; WIN caso contrário
-    if (TORRE_LOSS_SET.has(selectedNumber)) {
-      setTorreLossCount(prev => prev + 1);
-      // manter borda ativa até que ocorra um WIN
+    // Se havia números expostos, avaliar WIN/LOSS
+    if (exposedNumbers.length > 0) {
+      // setTorreEntradasCount(prev => prev + 1); // Contagem implícita no useMemo
+      const isLoss = exposedNumbers.includes(selectedNumber) || selectedNumber === 0;
+      
+      if (isLoss) {
+        setTorreLossCount(prev => prev + 1);
+        // setAnimatingTorre('yellow'); // Removido conforme solicitação
+      } else {
+        setTorreWinCount(prev => prev + 1);
+        setAnimatingTorre('green');
+        setTimeout(() => {
+          clearTorreVisuals();
+        }, 1000);
+      }
+    }
+
+    // 2. Definir próxima exposição (Status Visual)
+    let nextExposed = false;
+    for (const key in TORRE_STREETS) {
+      if (TORRE_STREETS[key].includes(selectedNumber)) {
+        nextExposed = true;
+        break;
+      }
+    }
+    
+    if (nextExposed) {
+      setTorrePendingEntrada(true);
+      // Sem borda amarela na entrada (solicitação do usuário)
+      // setAnimatingTorre(prev => prev === 'green' ? 'green' : 'yellow');
     } else {
-      setTorreWinCount(prev => prev + 1);
-      // Mostrar verde breve no WIN e limpar após pequeno atraso
-      setAnimatingTorre('green');
       setTorrePendingEntrada(false);
-      setTimeout(() => {
-        clearTorreVisuals();
-      }, 350);
+      setAnimatingTorre(prev => prev === 'green' ? 'green' : undefined);
     }
   };
 
@@ -821,33 +904,33 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const recalculateTorreFromLastNumbers = () => {
     let wins = 0;
     let losses = 0;
+    let exposedNumbers: number[] = [];
     let pending = false;
 
     for (let i = 0; i < lastNumbers.length; i++) {
-      const n = lastNumbers[i];
-      if (!pending) {
-        if (TORRE_ENTRY_NUMBERS.includes(n)) {
-          pending = true;
-        }
-      } else {
-        if (TORRE_LOSS_SET.has(n)) {
-          losses++;
-        } else {
-          wins++;
-          pending = false;
+      const number = lastNumbers[i];
+      
+      if (exposedNumbers.length > 0) {
+         if (exposedNumbers.includes(number) || number === 0) {
+           losses++;
+         } else {
+           wins++;
+         }
+      }
+      
+      exposedNumbers = [];
+      for (const key in TORRE_STREETS) {
+        if (TORRE_STREETS[key].includes(number)) {
+          exposedNumbers = TORRE_STREETS[key];
+          break;
         }
       }
     }
 
     setTorreWinCount(wins);
     setTorreLossCount(losses);
-    setTorrePendingEntrada(pending);
-    setAnimatingTorre(pending ? 'yellow' : undefined);
-
-    // UI totalmente driven por estado via animatingTorre/torrePendingEntrada
-    if (!pending) {
-      clearTorreVisuals();
-    }
+    setTorrePendingEntrada(exposedNumbers.length > 0);
+    setAnimatingTorre(undefined);
   };
 
   // Avaliar P2 com modos 1 (um gatilho) e 2 (dois gatilhos consecutivos)
@@ -1039,6 +1122,21 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   
   // Estados para o modal de cálculo de lucro
   const [showProfitModal, setShowProfitModal] = useState(false);
+  const [showMobileDashboard, setShowMobileDashboard] = useState(false);
+  const [showMobileHistory, setShowMobileHistory] = useState(false);
+  const [showMobileProfitPage, setShowMobileProfitPage] = useState(false);
+  const [showMobileHistoryPage, setShowMobileHistoryPage] = useState(false);
+  const [showMobileCreateBalancePage, setShowMobileCreateBalancePage] = useState(false);
+  const [recentSaldos, setRecentSaldos] = useState<Array<{ data: string; saldo_inicial: number; saldo_atual: number }>>([]);
+  useEffect(() => {
+    if (showMobileCreateBalancePage) {
+      const last = (lastSaldoRecord?.saldo_atual ?? currentSaldoRecord?.saldo_atual ?? balance) || 0;
+      setCreateSaldoInicial(last);
+      setCreateSaldoAtual(last);
+      setCreateDataCadastro(new Date().toISOString().split('T')[0]);
+    }
+  }, [showMobileCreateBalancePage, lastSaldoRecord, currentSaldoRecord, balance]);
+  const [showMobileProfitModal, setShowMobileProfitModal] = useState(false);
   const [profitParams, setProfitParams] = useState({
     days: 30,
     startDate: new Date().toISOString().split('T')[0],
@@ -1107,8 +1205,54 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
   // Estados para edição inline do saldo no header
   const [isEditingBalance, setIsEditingBalance] = useState<boolean>(false);
+  useEffect(() => {
+    const w = typeof window !== 'undefined' ? window.innerWidth : 1024;
+    if (user && w <= 768) setShowMobileDashboard(true);
+  }, [user]);
+
+  useEffect(() => {
+    const loadRecent = async () => {
+      if (!user) return;
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const { data } = await supabase
+        .from('r171_saldo')
+        .select('data,saldo_inicial,saldo_atual')
+        .eq('id_senha', user.id)
+        .lt('data', today)
+        .order('data', { ascending: false })
+        .limit(5);
+      const list = (data as any[]) || [];
+      const filtered = list.filter((s) => s.data !== today).slice(0, 4);
+      setRecentSaldos(filtered);
+    };
+    loadRecent();
+  }, [user, showMobileDashboard]);
+  const refreshAllUI = async () => {
+    if (!user) return;
+    await refreshBalance();
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const { data } = await supabase
+      .from('r171_saldo')
+      .select('data,saldo_inicial,saldo_atual')
+      .eq('id_senha', user.id)
+      .lt('data', today)
+      .order('data', { ascending: false })
+      .limit(5);
+    const list = (data as any[]) || [];
+    const filtered = list.filter((s) => s.data !== today).slice(0, 4);
+    setRecentSaldos(filtered);
+  };
   const [editBalanceValue, setEditBalanceValue] = useState<string>('');
   const editBalanceInputRef = useRef<HTMLInputElement>(null);
+  const createBalanceSectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showMobileCreateBalancePage && createBalanceSectionRef.current) {
+      createBalanceSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [showMobileCreateBalancePage]);
 
   // Função para iniciar edição do saldo
   const startEditingBalance = () => {
@@ -1125,18 +1269,33 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
   // Função para salvar novo saldo
   const saveBalance = async () => {
-    const newBalance = parseFloat(editBalanceValue);
+    const raw = (editBalanceValue || '').trim();
+    let normalized = raw;
+    if (raw.includes(',') && raw.includes('.')) {
+      normalized = raw.replace(/\./g, '').replace(',', '.');
+    } else if (raw.includes(',')) {
+      normalized = raw.replace(',', '.');
+    } else {
+      normalized = raw;
+    }
+    const newBalance = parseFloat(normalized);
     if (isNaN(newBalance)) {
       alert('Por favor, insira um valor válido');
       return;
     }
 
+    console.log('💾 Salvando saldo via edição rápida:', newBalance);
+    console.log('📊 Registro atual:', currentSaldoRecord);
+    
     const success = await adjustBalance(newBalance, 'Edição rápida via header');
     if (success) {
+      console.log('✅ Saldo salvo com sucesso!');
       setIsEditingBalance(false);
       setEditBalanceValue('');
+      await refreshBalance();
     } else {
-      alert('Erro ao atualizar saldo');
+      console.error('❌ Falha ao salvar saldo');
+      alert('Erro ao atualizar saldo. Verifique o console para mais detalhes.');
     }
   };
 
@@ -2212,24 +2371,15 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       }
     }
     
+    // Avaliar P2, TORRE e BET Terminais antes de atualizar demais lógicas
+    // evaluateTorre(num, lastNumbers);
+
     setLastNumbers(prev => {
       const newList = [...prev, num]; // CORREÇÃO: Adicionar no FINAL - ordem cronológica correta
       const updatedList = newList.slice(-60); // Manter apenas os últimos 60
       
-      // Avaliar P2, TORRE e BET Terminais antes de atualizar demais lógicas
-      // evaluateTorre(num, prev); // DESABILITADO TEMPORARIAMENTE
-      console.log('[DEBUG MAIN] Chamando evaluateTorreNumber para:', num);
       evaluateTorreNumber(num, torrePendingEntrada, setTorrePendingEntrada, setAnimatingTorre, setTorreWinCount, setTorreLossCount, clearTorreVisuals);
-      
-      // FORÇA ADICIONAL: Se WIN detectado, forçar remoção direta
-      if (torrePendingEntrada && ![0, 1, 2, 3, 34, 35, 36].includes(num)) {
-        console.log('[DEBUG MAIN] WIN detectado - forçando remoção direta');
-        setTimeout(() => {
-          setAnimatingTorre(undefined);
-          setTorrePendingEntrada(false);
-        }, 10);
-      }
-      
+
       console.log('[DEBUG MAIN] Chamando evaluateBetTerminaisNumber para:', num);
       evaluateBetTerminaisNumber(num, betTerminaisPendingEntrada, setBetTerminaisPendingEntrada, setAnimatingBetTerminais, setBetTerminaisWins, setBetTerminaisLosses, setBetTerminaisEntradas, setBetTerminaisNegSeqCurrent, setBetTerminaisNegSeqMax, setBetTerminaisPosSeqCurrent, setBetTerminaisPosSeqMax, prev);
       
@@ -2299,6 +2449,134 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       }
       
       // P2 logic moved to StatisticsCards.tsx - no duplicate logic here
+      
+      // Detectar sequências de 3 números seguidos na mesma categoria
+      const alerts = detectSequenceAlerts(updatedList);
+      setSequenceAlerts(alerts);
+      
+      // Contar sequências consecutivas para dúzias e colunas
+      if (updatedList.length >= 3) {
+        const last3 = updatedList.slice(-3);
+        
+        // Função auxiliar para obter dúzia
+        const getDozen = (n: number) => {
+          if (n === 0) return null;
+          if (n >= 1 && n <= 12) return 1;
+          if (n >= 13 && n <= 24) return 2;
+          if (n >= 25 && n <= 36) return 3;
+          return null;
+        };
+        
+        // Função auxiliar para obter coluna
+        const getColumn = (n: number) => {
+          if (n === 0) return null;
+          if (n % 3 === 0) return 3;
+          if (n % 3 === 1) return 1;
+          if (n % 3 === 2) return 2;
+          return null;
+        };
+        
+        // Contar sequência de dúzias
+        const dozens = last3.map(getDozen);
+        if (dozens[0] !== null && dozens[0] === dozens[1] && dozens[1] === dozens[2]) {
+          // Contar quantos números seguidos na mesma dúzia
+          let count = 3;
+          for (let i = updatedList.length - 4; i >= 0; i--) {
+            if (getDozen(updatedList[i]) === dozens[0]) {
+              count++;
+            } else {
+              break;
+            }
+          }
+          setDozenSequenceCount({ dozen: dozens[0], count });
+        } else {
+          setDozenSequenceCount(null);
+        }
+        
+        // Contar sequência de colunas
+        const columns = last3.map(getColumn);
+        if (columns[0] !== null && columns[0] === columns[1] && columns[1] === columns[2]) {
+          // Contar quantos números seguidos na mesma coluna
+          let count = 3;
+          for (let i = updatedList.length - 4; i >= 0; i--) {
+            if (getColumn(updatedList[i]) === columns[0]) {
+              count++;
+            } else {
+              break;
+            }
+          }
+          setColumnSequenceCount({ column: columns[0], count });
+        } else {
+          setColumnSequenceCount(null);
+        }
+        
+        // Função auxiliar para obter cor
+        const getColor = (n: number) => {
+          const reds = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+          if (n === 0) return 'green';
+          return reds.includes(n) ? 'red' : 'black';
+        };
+        
+        // Contar sequência de cores
+        const colors = last3.map(getColor);
+        if (colors[0] !== 'green' && colors[0] === colors[1] && colors[1] === colors[2]) {
+          let count = 3;
+          for (let i = updatedList.length - 4; i >= 0; i--) {
+            if (getColor(updatedList[i]) === colors[0]) {
+              count++;
+            } else {
+              break;
+            }
+          }
+          setColorSequence({ color: colors[0], count });
+        } else {
+          setColorSequence(null);
+        }
+        
+        // Função auxiliar para alto/baixo
+        const getHighLow = (n: number) => {
+          if (n === 0) return null;
+          return n >= 1 && n <= 18 ? 'low' : 'high';
+        };
+        
+        // Contar sequência de alto/baixo
+        const highLows = last3.map(getHighLow);
+        if (highLows[0] !== null && highLows[0] === highLows[1] && highLows[1] === highLows[2]) {
+          let count = 3;
+          for (let i = updatedList.length - 4; i >= 0; i--) {
+            if (getHighLow(updatedList[i]) === highLows[0]) {
+              count++;
+            } else {
+              break;
+            }
+          }
+          setHighLowSequence({ type: highLows[0], count });
+        } else {
+          setHighLowSequence(null);
+        }
+        
+        // Função auxiliar para par/ímpar
+        const getEvenOdd = (n: number) => {
+          if (n === 0) return null;
+          return n % 2 === 0 ? 'even' : 'odd';
+        };
+        
+        // Contar sequência de par/ímpar
+        const evenOdds = last3.map(getEvenOdd);
+        if (evenOdds[0] !== null && evenOdds[0] === evenOdds[1] && evenOdds[1] === evenOdds[2]) {
+          let count = 3;
+          for (let i = updatedList.length - 4; i >= 0; i--) {
+            if (getEvenOdd(updatedList[i]) === evenOdds[0]) {
+              count++;
+            } else {
+              break;
+            }
+          }
+          setEvenOddSequence({ type: evenOdds[0], count });
+        } else {
+          setEvenOddSequence(null);
+        }
+      }
       
       return updatedList;
     });
@@ -2455,15 +2733,16 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         dailyProfit = profitParams.initialValue * (profitParams.dailyProfitPercent / 100);
       }
       
-      currentBalance += dailyProfit;
+      // Registrar linha mostrando o saldo ANTES de aplicar o lucro do dia
       totalAccumulated += dailyProfit;
-
       results.push({
         date: currentDate.toLocaleDateString('pt-BR'),
         currentBalance: parseFloat(currentBalance.toFixed(2)),
         dailyProfit: parseFloat(dailyProfit.toFixed(2)),
         totalAccumulated: parseFloat(totalAccumulated.toFixed(2))
       });
+      // Aplicar lucro ao saldo para o próximo dia
+      currentBalance += dailyProfit;
     }
 
     setProfitResults(results);
@@ -2866,6 +3145,397 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
     );
   };
 
+  if (showMobileDashboard) {
+    return (
+      <div className="min-h-screen bg-gray-100 -mt-8">
+        <MobileMenu 
+          isOpen={showMobileMenu}
+          onClose={() => setShowMobileMenu(false)}
+          onMenuItemClick={(item) => {
+            if (item === '4cores') {
+              setShowFourColorsMobile(true);
+            } else if (item === 'progressao-cores') {
+              setShowColorProgressionMobile(true);
+            }
+          }}
+        />
+        
+        <FourColorsMobile 
+          isOpen={showFourColorsMobile}
+          onClose={() => setShowFourColorsMobile(false)}
+        />
+        
+        <ColorProgressionMobile 
+          isOpen={showColorProgressionMobile}
+          onClose={() => setShowColorProgressionMobile(false)}
+        />
+        
+        <div className="bg-green-700 p-3 flex items-center justify-between sticky top-0 z-20">
+          <button 
+            onClick={() => setShowMobileMenu(true)}
+            className="flex items-center gap-2 focus:outline-none"
+          >
+            <img src="/logo-171.svg" alt="Logo 171" className="w-6 h-6" />
+            <div className="text-white font-bold text-sm md:hidden">Roleta 171</div>
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="text-white text-xs">{user?.nome}</div>
+            <button
+              onClick={() => onLogout && onLogout()}
+              className="text-white text-xs bg-red-600 hover:bg-red-700 px-2 py-1 rounded"
+              title="Sair"
+              aria-label="Sair"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
+        </div>
+        <div className="p-3 space-y-3">
+          <div className="bg-green-700 rounded-lg p-3 text-white">
+            <div className="text-xs font-semibold">Saldo Atualizado</div>
+            {isEditingBalance ? (
+              <div className="flex items-center gap-2 text-sm justify-end">
+                <input
+                  ref={editBalanceInputRef}
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                  value={editBalanceValue}
+                  onChange={(e) => {
+                    let raw = e.target.value.replace(/[^\d]/g, '');
+                    if (!raw) {
+                      setEditBalanceValue('');
+                      return;
+                    }
+                    const cents = raw.slice(-2).padStart(2, '0');
+                    let ints = raw.slice(0, -2);
+                    ints = ints.replace(/^0+/, '');
+                    if (ints.length === 0) ints = '0';
+                    const withThousands = ints.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                    const masked = `${withThousands},${cents}`;
+                    setEditBalanceValue(masked);
+                  }}
+                  onBlur={(e) => {
+                    const raw = e.target.value.trim();
+                    if (!raw) return;
+                    let normalized = raw;
+                    if (raw.includes(',') && raw.includes('.')) {
+                      normalized = raw.replace(/\./g, '').replace(',', '.');
+                    } else if (raw.includes(',')) {
+                      normalized = raw.replace(',', '.');
+                    }
+                    const num = parseFloat(normalized);
+                    if (!isNaN(num)) setEditBalanceValue(num.toFixed(2));
+                  }}
+                  className="w-28 p-1 rounded text-right text-green-900"
+                  step="0.01"
+                />
+                <button onClick={saveBalance} className="bg-white text-green-700 rounded px-2 py-1 font-semibold">Salvar</button>
+                <button onClick={cancelEditingBalance} className="bg-green-600 text-white rounded px-2 py-1">Cancelar</button>
+              </div>
+            ) : (
+              <div className="flex items-center text-sm justify-between w-full">
+                <div>
+                  <button
+                    onClick={refreshAllUI}
+                    className="text-white rounded px-[9px] py-[3px] text-[13px] leading-none"
+                    title="Atualizar valores da tela"
+                    aria-label="Atualizar"
+                  >
+                    ⟳
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 justify-end">
+                  <span>R$ {(balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <button onClick={startEditingBalance} className="text-green-200">✏️</button>
+                  <span className="text-green-200">|</span>
+                  <span>{(() => { const si = currentSaldoRecord?.saldo_inicial || 0; const bal = balance || 0; const lucroPerc = si > 0 ? ((bal - si) / si) * 100 : 0; return `${lucroPerc >= 0 ? '+' : ''}${lucroPerc.toFixed(2)}%`; })()}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {!showMobileProfitPage && !showMobileHistoryPage && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => setShowMobileProfitPage(true)} className="bg-blue-600 text-white rounded-lg p-3 text-xs font-semibold">Calcular Lucro</button>
+                <button onClick={() => setShowMobileCreateBalancePage(true)} className="bg-amber-600 text-white rounded-lg p-3 text-xs font-semibold">Cadastrar Saldo</button>
+              </div>
+
+              <div className="bg-gray-100 rounded-lg p-3">
+                <div className="text-[13px] font-semibold -mt-[8px] mb-[6px]">Saldo Atual</div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <div className="text-gray-600">Data</div>
+                    <div className="font-bold text-gray-800">{new Date().toLocaleDateString('pt-BR')}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-600">Saldo Inicial</div>
+                    <div className="font-bold text-gray-800">R$ {(currentSaldoRecord?.saldo_inicial || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-600">Saldo Atual</div>
+                    <div className="font-bold text-gray-800">R$ {(balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-600">Lucro</div>
+                    <div className="font-bold mb-[10px]">
+                      {(() => {
+                        const si = currentSaldoRecord?.saldo_inicial || 0;
+                        const bal = balance || 0;
+                        const vlrLucro = bal - si;
+                        const perLucro = si > 0 ? (vlrLucro / si) * 100 : 0;
+                        return (
+                          <div className="flex items-center justify-between">
+                            <span className={vlrLucro >= 0 ? 'text-green-600' : 'text-amber-900'}>
+                              R$ {vlrLucro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            <span className={perLucro >= 0 ? 'text-green-600' : 'text-red-800'}>
+                              {`${perLucro >= 0 ? '+' : ''}${perLucro.toFixed(2)}%`}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {[
+                    { p: 0.0234, bg: 'bg-blue-50', text: 'text-blue-800', sub: 'text-blue-600' },
+                    { p: 0.0373, bg: 'bg-blue-100', text: 'text-blue-800', sub: 'text-blue-600' },
+                    { p: 0.0473, bg: 'bg-blue-200', text: 'text-blue-900', sub: 'text-blue-700' },
+                    { p: 0.10,   bg: 'bg-blue-300', text: 'text-blue-900', sub: 'text-blue-700' }
+                  ].map((it, idx) => (
+                    <div key={idx} className={`text-center ${it.bg} rounded p-2 border border-blue-400 -mt-[6px] -mb-[6px]`}>
+                      <div className="text-blue-700 text-xs">{(it.p * 100).toFixed(2)}%</div>
+                      <div className={`${it.text} font-bold text-xs`}>R$ {((currentSaldoRecord?.saldo_inicial || 0) * (1 + it.p)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className={`${it.sub} text-[11px]`}>({((currentSaldoRecord?.saldo_inicial || 0) * it.p).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="-mt-[8px] bg-white rounded-lg border border-gray-200 p-2">
+                <div className="h-[150px]">
+                  {(() => {
+                    const todayLabel = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                    const recentAsc = [...recentSaldos.slice(0, 4)].reverse();
+                    const labels = [
+                      ...recentAsc.map((s) => {
+                        const [ano, mes, dia] = s.data.split('-');
+                        return `${dia}/${mes}`;
+                      }),
+                      todayLabel
+                    ];
+                    const values = [
+                      ...recentAsc.map((s) => Number(s.saldo_atual || 0)),
+                      (balance || 0)
+                    ];
+                    const profits = [
+                      ...recentAsc.map((s) => Number(s.saldo_atual || 0) - Number(s.saldo_inicial || 0)),
+                      Number(balance || 0) - Number(currentSaldoRecord?.saldo_inicial || 0)
+                    ];
+                    const data: any = {
+                      labels,
+                      datasets: [
+                        {
+                          data: values,
+                          backgroundColor: profits.map((p) => p < 0 ? 'rgba(255,182,193,0.85)' : 'rgba(16,185,129,0.7)'),
+                          borderColor: profits.map((p) => p < 0 ? 'rgba(255,182,193,1)' : '#10b981'),
+                          borderWidth: 1,
+                          borderRadius: 4,
+                          profits
+                        }
+                      ]
+                    };
+                    const options = {
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: { legend: { display: false } },
+                      scales: {
+                        x: { grid: { display: false } },
+                        y: { grid: { display: false } }
+                      }
+                    };
+                    return <Bar data={data} options={options as any} />;
+                  })()}
+                </div>
+              </div>
+
+              <div>
+                <button onClick={() => setShowMobileHistoryPage(true)} className="w-full bg-purple-600 text-white rounded-lg p-3 text-xs font-semibold">Histórico de Saldos</button>
+              </div>
+              <div className="mt-2 bg-white rounded-lg border border-gray-200">
+                <div className="px-2 py-1 border-b">
+                  <div className="grid grid-cols-5 gap-1 text-[11px] font-semibold text-gray-700">
+                    <div>Data</div>
+                    <div className="text-right">Sld Inicial</div>
+                    <div className="text-right">Sld Final</div>
+                    <div className="text-right">Vlr Lucro</div>
+                    <div className="text-right">% Lucro</div>
+                  </div>
+                </div>
+                <div className="px-2 py-1">
+                  {recentSaldos.length === 0 ? (
+                    <div className="text-center text-[11px] text-gray-500">Sem registros</div>
+                  ) : (
+                    <div className="space-y-1">
+                      {recentSaldos.slice(0,4).map((s, i) => {
+                        const saldoAtual = Number(s.saldo_atual || 0);
+                        const saldoInicial = Number(s.saldo_inicial || 0);
+                        const vlrLucro = saldoAtual - saldoInicial;
+                        const perLucro = saldoInicial > 0 ? (vlrLucro / saldoInicial) * 100 : 0;
+                        const [ano, mes, dia] = s.data.split('-');
+                        return (
+                          <div key={i} className="grid grid-cols-5 gap-1 text-[11px]">
+                            <div className="text-gray-700">{`${dia}/${mes}/${ano.slice(2)}`}</div>
+                            <div className="text-right">{saldoInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            <div className="text-right">{saldoAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            <div className={`text-right ${vlrLucro >= 0 ? 'text-green-600' : 'text-amber-900'}`}>{vlrLucro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            <div className={`text-right ${perLucro >= 0 ? 'text-green-600' : 'text-red-800'}`}>{`${perLucro >= 0 ? '+' : ''}${perLucro.toFixed(2)}%`}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {showMobileProfitPage && (
+            <div className="bg-white rounded-xl shadow p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-bold text-gray-800">💰 Calcular Lucro</h2>
+                <button className="text-gray-500 text-xl" onClick={() => { setShowMobileProfitPage(false); setProfitResults([]); }}>×</button>
+              </div>
+              <div className="space-y-3 text-xs">
+                <div className="space-y-2">
+                  <label className="block">Qtde. Dias:</label>
+                  <input type="number" value={profitParams.days} onChange={(e) => setProfitParams(prev => ({ ...prev, days: parseInt(e.target.value) || 30 }))} className="w-full p-2 border rounded" min="1" max="365" />
+                </div>
+                <div className="space-y-2">
+                  <label className="block">Data Inicial:</label>
+                  <input type="date" value={profitParams.startDate} onChange={(e) => setProfitParams(prev => ({ ...prev, startDate: e.target.value }))} className="w-full p-2 border rounded" />
+                </div>
+                <div className="space-y-2">
+                  <label className="block">Valor Inicial (R$):</label>
+                  <input type="text" inputMode="decimal" value={profitParams.initialValue.toString()} onChange={(e) => setProfitParams(prev => ({ ...prev, initialValue: parseFloat(e.target.value.replace(',', '.')) || 0 }))} className="w-full p-2 border rounded text-right" placeholder="100.00" />
+                </div>
+                <div className="space-y-2">
+                  <label className="block">% Lucro ao Dia:</label>
+                  <input type="text" inputMode="decimal" value={profitParams.dailyProfitPercent.toString()} onChange={(e) => setProfitParams(prev => ({ ...prev, dailyProfitPercent: parseFloat(e.target.value.replace(',', '.')) || 0 }))} className="w-full p-2 border rounded text-right" placeholder="3.00" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="compoundInterestMobilePage" checked={profitParams.compoundInterest} onChange={(e) => setProfitParams(prev => ({ ...prev, compoundInterest: e.target.checked }))} className="w-4 h-4" />
+                  <label htmlFor="compoundInterestMobilePage">Juros Compostos?</label>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={() => { setProfitParams({ days: 30, startDate: new Date().toISOString().split('T')[0], initialValue: 100, dailyProfitPercent: 3, compoundInterest: false }); setProfitResults([]); }} className="bg-red-600 text-white rounded p-2">🗑️ Limpar</button>
+                  <button onClick={printResults} disabled={profitResults.length === 0} className={`rounded p-2 ${profitResults.length === 0 ? 'bg-gray-300 text-gray-500' : 'bg-blue-600 text-white'}`}>🖨️ Imprimir</button>
+                  <button onClick={calculateProfit} className="bg-green-600 text-white rounded p-2">🧮 Calcular</button>
+                </div>
+                <div className="pt-2 border-t">
+                  <h3 className="text-sm font-bold mb-2">📊 Resultados</h3>
+                  {profitResults.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-green-50 p-2 rounded">
+                          <div className="text-gray-600">Total de Lucro</div>
+                          <div className="text-right font-bold text-green-600">R$ {profitResults[profitResults.length - 1]?.totalAccumulated.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        </div>
+                        <div className="bg-blue-50 p-2 rounded">
+                          <div className="text-gray-600">Total Geral</div>
+                          <div className="text-right font-bold text-blue-600">R$ {profitResults[profitResults.length - 1]?.currentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        </div>
+                        <div className="bg-purple-50 p-2 rounded">
+                          <div className="text-gray-600">Média Diária</div>
+                          <div className="text-right font-bold text-purple-600">R$ {((profitResults[profitResults.length - 1]?.totalAccumulated || 0) / profitParams.days).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        </div>
+                      </div>
+                      <table className="w-full text-[11px]">
+                        <thead>
+                          <tr>
+                            <th className="text-left p-1 border-b">Data</th>
+                            <th className="text-right p-1 border-b">Saldo Atual</th>
+                            <th className="text-right p-1 border-b">Lucro Diário</th>
+                            <th className="text-right p-1 border-b">Total Acum.</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {profitResults.map((result, index) => (
+                            <tr key={index} className="hover:bg-gray-50">
+                              <td className="p-1 border-b">{result.date}</td>
+                          <td className="p-1 border-b text-right">R$ {result.currentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                          <td className="p-1 border-b text-right text-green-600">R$ {result.dailyProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                          <td className="p-1 border-b text-right font-semibold">R$ {result.totalAccumulated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-500 py-6">
+                      <div className="text-3xl mb-2">📈</div>
+                      <div>Preencha os parâmetros e clique em "Calcular" para ver os resultados</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showMobileHistoryPage && (
+            <div className="bg-white rounded-xl shadow p-3">
+              <div className="flex items-center justify-between mb-2">
+                <button className="text-blue-600 text-sm font-semibold" onClick={() => setShowMobileHistoryPage(false)}>← Voltar</button>
+                <h2 className="text-sm font-bold text-gray-800">📊 Histórico de Saldos</h2>
+                <div className="w-12" />
+              </div>
+              <HistoricoSaldos onClose={() => setShowMobileHistoryPage(false)} variant="inline" />
+            </div>
+          )}
+
+          {showMobileCreateBalancePage && (
+            <div ref={createBalanceSectionRef} className="bg-white rounded-xl shadow p-3">
+              <div className="flex items-center justify-between mb-2">
+                <button className="text-blue-600 text-sm font-semibold" onClick={() => setShowMobileCreateBalancePage(false)}>← Voltar</button>
+                <h2 className="text-sm font-bold text-gray-800">🔥 Criar Registro de Saldo</h2>
+                <div className="w-12" />
+              </div>
+              <div className="grid grid-cols-1 gap-3 mb-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Data de Cadastro</label>
+                  <input type="date" value={createDataCadastro} onChange={(e) => setCreateDataCadastro(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Saldo Inicial (R$)</label>
+                  <input type="number" inputMode="decimal" step="0.01" value={createSaldoInicial.toFixed(2)} onChange={(e) => setCreateSaldoInicial(parseFloat(e.target.value.replace(',', '.')) || 0)} className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-right" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Saldo Atual (R$)</label>
+                  <input type="number" inputMode="decimal" step="0.01" value={createSaldoAtual.toFixed(2)} onChange={(e) => setCreateSaldoAtual(parseFloat(e.target.value.replace(',', '.')) || 0)} className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-right" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Valor do Lucro (R$)</label>
+                  <input type="text" value={`${createValorLucro >= 0 ? '+' : ''}R$ ${createValorLucro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} readOnly className={`w-full p-2 border border-gray-300 rounded-lg bg-gray-50 text-right font-semibold ${createValorLucro >= 0 ? 'text-green-600' : 'text-amber-900'}`} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Percentual do Lucro (%)</label>
+                  <input type="text" value={`${createPercentualLucro >= 0 ? '+' : ''}${createPercentualLucro.toFixed(2)}%`} readOnly className={`w-full p-2 border border-gray-300 rounded-lg bg-gray-50 text-right font-semibold ${createPercentualLucro >= 0 ? 'text-green-600' : 'text-amber-900'}`} />
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setShowMobileCreateBalancePage(false)} className="bg-red-600 text-white py-2 px-4 rounded-lg font-semibold">❌ Cancelar</button>
+                <button onClick={async () => { try { const success = await createSaldoRecord(createDataCadastro, createSaldoInicial, createSaldoAtual); if (success) { setShowMobileCreateBalancePage(false); setCreateDataCadastro(new Date().toISOString().split('T')[0]); setCreateSaldoInicial(createSaldoAtual); setCreateSaldoAtual(createSaldoAtual); } } catch (error) { console.error('Erro ao criar saldo:', error); } }} className="bg-green-600 text-white py-2 px-4 rounded-lg font-semibold">💾 Criar Registro</button>
+              </div>
+            </div>
+          )}
+          
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Modal para adicionar números */}
@@ -3065,8 +3735,14 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       {/* Título e botões na mesma linha */}
       <div className="flex justify-between items-center" style={{marginTop: '-13px', marginBottom: '9px'}}>
         <div className="flex items-center gap-3">
-          <img src="/logo-171.svg" alt="Logo 171" className="w-8 h-8" />
-          <h1 className="text-2xl font-bold text-white" style={{marginTop: '-15px'}}>Roleta 171</h1>
+          <button 
+            className="flex items-center gap-3 focus:outline-none hover:opacity-80 transition-opacity" 
+            onClick={() => setShowConfigModal(true)}
+            title="Abrir Configurações"
+          >
+            <img src="/logo-171.svg" alt="Logo 171" className="w-8 h-8" />
+            <h1 className="text-2xl font-bold text-white" style={{marginTop: '-15px'}}>Roleta 171</h1>
+          </button>
           {user && (
             <div className="text-xs" style={{marginTop: '-10px', marginLeft: '36px'}}>
               <span style={{color: 'white'}}>{user.nome}</span>
@@ -3075,10 +3751,37 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 <div className="inline-flex items-center gap-1">
                   <input
                     ref={editBalanceInputRef}
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
+                    pattern="[0-9]*[.,]?[0-9]*"
                     value={editBalanceValue}
-                    onChange={(e) => setEditBalanceValue(e.target.value)}
+                    onChange={(e) => {
+                      let raw = e.target.value.replace(/[^\d]/g, '');
+                      if (!raw) {
+                        setEditBalanceValue('');
+                        return;
+                      }
+                      const cents = raw.slice(-2).padStart(2, '0');
+                      let ints = raw.slice(0, -2);
+                      ints = ints.replace(/^0+/, '');
+                      if (ints.length === 0) ints = '0';
+                      const withThousands = ints.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                      const masked = `${withThousands},${cents}`;
+                      setEditBalanceValue(masked);
+                    }}
                     onKeyDown={handleBalanceKeyDown}
+                    onBlur={(e) => {
+                      const raw = e.target.value.trim();
+                      if (!raw) return;
+                      let normalized = raw;
+                      if (raw.includes(',') && raw.includes('.')) {
+                        normalized = raw.replace(/\./g, '').replace(',', '.');
+                      } else if (raw.includes(',')) {
+                        normalized = raw.replace(',', '.');
+                      }
+                      const num = parseFloat(normalized);
+                      if (!isNaN(num)) setEditBalanceValue(num.toFixed(2));
+                    }}
                     className="bg-green-600 text-white border border-green-400 rounded px-1 py-0 text-xs w-20 focus:outline-none focus:ring-1 focus:ring-green-300"
                     style={{fontSize: '12px', height: '18px'}}
                   />
@@ -3157,7 +3860,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
             onClick={() => setShowDuzColPanel(v => !v)}
             className="bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors font-semibold flex items-center justify-center"
             style={{height: '22px', width: '35px', fontSize: '11px', lineHeight: '1'}}
-            title="Registro de Entradas (Dúzias e Colunas)"
+            title="4 Cores"
           >
             📑
           </button>
@@ -3897,14 +4600,18 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
 
           {/* Painel de Registro de Entradas - Full width e empurra Estatísticas para baixo */}
           {showDuzColPanel && (
-            <DuzColPopup isOpen={showDuzColPanel} onClose={() => setShowDuzColPanel(false)} />
+            <FourColorsPanel 
+              isOpen={showDuzColPanel} 
+              onClose={() => setShowDuzColPanel(false)} 
+              lastNumbers={lastNumbers}
+            />
           )}
 
           {/* Container de Estatísticas - Sempre visível, empurrado para baixo quando Padrão Detectado estiver ativo */}
           <div 
             className="bg-gray-800 rounded-lg p-3 h-fit transform-gpu transition-all duration-300"
             style={{
-              marginTop: (patternAlert || espanholEnabled) ? '-21px' : '-26px',
+              marginTop: showDuzColPanel ? '0px' : (patternAlert || espanholEnabled) ? '-21px' : '-26px',
               willChange: 'transform, opacity, filter'
             }}
           >
@@ -3974,6 +4681,11 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 positiveSequenceMax: betTerminaisPosSeqMax
               }}
               calculatedP2Stats={calculatedP2Stats}
+              dozenSequenceCount={dozenSequenceCount}
+              columnSequenceCount={columnSequenceCount}
+              colorSequence={colorSequence}
+              highLowSequence={highLowSequence}
+              evenOddSequence={evenOddSequence}
               calculatedTorreStats={calculatedTorreStats}
               window32P1={window32P1}
               calculated32P1Stats={calculated32P1Stats}
@@ -4074,6 +4786,183 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
         </div>
       </div>
     </div>
+
+    {showMobileDashboard && (
+      <div className="fixed inset-0 bg-black bg-opacity-70 z-[9998] flex items-start justify-center p-2">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-auto mt-2 mb-4 overflow-y-auto">
+          <div className="flex items-center justify-between px-3 py-2 border-b">
+            <div className="flex items-center gap-2">
+              <img src="/logo-171.svg" alt="Logo 171" className="w-6 h-6" />
+              <div className="text-xs font-bold">Roleta 171</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-gray-700 text-xs">{user?.nome}</div>
+              <button
+                onClick={() => onLogout && onLogout()}
+                className="text-white text-xs bg-red-600 hover:bg-red-700 px-2 py-1 rounded"
+                title="Sair"
+                aria-label="Sair"
+              >
+                <LogOut size={14} />
+              </button>
+              <button onClick={() => setShowMobileDashboard(false)} className="text-gray-500 text-xl">×</button>
+            </div>
+          </div>
+          <div className="p-3 space-y-3">
+            <div className="bg-green-700 rounded-lg p-3 text-white">
+              <div className="text-xs font-semibold">{user?.nome}</div>
+              <div className="flex items-center gap-1 text-sm">
+                <span>R$ {(balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <button onClick={startEditingBalance} className="text-green-200">✏️</button>
+                <span className="text-green-200">|</span>
+                <span>{(currentSaldoRecord?.per_lucro || 0) >= 0 ? '+' : ''}{(currentSaldoRecord?.per_lucro || 0).toFixed(2)}%</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setShowMobileProfitModal(true)} className="bg-blue-600 text-white rounded-lg p-3 text-xs font-semibold">Calcular Lucro</button>
+              <button onClick={() => setShowCreateBalanceModal(true)} className="bg-amber-600 text-white rounded-lg p-3 text-xs font-semibold">Cadastrar Saldo</button>
+            </div>
+
+            <div className="bg-gray-100 rounded-lg p-3">
+              <div className="text-xs font-semibold mb-2">Saldo Atual</div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <div className="text-gray-600">Data</div>
+                  <div className="font-bold text-gray-800">{new Date().toLocaleDateString('pt-BR')}</div>
+                </div>
+                <div>
+                  <div className="text-gray-600">Saldo Inicial</div>
+                  <div className="font-bold text-gray-800">R$ {(currentSaldoRecord?.saldo_inicial || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                </div>
+                <div>
+                  <div className="text-gray-600">Saldo Atual</div>
+                  <div className="font-bold text-gray-800">R$ {(balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                </div>
+                <div>
+                  <div className="text-gray-600">Valor do Lucro</div>
+                  <div className={(currentSaldoRecord?.vlr_lucro || 0) >= 0 ? 'text-green-600 font-bold' : 'text-amber-900 font-bold'}>{(currentSaldoRecord?.vlr_lucro || 0) >= 0 ? '+' : ''}R$ {(currentSaldoRecord?.vlr_lucro || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                </div>
+                <div>
+                  <div className="text-gray-600">Percentual do Lucro</div>
+                  <div className={(currentSaldoRecord?.per_lucro || 0) >= 0 ? 'text-green-600 font-bold' : 'text-amber-900 font-bold'}>{(currentSaldoRecord?.per_lucro || 0) >= 0 ? '+' : ''}{(currentSaldoRecord?.per_lucro || 0).toFixed(2)}%</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {[
+                  { p: 0.0234 },
+                  { p: 0.0373 },
+                  { p: 0.0473 },
+                  { p: 0.10 }
+                ].map((it, idx) => (
+                  <div key={idx} className="text-center bg-white rounded p-2">
+                    <div className="text-yellow-600 text-xs">{(it.p * 100).toFixed(2)}%</div>
+                    <div className="text-gray-800 font-bold text-xs">R$ {((currentSaldoRecord?.saldo_inicial || 0) * (1 + it.p)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div className="text-green-600 text-[11px]">({((currentSaldoRecord?.saldo_inicial || 0) * it.p).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <button onClick={() => setShowMobileHistory(true)} className="w-full bg-purple-600 text-white rounded-lg p-3 text-xs font-semibold">Histórico de Saldos</button>
+            </div>
+
+            {showMobileHistory && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-start justify-center p-2" onClick={() => setShowMobileHistory(false)}>
+                <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                  <HistoricoSaldos onClose={() => setShowMobileHistory(false)} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {showMobileProfitModal && (
+      <div className="fixed inset-0 bg-black bg-opacity-60 z-[9999] flex items-center justify-center p-2" onClick={() => setShowMobileProfitModal(false)}>
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-auto overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-between items-center p-3 border-b">
+            <h2 className="text-sm font-bold text-gray-800">💰 Calcular Lucro</h2>
+            <button className="text-gray-500 text-xl" onClick={() => { setShowMobileProfitModal(false); setProfitResults([]); }}>×</button>
+          </div>
+          <div className="p-3 space-y-3 text-xs">
+            <div className="space-y-2">
+              <label className="block">Qtde. Dias:</label>
+              <input type="number" value={profitParams.days} onChange={(e) => setProfitParams(prev => ({ ...prev, days: parseInt(e.target.value) || 30 }))} className="w-full p-2 border rounded" min="1" max="365" />
+            </div>
+            <div className="space-y-2">
+              <label className="block">Data Inicial:</label>
+              <input type="date" value={profitParams.startDate} onChange={(e) => setProfitParams(prev => ({ ...prev, startDate: e.target.value }))} className="w-full p-2 border rounded" />
+            </div>
+            <div className="space-y-2">
+              <label className="block">Valor Inicial (R$):</label>
+              <input type="number" value={profitParams.initialValue.toFixed(2)} onChange={(e) => setProfitParams(prev => ({ ...prev, initialValue: parseFloat(e.target.value) || 0 }))} className="w-full p-2 border rounded text-right" min="0" step="0.01" placeholder="100.00" />
+            </div>
+            <div className="space-y-2">
+              <label className="block">% Lucro ao Dia:</label>
+              <input type="number" value={profitParams.dailyProfitPercent.toFixed(2)} onChange={(e) => setProfitParams(prev => ({ ...prev, dailyProfitPercent: parseFloat(e.target.value) || 0 }))} className="w-full p-2 border rounded text-right" min="0" step="0.01" placeholder="3.00" />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="compoundInterestMobile" checked={profitParams.compoundInterest} onChange={(e) => setProfitParams(prev => ({ ...prev, compoundInterest: e.target.checked }))} className="w-4 h-4" />
+              <label htmlFor="compoundInterestMobile">Juros Compostos?</label>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button onClick={() => { setProfitParams({ days: 30, startDate: new Date().toISOString().split('T')[0], initialValue: 100, dailyProfitPercent: 3, compoundInterest: false }); setProfitResults([]); }} className="bg-red-600 text-white rounded p-2">🗑️ Limpar</button>
+              <button onClick={printResults} disabled={profitResults.length === 0} className={`rounded p-2 ${profitResults.length === 0 ? 'bg-gray-300 text-gray-500' : 'bg-blue-600 text-white'}`}>🖨️ Imprimir</button>
+              <button onClick={calculateProfit} className="bg-green-600 text-white rounded p-2">🧮 Calcular</button>
+            </div>
+            <div className="pt-2 border-t">
+              <h3 className="text-sm font-bold mb-2">📊 Resultados</h3>
+              {profitResults.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-green-50 p-2 rounded">
+                      <div className="text-gray-600">Total de Lucro</div>
+                      <div className="text-right font-bold text-green-600">R$ {profitResults[profitResults.length - 1]?.totalAccumulated.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    </div>
+                    <div className="bg-blue-50 p-2 rounded">
+                      <div className="text-gray-600">Total Geral</div>
+                      <div className="text-right font-bold text-blue-600">R$ {profitResults[profitResults.length - 1]?.currentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    </div>
+                    <div className="bg-purple-50 p-2 rounded">
+                      <div className="text-gray-600">Média Diária</div>
+                      <div className="text-right font-bold text-purple-600">R$ {((profitResults[profitResults.length - 1]?.totalAccumulated || 0) / profitParams.days).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    </div>
+                  </div>
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr>
+                        <th className="text-left p-1 border-b">Data</th>
+                        <th className="text-right p-1 border-b">Saldo Atual</th>
+                        <th className="text-right p-1 border-b">Lucro Diário</th>
+                        <th className="text-right p-1 border-b">Total Acum.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {profitResults.map((result, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="p-1 border-b">{result.date}</td>
+                          <td className="p-1 border-b text-right">R$ {result.currentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                          <td className="p-1 border-b text-right text-green-600">R$ {result.dailyProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                          <td className="p-1 border-b text-right font-semibold">R$ {result.totalAccumulated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 py-6">
+                  <div className="text-3xl mb-2">📈</div>
+                  <div>Preencha os parâmetros e clique em "Calcular" para ver os resultados</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Modal de Cálculo de Lucro */}
     {showProfitModal && (
@@ -4360,11 +5249,29 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               📊 Histórico de Saldos
             </button>
             <button 
-              onClick={() => {
-                // Atualizar os valores com o último saldo cadastrado antes de abrir o modal
-                setCreateSaldoInicial(currentSaldoRecord?.saldo_atual || 0);
-                setCreateSaldoAtual(currentSaldoRecord?.saldo_atual || 0);
-                setShowCreateBalanceModal(true);
+              onClick={async () => {
+                // Buscar o último saldo cadastrado do banco de dados
+                try {
+                  const { data: lastRecord } = await supabase
+                    .from('r171_saldo')
+                    .select('saldo_atual')
+                    .eq('id_senha', user?.id)
+                    .order('data', { ascending: false })
+                    .limit(1)
+                    .single();
+                  
+                  const lastSaldo = lastRecord?.saldo_atual || 0;
+                  setCreateSaldoInicial(lastSaldo);
+                  setCreateSaldoAtual(lastSaldo);
+                  setCreateDataCadastro(new Date().toISOString().split('T')[0]);
+                  setShowCreateBalanceModal(true);
+                } catch (error) {
+                  console.log('Nenhum saldo anterior encontrado, usando 0 como padrão');
+                  setCreateSaldoInicial(0);
+                  setCreateSaldoAtual(0);
+                  setCreateDataCadastro(new Date().toISOString().split('T')[0]);
+                  setShowCreateBalanceModal(true);
+                }
               }}
               className="bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors flex items-center gap-2"
             >
@@ -4544,13 +5451,12 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               <span>❌</span>
               Cancelar
             </button>
-            <button
+              <button
               onClick={async () => {
                 try {
                   // Atualizar todos os campos do registro de saldo
                   const success = await updateSaldoRecord({
                     data: editDataCadastro,
-                    saldo_inicial: editSaldoInicial,
                     saldo_atual: editSaldoAtual
                   });
                   

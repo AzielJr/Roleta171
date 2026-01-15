@@ -18,6 +18,10 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
   const [isSaving, setIsSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showHistorico, setShowHistorico] = useState(false);
+  const [showAjustarLucro, setShowAjustarLucro] = useState(false);
+  const [ajusteTipo, setAjusteTipo] = useState<'valor' | 'percentual'>('percentual');
+  const [ajusteValor, setAjusteValor] = useState<string>('');
+  const [ajusteSaving, setAjusteSaving] = useState(false);
 
   // Atualiza os campos quando o registro atual muda
   useEffect(() => {
@@ -244,6 +248,38 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
   // Se estiver no modo de criação e os campos ainda não foram preenchidos, mostrar valores zerados
   const shouldShowZeroValues = showCreateForm && saldoAtualNum === 0 && saldoInicialNum === 0;
   const { vlrLucro, perLucro } = shouldShowZeroValues ? { vlrLucro: 0, perLucro: 0 } : calcularLucro(saldoAtualNum, saldoInicialNum);
+
+  const aplicarAjusteLucro = async () => {
+    if (!currentSaldoRecord) return;
+    const valor = parseFloat(ajusteValor.replace(',', '.')) || 0;
+    const novoSaldoAtual = ajusteTipo === 'valor'
+      ? (saldoInicialNum) + valor
+      : (saldoInicialNum) * (1 + (valor / 100));
+    const { vlrLucro: novoVlrLucro, perLucro: novoPerLucro } = calcularLucro(novoSaldoAtual, saldoInicialNum);
+    setAjusteSaving(true);
+    try {
+      const { error } = await supabase
+        .from('r171_saldo')
+        .update({
+          saldo_atual: novoSaldoAtual,
+          vlr_lucro: novoVlrLucro,
+          per_lucro: novoPerLucro
+        })
+        .eq('id', currentSaldoRecord.id);
+      if (error) {
+        alert('Erro ao ajustar lucro. Verifique os dados e tente novamente.');
+        return;
+      }
+      await refreshBalance();
+      setSaldoAtual(novoSaldoAtual.toFixed(2));
+      setShowAjustarLucro(false);
+      setAjusteValor('');
+    } catch (e) {
+      alert('Erro inesperado ao ajustar lucro.');
+    } finally {
+      setAjusteSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -525,17 +561,21 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
                 📊 Histórico de Saldos
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   // Inicializar campos para novo cadastro
                   setData(new Date().toISOString().split('T')[0]); // Data de hoje
-                  setSaldoAtual('0.00'); // Zerar saldo atual temporariamente
-                  setSaldoInicial('0.00'); // Zerar saldo inicial temporariamente
-                  fetchLastBalance(true); // Buscar último saldo e definir tanto inicial quanto atual
+                  await fetchLastBalance(true); // Buscar último saldo e definir tanto inicial quanto atual
                   setShowCreateForm(true);
                 }}
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
               >
                 ➕ Cadastrar Saldo
+              </button>
+              <button
+                onClick={() => setShowAjustarLucro(true)}
+                className="px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium"
+              >
+                ⚙️ Ajustar Lucro
               </button>
             </div>
             <button
@@ -673,6 +713,99 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
       {/* Modal de Histórico */}
       {showHistorico && (
         <HistoricoSaldos onClose={() => setShowHistorico(false)} />
+      )}
+
+      {showAjustarLucro && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4" onClick={() => setShowAjustarLucro(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-4 border-b">
+              <h2 className="text-lg font-bold text-gray-800">⚙️ Ajustar Lucro</h2>
+              <button className="text-gray-500 hover:text-gray-700" onClick={() => setShowAjustarLucro(false)}>×</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="text-xs text-blue-700">Saldo Inicial</div>
+                  <div className="text-xl font-bold text-blue-800">R$ {saldoInicialNum.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                </div>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-right">
+                  <div className="text-xs text-yellow-700">Lucro Atual</div>
+                  <div className={`text-xl font-bold ${vlrLucro >= 0 ? 'text-green-600' : 'text-amber-900'}`}>{vlrLucro >= 0 ? '+' : ''}R$ {Math.abs(vlrLucro).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setAjusteTipo('valor')}
+                  className={`flex-1 px-3 py-2 rounded border ${ajusteTipo === 'valor' ? 'bg-yellow-600 text-white border-yellow-700' : 'bg-gray-100 text-gray-700 border-gray-300'}`}
+                >
+                  Por valor (R$)
+                </button>
+                <button
+                  onClick={() => setAjusteTipo('percentual')}
+                  className={`flex-1 px-3 py-2 rounded border ${ajusteTipo === 'percentual' ? 'bg-yellow-600 text-white border-yellow-700' : 'bg-gray-100 text-gray-700 border-gray-300'}`}
+                >
+                  Por percentual (%)
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{ajusteTipo === 'valor' ? 'Valor do Lucro (R$)' : 'Percentual do Lucro (%)'}</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                  value={ajusteValor}
+                  onChange={(e) => {
+                    let value = e.target.value.replace(',', '.');
+                    value = value.replace(/[^0-9.\-]/g, '');
+                    const parts = value.split('.');
+                    if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
+                    setAjusteValor(value);
+                  }}
+                  onBlur={(e) => {
+                    const v = parseFloat(e.target.value.replace(',', '.')) || 0;
+                    setAjusteValor(v.toFixed(2));
+                  }}
+                  className="w-full px-4 py-3 border border-yellow-300 rounded-lg text-lg font-semibold text-right focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
+                  placeholder={ajusteTipo === 'valor' ? '0,00' : '0,00'}
+                />
+              </div>
+
+              {(() => {
+                const valor = parseFloat(ajusteValor.replace(',', '.')) || 0;
+                const novoSaldo = ajusteTipo === 'valor' ? (saldoInicialNum) + valor : (saldoInicialNum) * (1 + (valor / 100));
+                const { vlrLucro: nv, perLucro: np } = calcularLucro(novoSaldo, saldoInicialNum);
+                return (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="text-xs text-green-700">Novo Saldo</div>
+                      <div className={`text-xl font-bold ${novoSaldo >= 0 ? 'text-green-800' : 'text-amber-900'}`}>R$ {novoSaldo.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    </div>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-right">
+                      <div className="text-xs text-yellow-700">Novo Lucro</div>
+                      <div className={`text-xl font-bold ${nv >= 0 ? 'text-green-600' : 'text-amber-900'}`}>{nv >= 0 ? '+' : ''}R$ {Math.abs(nv).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    </div>
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-right">
+                      <div className="text-xs text-purple-700">Novo Percentual</div>
+                      <div className={`text-xl font-bold ${np >= 0 ? 'text-green-600' : 'text-amber-900'}`}>{np >= 0 ? '+' : ''}{np.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t">
+              <button onClick={() => setShowAjustarLucro(false)} className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">Cancelar</button>
+              <button
+                onClick={aplicarAjusteLucro}
+                disabled={ajusteSaving || !ajusteValor}
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50"
+              >
+                {ajusteSaving ? '⏳ Aplicando...' : 'Aplicar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

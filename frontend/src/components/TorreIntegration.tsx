@@ -8,6 +8,9 @@ interface TorreIntegrationProps {
     animatingTorre: 'yellow' | 'green' | undefined;
     torreWinCount: number;
     torreLossCount: number;
+    torreEntradasCount: number;
+    currentNegativeSequence: number;
+    maxNegativeSequence: number;
   }) => void;
   onEvaluateTorre: (evaluateFunction: (num: number, snapshot?: number[]) => void) => void;
 }
@@ -22,6 +25,9 @@ const TorreIntegration: React.FC<TorreIntegrationProps> = ({
     animatingTorre,
     torreWinCount,
     torreLossCount,
+    torreEntradasCount,
+    currentNegativeSequence,
+    maxNegativeSequence,
     evaluateTorre,
     resetTorre
   } = useTorreLogic(avisosSonorosAtivos);
@@ -32,9 +38,21 @@ const TorreIntegration: React.FC<TorreIntegrationProps> = ({
       torrePendingEntrada,
       animatingTorre,
       torreWinCount,
-      torreLossCount
+      torreLossCount,
+      torreEntradasCount,
+      currentNegativeSequence,
+      maxNegativeSequence
     });
-  }, [torrePendingEntrada, animatingTorre, torreWinCount, torreLossCount, onTorreStateChange]);
+  }, [
+    torrePendingEntrada, 
+    animatingTorre, 
+    torreWinCount, 
+    torreLossCount, 
+    torreEntradasCount, 
+    currentNegativeSequence, 
+    maxNegativeSequence, 
+    onTorreStateChange
+  ]);
 
   // Fornecer função de avaliação para o componente pai
   useEffect(() => {

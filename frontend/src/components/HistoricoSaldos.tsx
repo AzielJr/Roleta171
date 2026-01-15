@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useBalance } from '../contexts/BalanceContext';
 import { R171Saldo } from '../lib/supabase';
  
 interface HistoricoSaldosProps {
   onClose: () => void;
+  variant?: 'modal' | 'inline';
 }
 
-export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => {
+export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose, variant = 'modal' }) => {
   const { user } = useAuth();
+  const { balance, currentSaldoRecord } = useBalance();
   const [saldos, setSaldos] = useState<R171Saldo[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataInicial, setDataInicial] = useState('');
@@ -127,9 +130,14 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
       }
 
       // Normalizar tipos numéricos para evitar divergências (strings vs numbers)
+      // IMPORTANTE: Para o registro de hoje, usar o saldo atual do contexto (balance) que está atualizado em tempo real
+      const hoje = new Date().toISOString().split('T')[0];
       const normalizados = (data || []).map((r: any) => {
         const saldo_inicial = r.saldo_inicial != null ? Number(r.saldo_inicial) : 0;
-        const saldo_atual = r.saldo_atual != null ? Number(r.saldo_atual) : 0;
+        // Se for o registro de hoje E temos um saldo atual do contexto, usar o balance atualizado
+        const saldo_atual = (r.data === hoje && balance != null) 
+          ? Number(balance) 
+          : (r.saldo_atual != null ? Number(r.saldo_atual) : 0);
         const vlr_lucro = r.vlr_lucro != null ? Number(r.vlr_lucro) : (saldo_atual - saldo_inicial);
         const per_lucro = r.per_lucro != null ? Number(r.per_lucro) : (saldo_inicial > 0 ? (vlr_lucro / saldo_inicial) * 100 : 0);
         return {
@@ -141,7 +149,10 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
         } as R171Saldo;
       });
 
-      // Consolidar por data: manter somente o registro mais recente (maior created_at) de cada dia
+      // Consolidar por data: escolher o registro "mais confiável" por dia
+      // Critérios: 1) possui vlr_lucro/per_lucro definidos (não nulos) -> priorizar
+      //            2) maior created_at
+      //            3) maior id (fallback)
       const porDataMaisRecente = Object.values(
         normalizados.reduce((acc: Record<string, R171Saldo>, item: any) => {
           const key = item.data; // 'YYYY-MM-DD'
@@ -150,18 +161,19 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
           if (!atual) {
             acc[key] = item;
           } else {
-            // Comparar created_at para manter o mais recente
-            const caNovo = new Date(item.created_at).getTime();
-            const caAtual = new Date(atual.created_at).getTime();
-            if (caNovo >= caAtual) acc[key] = item;
+            const score = (r: any) => {
+              const hasProfit = (r.vlr_lucro != null || r.per_lucro != null) ? 1 : 0;
+              const created = new Date(r.created_at).getTime();
+              const idVal = typeof r.id === 'number' ? r.id : 0;
+              return hasProfit * 1e12 + created * 1e3 + idVal;
+            };
+            if (score(item) >= score(atual)) acc[key] = item;
           }
           return acc;
         }, {})
       ) as R171Saldo[];
 
-      // Ordenar por data ascendente
       porDataMaisRecente.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
-
       setSaldos(porDataMaisRecente);
       setFiltroAplicado(true);
     } catch (error) {
@@ -176,7 +188,7 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
     if (user && dataInicial && dataFinal) {
       carregarHistorico();
     }
-  }, [user, dataInicial, dataFinal]);
+  }, [user, dataInicial, dataFinal, balance]); // Adicionar balance para recarregar quando o saldo mudar
 
   // Assinar alterações em tempo real para manter a lista sempre atualizada
   useEffect(() => {
@@ -259,7 +271,10 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
     const horaAtual = new Date().toLocaleTimeString('pt-BR');
     
     // Calcular estatísticas APENAS com os dados filtrados
-    const lucroTotal = dadosParaImprimir.reduce((acc, s) => acc + ((s.saldo_atual || 0) - (s.saldo_inicial || 0)), 0);
+    const lucroTotal = dadosParaImprimir.reduce((acc, s) => {
+      const vlr = s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0));
+      return acc + vlr;
+    }, 0);
     const maiorSaldo = dadosParaImprimir.length > 0 ? Math.max(...dadosParaImprimir.map(s => s.saldo_atual || 0)) : 0;
     const menorSaldo = dadosParaImprimir.length > 0 ? Math.min(...dadosParaImprimir.map(s => s.saldo_atual || 0)) : 0;
     
@@ -267,8 +282,9 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
     
     // Calcular média de percentual de lucratividade com dados filtrados
     const percentuais = dadosParaImprimir.map(s => {
-      const lucro = s.saldo_atual - s.saldo_inicial;
-      return s.saldo_inicial > 0 ? (lucro / s.saldo_inicial) * 100 : 0;
+      if (s.per_lucro != null) return Number(s.per_lucro);
+      const lucro = s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0));
+      return (s.saldo_inicial || 0) > 0 ? (lucro / (s.saldo_inicial || 1)) * 100 : 0;
     });
     const mediaPercentual = percentuais.length > 0 ? percentuais.reduce((acc, p) => acc + p, 0) / percentuais.length : 0;
     
@@ -276,216 +292,73 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatório de Histórico de Saldos</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 15px;
-            color: #333;
-            position: relative;
-        }
-        .print-button {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background-color: #f97316; /* laranja */
-            color: #fff;
-            border: none;
-            border-radius: 50%;
-            width: 56px;  /* botão redondo maior */
-            height: 56px; /* botão redondo maior */
-            font-size: 26px; /* ícone maior */
-            line-height: 56px; /* centraliza verticalmente o ícone */
-            text-align: center; /* centraliza horizontalmente o ícone */
-            cursor: pointer;
-            box-shadow: 0 6px 14px rgba(0,0,0,0.25);
-            z-index: 1000;
-        }
-        .print-button:hover {
-            background-color: #ea580c; /* laranja mais escuro no hover */
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-            margin-top: -20px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 10px;
-        }
-        .header p {
-            margin-top: -10px;
-            margin-bottom: -15px;
-        }
-        .info {
-            margin-bottom: 20px;
-        }
-        .summary {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 20px;
-            margin-bottom: 30px;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-        }
-        .summary-item {
-            text-align: center;
-        }
-        .summary-label {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 5px;
-        }
-        .summary-value {
-            font-size: 18px;
-            font-weight: bold;
-            color: #333;
-        }
-        .summary-value.positive {
-            color: #16a34a;
-        }
-        .summary-value.negative {
-            color: #dc2626;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-        }
-        th {
-            background-color: #f2f2f2;
-            font-weight: bold;
-            text-align: left;
-        }
-        th:nth-child(2), th:nth-child(3), th:nth-child(4), th:nth-child(5) {
-            text-align: right;
-        }
-        td {
-            text-align: left;
-        }
-        td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5) {
-            text-align: right;
-        }
-        /* Zebra (linhas alternadas) */
-        tbody tr:nth-child(odd) {
-            background-color: #fafafa;
-        }
-        tbody tr:nth-child(even) {
-            background-color: #ffffff;
-        }
-        .positive {
-            color: #16a34a;
-        }
-        .negative {
-            color: #dc2626;
-        }
-        .footer {
-            margin-top: 30px;
-            text-align: center;
-            font-size: 12px;
-            color: #666;
-        }
-        /* Ajustes solicitados de margens no cabeçalho do relatório */
-        .header h1 {
-            margin-top: 60px;
-            margin-bottom: 10px;
-        }
-        .header p {
-            margin-bottom: 12px;
-        }
-        @media print {
-            body { margin: 25px; }
-            .no-print { display: none; }
-            .print-button { display: none; }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Histórico de Saldos (Mobile)</title>
+  <style>
+    :root { --fg:#333; --muted:#666; --line:#e5e7eb; --green:#16a34a; --red:#dc2626; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 10px; color: var(--fg); }
+    .header { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid var(--line); position:sticky; top:0; background:#fff; }
+    .title { font-weight:700; font-size:14px; }
+    .period { font-size:11px; color: var(--muted); }
+    .summary { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin:10px 0; }
+    .card { background:#f9fafb; border:1px solid var(--line); border-radius:8px; padding:8px; text-align:center; }
+    .label { font-size:10px; color:var(--muted); }
+    .value { font-size:13px; font-weight:700; }
+    .value.green { color:var(--green); }
+    .value.red { color:var(--red); }
+    .list { border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+    .list-head { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px; padding:6px 8px; font-size:11px; font-weight:700; border-bottom:1px solid var(--line); background:#fff; }
+    .row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px; padding:6px 8px; font-size:11px; border-bottom:1px solid var(--line); }
+    .right { text-align:right; }
+    .green { color:var(--green); }
+    .red { color:var(--red); }
+    .footer { margin-top:10px; text-align:center; font-size:10px; color:var(--muted); }
+    @media print { .print-btn { display:none } body { margin: 10px } }
+  </style>
 </head>
 <body>
-    <button class="print-button no-print" onclick="window.print()" title="Imprimir Relatório">
-        🖨️
-    </button>
+  <div class="header">
+    <div class="title">📊 Histórico de Saldos</div>
+    <div class="period">${dataInicial ? dataInicial.split('-').reverse().join('/') : ''} a ${dataFinal ? dataFinal.split('-').reverse().join('/') : ''}</div>
+  </div>
 
-    <div class="header">
-        <h1>Relatório de Histórico de Saldos</h1>
-        <p><strong>Período:</strong> ${dataInicial ? dataInicial.split('-').reverse().join('/') : ''} a ${dataFinal ? dataFinal.split('-').reverse().join('/') : ''}</p>
+  <div class="summary">
+    <div class="card">
+      <div class="label">Total de Registros</div>
+      <div class="value">${dadosParaImprimir.length}</div>
     </div>
-    
-    <div class="info">
+    <div class="card">
+      <div class="label">Lucro Total</div>
+      <div class="value ${lucroTotal >= 0 ? 'green' : 'red'}">${formatarMoeda(lucroTotal)}</div>
     </div>
+  </div>
 
-    <div class="summary">
-        <div class="summary-item">
-            <div class="summary-label">Total de Registros</div>
-            <div class="summary-value">${dadosParaImprimir.length}</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-label">Lucro Total</div>
-            <div class="summary-value ${lucroTotal >= 0 ? 'positive' : 'negative'}">${formatarMoeda(lucroTotal)}</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-label">Maior Saldo</div>
-            <div class="summary-value positive">${formatarMoeda(maiorSaldo)}</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-label">Menor Saldo</div>
-            <div class="summary-value negative">${formatarMoeda(menorSaldo)}</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-label">Média em R$</div>
-            <div class="summary-value ${(() => {
-              const mediaReais = dadosParaImprimir.length > 0 ? lucroTotal / dadosParaImprimir.length : 0;
-              return mediaReais >= 0 ? 'positive' : 'negative';
-            })()}">${(() => {
-              const mediaReais = dadosParaImprimir.length > 0 ? lucroTotal / dadosParaImprimir.length : 0;
-              return formatarMoeda(mediaReais);
-            })()}</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-label">Média Percentual</div>
-            <div class="summary-value ${mediaPercentual >= 0 ? 'positive' : 'negative'}">${formatarPercentual(mediaPercentual)}</div>
-        </div>
+  <div class="list">
+    <div class="list-head">
+      <div>Data</div>
+      <div class="right">Saldo Atual</div>
+      <div class="right">Vlr Lucro</div>
+      <div class="right">% Lucro</div>
     </div>
-    
-    <table>
-        <thead>
-            <tr>
-                <th>Data</th>
-                <th>Saldo Inicial</th>
-                <th>Saldo Atual</th>
-                <th>Lucro/Prejuízo</th>
-                <th>Percentual</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${dadosParaImprimir.map(saldo => {
-              // Formatar data e calcular lucro/percentual dinamicamente
-              const [ano, mes, dia] = saldo.data.split('-');
-              const data = `${dia}/${mes}/${ano}`;
-              const lucro = (saldo.saldo_atual || 0) - (saldo.saldo_inicial || 0);
-              const percentual = (saldo.saldo_inicial || 0) > 0 ? (lucro / (saldo.saldo_inicial || 1)) * 100 : 0;
-              
-              return `
-                <tr>
-                    <td>${data}</td>
-                    <td>${formatarMoeda(saldo.saldo_inicial)}</td>
-                    <td>${formatarMoeda(saldo.saldo_atual)}</td>
-                    <td class="${lucro >= 0 ? 'positive' : 'negative'}">${formatarMoeda(lucro)}</td>
-                    <td class="${percentual >= 0 ? 'positive' : 'negative'}">${formatarPercentual(percentual)}</td>
-                </tr>
-              `;
-            }).join('')}
-        </tbody>
-    </table>
-    
-    <div class="footer">
-        <p>Relatório gerado automaticamente pelo sistema R171 - Gerado em: ${dataAtual} às ${horaAtual}</p>
-    </div>
+    ${dadosParaImprimir.map(saldo => {
+      const [ano, mes, dia] = saldo.data.split('-');
+      const data = `${dia}/${mes}/${ano}`;
+      const lucro = saldo.vlr_lucro != null ? Number(saldo.vlr_lucro) : ((saldo.saldo_atual || 0) - (saldo.saldo_inicial || 0));
+      const percentual = saldo.per_lucro != null ? Number(saldo.per_lucro) : ((saldo.saldo_inicial || 0) > 0 ? (lucro / (saldo.saldo_inicial || 1)) * 100 : 0);
+      return `
+        <div class="row">
+          <div>${data}</div>
+          <div class="right">${formatarMoeda(saldo.saldo_atual)}</div>
+          <div class="right ${lucro >= 0 ? 'green' : 'red'}">${formatarMoeda(lucro)}</div>
+          <div class="right ${percentual >= 0 ? 'green' : 'red'}">${formatarPercentual(percentual)}</div>
+        </div>
+      `;
+    }).join('')}
+  </div>
+
+  <div class="footer">Gerado em ${dataAtual} às ${horaAtual}</div>
 </body>
 </html>
     `;
@@ -519,6 +392,123 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
     // Usar a função gerarRelatorioHTML que já está corrigida
     gerarRelatorioHTML();
   };
+
+  if (variant === 'inline') {
+    return (
+      <div className="bg-white rounded-lg shadow-xl w-full overflow-hidden">
+        {/* Filtros */}
+        <div className="px-3 pt-2 pb-3 border-b border-gray-200 bg-gray-50">
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="w-full">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Data Inicial</label>
+              <input type="date" value={dataInicial} onChange={(e) => setDataInicial(e.target.value)} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div className="w-full">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Data Final</label>
+              <input type="date" value={dataFinal} onChange={(e) => setDataFinal(e.target.value)} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <button onClick={limparFiltro} className="w-full px-3 py-1.5 text-sm bg-gray-600 text-white rounded-lg">🗑️ Limpar</button>
+            <button onClick={gerarRelatorioHTML} className="w-full px-3 py-1.5 text-sm bg-orange-500 text-white rounded-lg">🖨️ Imprimir</button>
+          </div>
+        </div>
+
+        {/* Conteúdo */}
+        <div className="px-3 pt-2 pb-2">
+          {loading ? (
+            <div className="text-center py-8 text-gray-600">Carregando histórico...</div>
+          ) : saldos.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-4">📊</div>
+              <p>Nenhum registro encontrado para o período selecionado.</p>
+              <p className="text-sm mt-2">Tente ajustar os filtros de data.</p>
+            </div>
+          ) : (
+            <div className="max-h-[300px] overflow-y-auto overflow-x-auto">
+              <table className="w-full min-w-[600px] border-collapse border border-gray-300">
+                <thead className="sticky top-0 bg-white z-10">
+                  <tr className="bg-gray-100">
+                    <th className="border border-gray-300 px-2 py-1 text-left font-semibold text-gray-700 text-xs">Data</th>
+                    <th className="border border-gray-300 px-2 py-1 text-right font-semibold text-gray-700 text-xs">Saldo Inicial</th>
+                    <th className="border border-gray-300 px-2 py-1 text-right font-semibold text-gray-700 text-xs">Saldo Atual</th>
+                    <th className="border border-gray-300 px-2 py-1 text-right font-semibold text-gray-700 text-xs">Valor Lucro</th>
+                    <th className="border border-gray-300 px-2 py-1 text-right font-semibold text-gray-700 text-xs">% Lucro</th>
+                    <th className="border border-gray-300 px-2 py-1 text-center font-semibold text-gray-700 text-xs">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {saldosFiltrados.map((saldo, index) => {
+                    const valorLucro = saldo.vlr_lucro != null ? Number(saldo.vlr_lucro) : ((saldo.saldo_atual || 0) - (saldo.saldo_inicial || 0));
+                    const percentualLucro = saldo.per_lucro != null ? Number(saldo.per_lucro) : ((saldo.saldo_inicial || 0) > 0 
+                      ? (valorLucro / (saldo.saldo_inicial || 1)) * 100 
+                      : 0);
+                    const [ano, mes, dia] = saldo.data.split('-');
+                    return (
+                      <tr key={saldo.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="border border-gray-300 px-2 py-0.5 text-xs">{`${dia}/${mes}/${ano}`}</td>
+                        <td className="border border-gray-300 px-2 py-0.5 text-right text-xs">{formatarMoeda(saldo.saldo_inicial || 0)}</td>
+                        <td className={`border border-gray-300 px-2 py-0.5 text-right font-semibold text-xs ${(saldo.saldo_atual || 0) >= 0 ? 'text-green-600' : 'text-amber-900'}`}>{formatarMoeda(saldo.saldo_atual || 0)}</td>
+                        <td className={`border border-gray-300 px-2 py-0.5 text-right font-semibold text-xs ${valorLucro >= 0 ? 'text-green-600' : 'text-amber-900'}`}>{formatarMoeda(valorLucro)}</td>
+                        <td className={`border border-gray-300 px-2 py-0.5 text-right font-semibold text-xs ${percentualLucro >= 0 ? 'text-green-600' : 'text-red-800'}`}>{formatarPercentual(percentualLucro)}</td>
+                        <td className="border border-gray-300 px-2 py-0.5 text-center text-xs">
+                          {valorLucro > 0 ? (
+                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">Lucro</span>
+                          ) : valorLucro < 0 ? (
+                            <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">Prejuízo</span>
+                          ) : (
+                            <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">Neutro</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Resumo - cards 2 por linha no mobile */}
+        {saldos.length > 0 && (
+          <div className="px-3 py-3 border-t border-gray-200 bg-gray-50">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
+              <div className="text-center bg-white rounded p-2">
+                <div className="text-xs text-gray-600">Total de Registros</div>
+                <div className="text-lg font-bold text-gray-800">{saldosFiltrados.length}</div>
+              </div>
+              <div className="text-center bg-white rounded p-2">
+                <div className="text-xs text-gray-600">Lucro Total</div>
+                <div className={`text-lg font-bold ${
+                  (() => {
+                    const total = saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0))), 0);
+                    return total >= 0 ? 'text-green-600' : 'text-amber-900';
+                  })()
+                }`}>{(() => {
+                  const total = saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0))), 0);
+                  return formatarMoeda(total);
+                })()}</div>
+              </div>
+              <div className="text-center bg-white rounded p-2">
+                <div className="text-xs text-gray-600">Maior Saldo</div>
+                <div className="text-lg font-bold text-green-600">{formatarMoeda(saldosFiltrados.length > 0 ? Math.max(...saldosFiltrados.map(s => s.saldo_atual || 0)) : 0)}</div>
+              </div>
+              <div className="text-center bg-white rounded p-2">
+                <div className="text-xs text-gray-600">Menor Saldo</div>
+                <div className="text-lg font-bold text-amber-900">{formatarMoeda(saldosFiltrados.length > 0 ? Math.min(...saldosFiltrados.map(s => s.saldo_atual || 0)) : 0)}</div>
+              </div>
+              <div className="text-center bg-white rounded p-2">
+                <div className="text-xs text-gray-600">Média em R$</div>
+                <div className={`text-lg font-bold ${(() => { const totalLucro = saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0))), 0); const totalRegistros = saldosFiltrados.length; const mediaReais = totalRegistros > 0 ? totalLucro / totalRegistros : 0; return mediaReais >= 0 ? 'text-green-600' : 'text-amber-900'; })()}`}>{(() => { const totalLucro = saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0))), 0); const totalRegistros = saldosFiltrados.length; const mediaReais = totalRegistros > 0 ? totalLucro / totalRegistros : 0; return formatarMoeda(mediaReais); })()}</div>
+              </div>
+              <div className="text-center bg-white rounded p-2">
+                <div className="text-xs text-gray-600">Média Percentual</div>
+                <div className={`text-lg font-bold ${(() => { const percentuais = saldosFiltrados.map(s => { if (s.per_lucro != null) return Number(s.per_lucro); const lucro = s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0)); return (s.saldo_inicial || 0) > 0 ? (lucro / (s.saldo_inicial || 0)) * 100 : 0; }); const mediaPercentual = percentuais.length > 0 ? percentuais.reduce((acc, p) => acc + p, 0) / percentuais.length : 0; return mediaPercentual >= 0 ? 'text-green-600' : 'text-amber-900'; })()}`}>{(() => { const percentuais = saldosFiltrados.map(s => { if (s.per_lucro != null) return Number(s.per_lucro); const lucro = s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0)); return (s.saldo_inicial || 0) > 0 ? (lucro / (s.saldo_inicial || 0)) * 100 : 0; }); const mediaPercentual = percentuais.length > 0 ? percentuais.reduce((acc, p) => acc + p, 0) / percentuais.length : 0; return `${mediaPercentual >= 0 ? '+' : ''}${mediaPercentual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`; })()}</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 lg:p-4">
@@ -608,11 +598,10 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                 </thead>
                 <tbody>
                   {saldosFiltrados.map((saldo, index) => {
-                    // Calcular lucro e percentual SEMPRE a partir dos saldos (fonte única de verdade)
-                    const valorLucro = (saldo.saldo_atual || 0) - (saldo.saldo_inicial || 0);
-                    const percentualLucro = (saldo.saldo_inicial || 0) > 0 
+                    const valorLucro = saldo.vlr_lucro != null ? Number(saldo.vlr_lucro) : ((saldo.saldo_atual || 0) - (saldo.saldo_inicial || 0));
+                    const percentualLucro = saldo.per_lucro != null ? Number(saldo.per_lucro) : ((saldo.saldo_inicial || 0) > 0 
                       ? (valorLucro / (saldo.saldo_inicial || 1)) * 100 
-                      : 0;
+                      : 0);
 
                     return (
                       <tr key={saldo.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
@@ -677,9 +666,15 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
               <div className="text-center">
                 <div className="text-sm text-gray-600">Lucro Total</div>
                 <div className={`text-xl font-bold ${
-                  saldosFiltrados.reduce((acc, s) => acc + ((s.saldo_atual || 0) - (s.saldo_inicial || 0)), 0) >= 0 ? 'text-green-600' : 'text-amber-900'
+                  (() => {
+                    const total = saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0))), 0);
+                    return total >= 0 ? 'text-green-600' : 'text-amber-900';
+                  })()
                 }`}>
-                  {formatarMoeda(saldosFiltrados.reduce((acc, s) => acc + ((s.saldo_atual || 0) - (s.saldo_inicial || 0)), 0))}
+                  {(() => {
+                    const total = saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0))), 0);
+                    return formatarMoeda(total);
+                  })()}
                 </div>
               </div>
               <div className="text-center">
@@ -698,14 +693,14 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                 <div className="text-sm text-gray-600">Média em R$</div>
                 <div className={`text-xl font-bold ${
                   (() => {
-                    const totalLucro = saldosFiltrados.reduce((acc, s) => acc + ((s.saldo_atual || 0) - (s.saldo_inicial || 0)), 0);
+                    const totalLucro = saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0))), 0);
                     const totalRegistros = saldosFiltrados.length;
                     const mediaReais = totalRegistros > 0 ? totalLucro / totalRegistros : 0;
                     return mediaReais >= 0 ? 'text-green-600' : 'text-amber-900';
                   })()
                 }`}>
                   {(() => {
-                    const totalLucro = saldosFiltrados.reduce((acc, s) => acc + ((s.saldo_atual || 0) - (s.saldo_inicial || 0)), 0);
+                    const totalLucro = saldosFiltrados.reduce((acc, s) => acc + (s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0))), 0);
                     const totalRegistros = saldosFiltrados.length;
                     const mediaReais = totalRegistros > 0 ? totalLucro / totalRegistros : 0;
                     return formatarMoeda(mediaReais);
@@ -717,7 +712,8 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                 <div className={`text-xl font-bold ${
                   (() => {
                     const percentuais = saldosFiltrados.map(s => {
-                      const lucro = (s.saldo_atual || 0) - (s.saldo_inicial || 0);
+                      if (s.per_lucro != null) return Number(s.per_lucro);
+                      const lucro = s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0));
                       return (s.saldo_inicial || 0) > 0 ? (lucro / (s.saldo_inicial || 0)) * 100 : 0;
                     });
                     const mediaPercentual = percentuais.length > 0 ? percentuais.reduce((acc, p) => acc + p, 0) / percentuais.length : 0;
@@ -726,7 +722,8 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose }) => 
                 }`}>
                   {(() => {
                     const percentuais = saldosFiltrados.map(s => {
-                      const lucro = (s.saldo_atual || 0) - (s.saldo_inicial || 0);
+                      if (s.per_lucro != null) return Number(s.per_lucro);
+                      const lucro = s.vlr_lucro != null ? Number(s.vlr_lucro) : ((s.saldo_atual || 0) - (s.saldo_inicial || 0));
                       return (s.saldo_inicial || 0) > 0 ? (lucro / (s.saldo_inicial || 0)) * 100 : 0;
                     });
                     const mediaPercentual = percentuais.length > 0 ? percentuais.reduce((acc, p) => acc + p, 0) / percentuais.length : 0;

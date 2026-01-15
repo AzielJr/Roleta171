@@ -25,7 +25,14 @@ const RankingEstrategiasCard = ({ displayStrategiesRanking }) => {
                 </span>
               </div>
               <div className="text-right">
-                <div className="font-bold text-gray-800 text-xs">{strategy.winPercentage}%</div>
+                {(() => {
+                  const provided = Number(strategy.winPercentage) || 0;
+                  const total = Number(strategy.total) || 0;
+                  const wins = Number(strategy.wins) || 0;
+                  const computed = total > 0 ? Math.round((wins / total) * 100) : 0;
+                  const display = provided === 0 && wins > 0 && total > 0 ? computed : provided;
+                  return <div className="font-bold text-yellow-400 text-xs">{display}%</div>;
+                })()}
               </div>
             </div>
           ))}

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Info } from 'lucide-react';
 
-const ColunasCard = ({ statistics, columnsPercentages, columnsLoss, lastNumbers, getNumberColumnSafe, columnsAbsences }) => {
+const ColunasCard = ({ statistics, columnsPercentages, columnsLoss, lastNumbers, getNumberColumnSafe, columnsAbsences, columnSequenceCount = null, columnSequences = new Map() }) => {
   const [showPopup, setShowPopup] = useState(false);
 
   // Função para determinar a cor de um número
@@ -53,64 +53,12 @@ const ColunasCard = ({ statistics, columnsPercentages, columnsLoss, lastNumbers,
     return stats;
   };
 
-  // Gerar sugestões de aposta
-  const generateSuggestions = () => {
-    const stats = calculateStats();
-    
-    // Encontrar as 2 colunas que mais saíram
-    const columnEntries = Object.entries(stats.columns)
-      .map(([col, count]) => ({ col: parseInt(col), count }))
-      .sort((a, b) => b.count - a.count);
-    
-    const topColumns = columnEntries.slice(0, 2).map(item => item.col);
-
-    // Cor que mais saiu
-    const colorEntries = Object.entries(stats.colors)
-      .filter(([color]) => color !== 'green') // Excluir verde (zero)
-      .map(([color, count]) => ({ color, count }))
-      .sort((a, b) => b.count - a.count);
-    
-    const topColor = colorEntries[0]?.color || 'black';
-
-    // Melhor de Alto/Baixo
-    const bestHighLow = stats.highLow.high > stats.highLow.low ? 'Nºs Altos' : 'Nºs Baixos';
-    
-    // Melhor de Par/Ímpar
-    const bestEvenOdd = stats.evenOdd.even > stats.evenOdd.odd ? 'Par' : 'Ímpar';
-
-    // Encontrar o melhor campo geral (maior valor entre todos)
-    const allFields = [
-      { name: 'Coluna 1', value: stats.columns[1] },
-      { name: 'Coluna 2', value: stats.columns[2] },
-      { name: 'Coluna 3', value: stats.columns[3] },
-      { name: 'Cor Preta', value: stats.colors.black },
-      { name: 'Cor Vermelha', value: stats.colors.red },
-      { name: 'Nºs Baixos', value: stats.highLow.low },
-      { name: 'Nºs Altos', value: stats.highLow.high },
-      { name: 'Par', value: stats.evenOdd.even },
-      { name: 'Ímpar', value: stats.evenOdd.odd }
-    ];
-    
-    const bestField = allFields.sort((a, b) => b.value - a.value)[0];
-
-    return {
-      stats,
-      suggestions: {
-        columns: topColumns,
-        color: topColor === 'red' ? 'Vermelha' : 'Preta',
-        colorRaw: topColor,
-        bestHighLow,
-        bestEvenOdd,
-        bestField: bestField.name
-      }
-    };
-  };
   return (
     <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
       <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2 flex justify-between items-center">
          <div className="flex items-center gap-1">
            <span>Colunas</span>
-           <div title="Análise e Sugestões de Apostas">
+           <div title="Como funciona este card?">
              <Info 
                size={14} 
                className="text-blue-500 cursor-pointer hover:text-blue-700" 
@@ -118,7 +66,6 @@ const ColunasCard = ({ statistics, columnsPercentages, columnsLoss, lastNumbers,
              />
            </div>
          </div>
-         <span className="text-[13px] lg:text-[15px] text-yellow-600 font-normal">LOSS: <span className="font-bold">{columnsLoss}</span></span>
        </h3>
       <div className="space-y-0.5 lg:space-y-1">
         {[{
@@ -142,32 +89,45 @@ const ColunasCard = ({ statistics, columnsPercentages, columnsLoss, lastNumbers,
           color: 'bg-yellow-600',
           columnIndex: 1,
           absences: columnsAbsences.first
-        }].map((item) => (
-          <div key={item.label} className="grid items-center gap-1" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
+        }].map((item) => {
+          const sequences = columnSequences.get(item.columnIndex) || { current: 0, max: 0 };
+          const hasSequence = sequences.current >= 3;
+          
+          return (
+          <div key={item.label} className="grid items-center gap-1" style={{ gridTemplateColumns: '1.5fr 1.2fr 1fr' }}>
             {/* Coluna 1: Identificação da Coluna */}
             <div className="flex items-center gap-0.5 lg:gap-1">
               <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${item.color}`}></div>
-              <span className="text-xs lg:text-xs text-gray-600">{item.label}</span>
+              <span className={`text-xs lg:text-xs text-gray-600 ${hasSequence ? 'border border-yellow-400 px-1 rounded' : ''}`}>
+                {item.label}
+              </span>
             </div>
             
-            {/* Coluna 2: Ausências (centralizada) */}
-            <div className="text-center" style={{ marginLeft: '12px', marginRight: '12px' }}>
+            {/* Coluna 2: Sequências Consecutivas (atual / máxima) */}
+            <div className="text-center" style={{ marginLeft: '8px', marginRight: '8px' }}>
               <div 
-                className="text-pink-400" 
-                style={{ fontSize: '12px' }}
-                title={`Ausências: ${item.absences.current} atual / ${item.absences.max} máxima consecutiva`}
+                className={hasSequence ? 'text-red-600 font-bold animate-pulse' : 'text-pink-400'} 
+                style={{ fontSize: hasSequence ? '14px' : '12px' }}
+                title={`Sequência: ${sequences.current} atual / ${sequences.max} máxima consecutiva`}
               >
-                {item.absences.current} / {item.absences.max}
+                {sequences.current} / {sequences.max}
               </div>
             </div>
             
             {/* Coluna 3: Total e Percentual (alinhada à direita) */}
             <div className="text-right">
               <div className="font-bold text-gray-800 text-xs lg:text-sm">{item.value}</div>
-              <div className="text-xs lg:text-xs text-gray-500">{item.percentage}%</div>
+              {(() => {
+                const total = (statistics.columns.first || 0) + (statistics.columns.second || 0) + (statistics.columns.third || 0);
+                const computed = total > 0 ? Math.round(((item.value || 0) / total) * 100) : 0;
+                const provided = Number(item.percentage) || 0;
+                const display = ((provided === 0) && (item.value || 0) > 0 && total > 0) ? computed : provided;
+                return <div className="text-xs lg:text-xs text-yellow-400 font-semibold">{display}%</div>;
+              })()}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
       <div className="mt-2 pt-2 border-t border-gray-200">
         <div className="flex overflow-x-auto ranking-scroll pr-1">
@@ -198,154 +158,101 @@ const ColunasCard = ({ statistics, columnsPercentages, columnsLoss, lastNumbers,
         </div>
       </div>
 
-      {/* Popup de Análise e Sugestões - Portal para body */}
+      {/* Popup de Explicação - Portal para body */}
       {showPopup && createPortal(
         <div className="fixed inset-0 z-[9999]" style={{ top: 0, left: 0 }}>
           <div 
-            className="fixed inset-0 bg-black bg-opacity-30" 
+            className="fixed inset-0 bg-black bg-opacity-50" 
             onClick={() => setShowPopup(false)}
           />
           <div 
-            className="fixed bg-gray-50 rounded-lg p-4 shadow-2xl"
+            className="fixed bg-white rounded-xl p-6 shadow-2xl border-2 border-blue-200"
             style={{ 
-              top: '70px',
+              top: '50%',
               left: '50%',
-              transform: 'translateX(-50%)',
+              transform: 'translate(-50%, -50%)',
               width: 'calc(100vw - 32px)',
-              maxWidth: '1024px',
+              maxWidth: '700px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               zIndex: 10000
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-lg font-bold text-gray-800">Análise Estatística e Sugestões</h2>
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4 pb-3 border-b-2 border-blue-100">
+              <h2 className="text-2xl font-bold text-blue-600 flex items-center gap-2">
+                <Info size={28} className="text-blue-500" />
+                Como Funciona o Card de Colunas
+              </h2>
               <button 
                 onClick={() => setShowPopup(false)}
-                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                className="text-gray-400 hover:text-gray-600 text-3xl font-bold leading-none"
               >
                 ×
               </button>
             </div>
 
-            {(() => {
-              const { stats, suggestions } = generateSuggestions();
-              return (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Lado Esquerdo - Estatísticas */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3 text-center">Estatísticas Atuais</h3>
-                    
-                    {/* Colunas */}
-                    <div className="mb-3">
-                      <h4 className="font-semibold text-center mb-1">Colunas</h4>
-                      <div className="grid grid-cols-3 gap-1 text-center">
-                        <div className="border p-1 rounded text-sm">
-                          <div className="font-bold">1</div>
-                          <div>({stats.columns[1]})</div>
-                        </div>
-                        <div className="border p-1 rounded text-sm">
-                          <div className="font-bold">2</div>
-                          <div>({stats.columns[2]})</div>
-                        </div>
-                        <div className="border p-1 rounded text-sm">
-                          <div className="font-bold">3</div>
-                          <div>({stats.columns[3]})</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Cores */}
-                    <div className="mb-3">
-                      <h4 className="font-semibold text-center mb-1">Cores</h4>
-                      <div className="grid grid-cols-2 gap-1 text-center">
-                        <div className="border p-1 rounded text-sm">
-                          <div className="font-bold">Preta</div>
-                          <div>({stats.colors.black})</div>
-                        </div>
-                        <div className="border p-1 rounded text-sm">
-                          <div className="font-bold">Vermelha</div>
-                          <div>({stats.colors.red})</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Nºs Baixos/Altos */}
-                    <div className="mb-3">
-                      <h4 className="font-semibold text-center mb-1">Nºs Baixos/Altos</h4>
-                      <div className="grid grid-cols-2 gap-1 text-center">
-                        <div className="border p-1 rounded text-sm">
-                          <div className="font-bold">Baixos</div>
-                          <div>({stats.highLow.low})</div>
-                        </div>
-                        <div className="border p-1 rounded text-sm">
-                          <div className="font-bold">Altos</div>
-                          <div>({stats.highLow.high})</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Nºs Par/Ímpar */}
-                    <div className="mb-3">
-                      <h4 className="font-semibold text-center mb-1">Nºs Par/Ímpar</h4>
-                      <div className="grid grid-cols-2 gap-1 text-center">
-                        <div className="border p-1 rounded text-sm">
-                          <div className="font-bold">Par</div>
-                          <div>({stats.evenOdd.even})</div>
-                        </div>
-                        <div className="border p-1 rounded text-sm">
-                          <div className="font-bold">Ímpar</div>
-                          <div>({stats.evenOdd.odd})</div>
-                        </div>
-                      </div>
-                    </div>
+            {/* Conteúdo */}
+            <div className="space-y-4 text-gray-700">
+              {/* Seção 1: Linhas Principais */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h3 className="font-bold text-lg text-blue-700 mb-3 flex items-center gap-2">
+                  📊 Linhas Principais (3 Colunas)
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <p><span className="font-semibold">• Identificação:</span> Nome da coluna com bolinha colorida (1ª, 2ª ou 3ª Coluna)</p>
+                  <p><span className="font-semibold">• Campo do Meio:</span> <code className="bg-white px-2 py-1 rounded border">ATUAL / MÁXIMA</code></p>
+                  <div className="ml-6 mt-1 space-y-1">
+                    <p className="text-xs">→ <span className="font-semibold">ATUAL:</span> Quantos números seguidos saíram na mesma coluna agora</p>
+                    <p className="text-xs">→ <span className="font-semibold">MÁXIMA:</span> Maior sequência consecutiva já registrada (últimos 60 números)</p>
+                    <p className="text-xs">→ <span className="font-semibold text-red-600">Vermelho pulsante:</span> Quando ATUAL ≥ 3 (alerta de sequência!)</p>
+                    <p className="text-xs">→ <span className="font-semibold text-pink-500">Rosa claro:</span> Quando ATUAL &lt; 3 (normal)</p>
                   </div>
-
-                  {/* Lado Direito - Sugestões */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3 text-center">Melhor Dica</h3>
-                    <div className="bg-blue-50 p-3 rounded-lg">
-                      <div className="mb-2">
-                        <span className="font-semibold">Colunas:</span>
-                        <div className="text-lg font-bold text-blue-600">
-                          {suggestions.columns.join(' e ')}
-                        </div>
-                      </div>
-                      
-                      <div className="mb-2">
-                        <span className="font-semibold">Cor:</span>
-                        <div className="text-lg font-bold text-blue-600">
-                          {suggestions.color}
-                        </div>
-                      </div>
-                      
-                      <div className="mb-3">
-                        <span className="font-semibold">Alto/Baixo:</span>
-                        <div className="text-lg font-bold text-green-600">
-                          {suggestions.bestHighLow}
-                        </div>
-                      </div>
-                      
-                      <div className="mb-3">
-                        <span className="font-semibold">Par/Ímpar:</span>
-                        <div className="text-lg font-bold text-orange-600">
-                          {suggestions.bestEvenOdd}
-                        </div>
-                      </div>
-
-                      <div className="text-sm text-gray-900 mt-2 p-3 bg-yellow-100 rounded border border-yellow-300">
-                        <div className="font-bold text-gray-900 mb-2">💡 Sugestão para as próximas 25 rodadas:</div>
-                        <div className="text-gray-900 leading-relaxed">
-                          Aposte nas colunas <span className="font-bold text-blue-700">{suggestions.columns.join(' e ')}</span>, 
-                          priorizando números da cor <span className={`font-bold ${suggestions.colorRaw === 'red' ? 'text-red-600' : 'text-gray-800'}`}>{suggestions.color.toLowerCase()}</span> {' '}
-                          que sejam <span className="font-bold text-green-600">{suggestions.bestHighLow.toLowerCase()}</span> {' '}
-                          e <span className="font-bold text-orange-600">{suggestions.bestEvenOdd.toLowerCase()}</span>.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <p><span className="font-semibold">• Lado Direito:</span> Total de números sorteados nessa coluna e percentual</p>
                 </div>
-              );
-            })()}
+              </div>
+
+              {/* Seção 2: Lista no Footer */}
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <h3 className="font-bold text-lg text-green-700 mb-3 flex items-center gap-2">
+                  📜 Lista no Rodapé (Footer)
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <p><span className="font-semibold">• Exibição:</span> Mostra os últimos números sorteados em ordem reversa (mais recente primeiro)</p>
+                  <p><span className="font-semibold">• Cores:</span></p>
+                  <div className="ml-6 space-y-1">
+                    <p className="text-xs">→ <span className="font-semibold text-yellow-600">Amarelo:</span> 1ª Coluna</p>
+                    <p className="text-xs">→ <span className="font-semibold text-green-600">Verde:</span> 2ª Coluna</p>
+                    <p className="text-xs">→ <span className="font-semibold text-blue-600">Azul:</span> 3ª Coluna</p>
+                  </div>
+                  <p><span className="font-semibold">• Formato:</span> Apenas o número da coluna (1, 2 ou 3), não o número sorteado</p>
+                </div>
+              </div>
+
+              {/* Seção 3: Exemplo Prático */}
+              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                <h3 className="font-bold text-lg text-purple-700 mb-3 flex items-center gap-2">
+                  💡 Exemplo Prático
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <p className="font-semibold">Números sorteados: 7, 10, 4, 22, 25</p>
+                  <div className="bg-white p-3 rounded border mt-2">
+                    <p className="text-xs mb-1"><span className="font-semibold">1ª Coluna:</span> <code className="bg-gray-100 px-2 py-1 rounded">3 / 3</code> ← 3 seguidos (7,10,4), máximo 3</p>
+                    <p className="text-xs mb-1"><span className="font-semibold">2ª Coluna:</span> <code className="bg-gray-100 px-2 py-1 rounded">1 / 1</code> ← Atual: 1 (só o 22)</p>
+                    <p className="text-xs"><span className="font-semibold">3ª Coluna:</span> <code className="bg-gray-100 px-2 py-1 rounded">1 / 1</code> ← Atual: 1 (só o 25)</p>
+                  </div>
+                  <p className="text-xs mt-2"><span className="font-semibold">Lista no rodapé:</span> <span className="text-blue-600 font-bold">3</span> <span className="text-green-600 font-bold">2</span> <span className="text-yellow-600 font-bold">1 1 1</span></p>
+                </div>
+              </div>
+
+              {/* Nota sobre Dúzias */}
+              <div className="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-300">
+                <p className="text-sm font-semibold text-yellow-800 flex items-center gap-2">
+                  ℹ️ <span>O card de <span className="text-yellow-900">Dúzias</span> funciona exatamente da mesma forma, mas com 3 dúzias (1ª, 2ª, 3ª) ao invés de colunas.</span>
+                </p>
+              </div>
+            </div>
           </div>
         </div>,
         document.body

@@ -1,13 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBalance } from '../contexts/BalanceContext';
+import { Menu } from 'lucide-react';
 
 interface UserHeaderProps {
   className?: string;
   onEditSaldo?: () => void;
+  onMenuClick?: () => void;
+  onMobileMenuClick?: () => void;
 }
 
-export const UserHeader: React.FC<UserHeaderProps> = ({ className = '', onEditSaldo }) => {
+export const UserHeader: React.FC<UserHeaderProps> = ({ className = '', onEditSaldo, onMenuClick, onMobileMenuClick }) => {
   const { user } = useAuth();
   const { balance, loading, currentSaldoRecord, lastSaldoRecord, refreshBalance } = useBalance();
 
@@ -44,14 +47,17 @@ export const UserHeader: React.FC<UserHeaderProps> = ({ className = '', onEditSa
     <div className={`flex items-center justify-between ${className}`}>
       {/* Título Principal */}
       <div className="flex items-center space-x-4">
-        <div className="flex items-center gap-3">
+        <button 
+          onClick={onMobileMenuClick || onMenuClick}
+          className="flex items-center gap-3 focus:outline-none"
+        >
           <img src="/logo-171.svg" alt="Logo 171" className="w-8 h-8" />
-          <h1 className="text-2xl font-bold text-white" style={{marginTop: '-15px'}}>Roleta 171</h1>
-        </div>
+          <h1 className="text-2xl font-bold text-white hidden md:block" style={{marginTop: '-15px'}}>Roleta 171</h1>
+        </button>
         
         {/* Informações do Usuário */}
         {user && (
-          <div className="flex items-center space-x-3 text-sm" style={{marginLeft: '50px'}}>
+          <div className="flex items-center space-x-3 text-sm hidden md:flex" style={{marginLeft: '50px'}}>
             {/* Nome do Usuário */}
             <span className="text-green-300 font-medium">
               {user.nome || 'Usuário'}

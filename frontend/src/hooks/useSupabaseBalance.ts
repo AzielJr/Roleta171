@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase, R171Saldo } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -17,6 +17,23 @@ export const useSupabaseBalance = () => {
   const [loading, setLoading] = useState(false);
   const [currentSaldoRecord, setCurrentSaldoRecord] = useState<R171Saldo | null>(null);
   const [lastSaldoRecord, setLastSaldoRecord] = useState<R171Saldo | null>(null);
+  const updatingRef = useRef<boolean>(false);
+
+  const withRetry = async <T,>(fn: () => Promise<T>, maxAttempts = 3, baseDelayMs = 150): Promise<T> => {
+    let attempt = 0;
+    let lastError: any;
+    while (attempt < maxAttempts) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastError = err;
+        const wait = baseDelayMs * Math.pow(2, attempt);
+        await new Promise(res => setTimeout(res, wait));
+        attempt++;
+      }
+    }
+    throw lastError;
+  };
 
   const loadBalance = async () => {
     if (!user) return;
@@ -51,7 +68,6 @@ export const useSupabaseBalance = () => {
         .maybeSingle();
 
       if (lastRecord && !lastError) {
-        // Usar o último registro real diretamente
         setCurrentSaldoRecord(lastRecord);
         setBalance(lastRecord.saldo_atual || 0);
         return;
@@ -123,7 +139,7 @@ export const useSupabaseBalance = () => {
     if (!user) return;
 
     const today = new Date().toISOString().split('T')[0];
-    const initialBalance = 0;
+    let initialBalance = 0;
 
     try {
       // Busca o último saldo para usar como saldo_anterior (excluindo o dia atual)
@@ -136,6 +152,7 @@ export const useSupabaseBalance = () => {
         .limit(1);
 
       const saldoAnterior = lastRecord && lastRecord.length > 0 ? lastRecord[0].saldo_atual : 0;
+      initialBalance = saldoAnterior || 0;
 
       const { data, error } = await supabase
         .from('r171_saldo')
@@ -176,40 +193,98 @@ export const useSupabaseBalance = () => {
 
   // Atualiza o saldo no banco
   const updateBalance = async (newBalance: number) => {
-    if (!currentSaldoRecord) return false;
-
-    try {
-      const vlrLucro = newBalance - (currentSaldoRecord.saldo_inicial || 0);
-      const perLucro = currentSaldoRecord.saldo_inicial 
-        ? (vlrLucro / currentSaldoRecord.saldo_inicial) * 100 
-        : 0;
-
-      const { error } = await supabase
+    // Garantir que não há duas atualizações concorrentes
+    while (updatingRef.current) {
+      await new Promise(res => setTimeout(res, 100));
+    }
+    updatingRef.current = true;
+    let record: R171Saldo | null = currentSaldoRecord;
+    if (!record || record.id === -1) {
+      const { data: lastRecord } = await supabase
         .from('r171_saldo')
-        .update({
-          saldo_atual: newBalance,
-          vlr_lucro: vlrLucro,
-          per_lucro: perLucro
-        })
-        .eq('id', currentSaldoRecord.id);
-
-      if (error) {
-        console.error('Erro ao atualizar saldo:', error);
+        .select('*')
+        .eq('id_senha', user!.id)
+        .order('data', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!lastRecord) {
+        updatingRef.current = false;
         return false;
       }
+      setCurrentSaldoRecord(lastRecord);
+      record = lastRecord;
+    }
 
-      // Atualizar o estado local com os novos valores
-      setCurrentSaldoRecord({
-        ...currentSaldoRecord,
+    try {
+      const baseRecord = record!;
+      const today = new Date().toISOString().split('T')[0];
+      // Buscar saldo do dia anterior para garantir saldo_inicial correto
+      const { data: prev } = await supabase
+        .from('r171_saldo')
+        .select('saldo_atual,data')
+        .eq('id_senha', user!.id)
+        .lt('data', today)
+        .order('data', { ascending: false })
+        .limit(1);
+      const prevFinal = Array.isArray(prev) && prev.length > 0 ? Number(prev[0].saldo_atual || 0) : 0;
+      // Determinar saldo_inicial usado (corrigir se estiver zerado/igual ao atual indevidamente)
+      const currentInicial = Number(baseRecord.saldo_inicial || 0);
+      const shouldCorrectInicial = (currentInicial === 0 && prevFinal > 0) || (currentInicial === Number(baseRecord.saldo_atual || 0) && prevFinal > 0);
+      const usedSaldoInicial = shouldCorrectInicial ? prevFinal : currentInicial;
+      const vlrLucro = newBalance - usedSaldoInicial;
+      const perLucro = usedSaldoInicial 
+        ? (vlrLucro / usedSaldoInicial) * 100 
+        : 0;
+
+      console.log('✅ updateBalance: Atualizando saldo no banco', {
+        id: baseRecord.id,
+        saldo_atual: newBalance,
+        vlr_lucro: vlrLucro,
+        per_lucro: perLucro,
+        saldo_inicial_usado: usedSaldoInicial,
+        correcao_inicial: shouldCorrectInicial
+      });
+
+      const updatePayload: any = {
         saldo_atual: newBalance,
         vlr_lucro: vlrLucro,
         per_lucro: perLucro
-      });
+      };
+      if (shouldCorrectInicial) {
+        updatePayload.saldo_inicial = usedSaldoInicial;
+      }
+
+      const runUpdate = async () => {
+        const { data, error } = await supabase
+          .from('r171_saldo')
+          .update(updatePayload)
+          .eq('id', baseRecord.id)
+          .select();
+        if (error) throw error;
+        return data as any[];
+      };
+      const updatedRows = await withRetry(runUpdate);
+
+      console.log('✅ Saldo atualizado com sucesso no banco de dados');
+
+      // Atualizar o estado local com os novos valores
+      const updated = Array.isArray(updatedRows) && updatedRows.length > 0 
+        ? updatedRows[0] as R171Saldo 
+        : {
+            ...baseRecord,
+            saldo_atual: newBalance,
+            vlr_lucro: vlrLucro,
+            per_lucro: perLucro,
+            saldo_inicial: shouldCorrectInicial ? usedSaldoInicial : baseRecord.saldo_inicial
+          } as R171Saldo;
+      setCurrentSaldoRecord(updated);
       
       setBalance(newBalance);
+      updatingRef.current = false;
       return true;
     } catch (error) {
-      console.error('Erro ao atualizar saldo:', error);
+      console.error('❌ Erro ao atualizar saldo:', error);
+      updatingRef.current = false;
       return false;
     }
   };
@@ -282,10 +357,27 @@ export const useSupabaseBalance = () => {
     if (!currentSaldoRecord) return false;
 
     try {
-      const saldoInicial = updates.saldo_inicial ?? currentSaldoRecord.saldo_inicial;
-      const saldoAtual = updates.saldo_atual ?? currentSaldoRecord.saldo_atual;
-      const vlrLucro = saldoAtual - saldoInicial;
-      const perLucro = saldoInicial > 0 ? (vlrLucro / saldoInicial) * 100 : 0;
+      while (updatingRef.current) {
+        await new Promise(res => setTimeout(res, 100));
+      }
+      updatingRef.current = true;
+
+      const saldoAtual = updates.saldo_atual ?? currentSaldoRecord.saldo_atual ?? 0;
+      const effectiveDate = updates.data ?? currentSaldoRecord.data ?? new Date().toISOString().split('T')[0];
+      // Buscar saldo do dia anterior para validar/corrigir saldo_inicial
+      const { data: prev } = await supabase
+        .from('r171_saldo')
+        .select('saldo_atual,data')
+        .eq('id_senha', user!.id)
+        .lt('data', effectiveDate)
+        .order('data', { ascending: false })
+        .limit(1);
+      const prevFinal = Array.isArray(prev) && prev.length > 0 ? Number(prev[0].saldo_atual || 0) : 0;
+      const currentInicial = updates.saldo_inicial ?? currentSaldoRecord.saldo_inicial ?? 0;
+      const shouldCorrectInicial = (updates.saldo_inicial === undefined) && (((currentInicial === 0) && prevFinal > 0) || ((currentInicial === (currentSaldoRecord.saldo_atual ?? 0)) && prevFinal > 0));
+      const usedSaldoInicial = shouldCorrectInicial ? prevFinal : currentInicial;
+      const vlrLucro = saldoAtual - usedSaldoInicial;
+      const perLucro = usedSaldoInicial > 0 ? (vlrLucro / usedSaldoInicial) * 100 : 0;
 
       const updateData: any = {
         saldo_atual: saldoAtual,
@@ -295,32 +387,42 @@ export const useSupabaseBalance = () => {
 
       if (updates.saldo_inicial !== undefined) {
         updateData.saldo_inicial = updates.saldo_inicial;
+      } else if (shouldCorrectInicial) {
+        updateData.saldo_inicial = usedSaldoInicial;
       }
 
       if (updates.data) {
         updateData.data = updates.data;
       }
 
-      const { error } = await supabase
-        .from('r171_saldo')
-        .update(updateData)
-        .eq('id', currentSaldoRecord.id);
-
-      if (error) {
-        console.error('Erro ao atualizar registro de saldo:', error);
-        return false;
-      }
+      const runUpdate = async () => {
+        const { data, error } = await supabase
+          .from('r171_saldo')
+          .update(updateData)
+          .eq('id', currentSaldoRecord.id)
+          .select();
+        if (error) throw error;
+        return data as any[];
+      };
+      const updatedRows = await withRetry(runUpdate);
 
       // Atualizar o estado local
-      setCurrentSaldoRecord(prev => prev ? {
-        ...prev,
-        ...updateData
-      } : null);
+      const updated = Array.isArray(updatedRows) && updatedRows.length > 0 
+        ? updatedRows[0] as R171Saldo 
+        : (prev => prev ? {
+          ...prev,
+          ...updateData,
+          saldo_inicial: updateData.saldo_inicial ?? prev.saldo_inicial
+        } : null)(currentSaldoRecord);
+      if (updated) setCurrentSaldoRecord(updated);
       
       setBalance(saldoAtual);
+      await loadBalance();
+      updatingRef.current = false;
       return true;
     } catch (error) {
       console.error('Erro ao atualizar registro de saldo:', error);
+      updatingRef.current = false;
       return false;
     }
   };

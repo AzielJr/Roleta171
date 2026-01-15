@@ -6,6 +6,7 @@ import BETTerminaisCard from './BETTerminaisCard';
 import ColunasCard from './ColunasCard';
 import NovesForaCard from './NovesForaCard';
 import { calculateDozenAbsences, calculateColumnAbsences } from '../utils/statisticsCalculator';
+import { calculateDozenSequences, calculateColumnSequences } from '../utils/sequenceCounter';
 
 const StatisticsCards = ({
   lastNumbers = [],
@@ -52,7 +53,19 @@ const StatisticsCards = ({
   p2Mode = 1,
   setP2Mode = (v: number | ((prev: number) => number)) => {},
   rowOrder = 0,
-  ROULETTE_SEQUENCE = []
+  ROULETTE_SEQUENCE = [],
+  dozenSequenceCount = null,
+  columnSequenceCount = null,
+  colorSequence = null,
+  highLowSequence = null,
+  evenOddSequence = null
+}: {
+  dozenSequenceCount?: {dozen: number, count: number} | null,
+  columnSequenceCount?: {column: number, count: number} | null,
+  colorSequence?: {color: string, count: number} | null,
+  highLowSequence?: {type: string, count: number} | null,
+  evenOddSequence?: {type: string, count: number} | null,
+  [key: string]: any
 }) => {
 
     const { totalNumbers: derivedTotalNumbers, colorPercentages: derivedColorPercentages, evenOddPercentages: derivedEvenOddPercentages, highLowPercentages: derivedHighLowPercentages, dozensPercentages: derivedDozensPercentages, columnsPercentages: derivedColumnsPercentages } = useStatistics(statistics);
@@ -89,18 +102,24 @@ const StatisticsCards = ({
     const dozensLoss = React.useMemo(() => countLossRuns(lastNumbers.map(getNumberDozenSafe)), [lastNumbers]);
     const dozensAbsences = React.useMemo(() => calculateDozenAbsences(lastNumbers), [lastNumbers]);
     const columnsAbsences = React.useMemo(() => calculateColumnAbsences(lastNumbers), [lastNumbers]);
+    
+    // Calcular sequências consecutivas (atual / máxima)
+    const dozenSequences = React.useMemo(() => calculateDozenSequences(lastNumbers), [lastNumbers]);
+    const columnSequences = React.useMemo(() => calculateColumnSequences(lastNumbers), [lastNumbers]);
    const StatCard = ({
     title,
     data,
     colors = [],
     cardType,
-    containerClassName = 'min-h-[111px]'
+    containerClassName = 'min-h-[111px]',
+    sequenceHighlight = null
   }: {
     title: React.ReactNode | string;
     data: Array<{ label: string; value: number; percentage?: number; hidePercentage?: boolean; customValue?: string }>;
     colors?: string[];
     cardType?: 'colors' | 'highLow' | 'evenOdd' | string;
     containerClassName?: string;
+    sequenceHighlight?: {label: string, count: number} | null;
   }) => {
     return (
       <div className={`bg-white rounded-lg shadow-md p-2 lg:p-3 h-full ${containerClassName}`}>
@@ -114,11 +133,14 @@ const StatisticsCards = ({
             const displayPercentage = !item.hidePercentage && item.percentage !== undefined
               ? (item.percentage === 0 && (item.value || 0) > 0 && total > 0 ? computed : item.percentage)
               : (!item.hidePercentage ? computed : undefined);
+            const hasSequence = sequenceHighlight && sequenceHighlight.label === item.label;
             return (
               <div key={`${typeof title === 'string' ? title : 'stat'}-${item.label}-${idx}`} className="flex items-center justify-between">
                 <div className="flex items-center gap-0.5 lg:gap-1">
                   {colors[idx] ? <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${colors[idx]}`}></div> : null}
-                  <span className="text-xs lg:text-xs text-gray-600 truncate">{item.label}</span>
+                  <span className={`text-xs lg:text-xs text-gray-600 truncate ${hasSequence ? 'border border-yellow-400 px-1 rounded' : ''}`}>
+                    {item.label}
+                  </span>
                 </div>
                 <div className="text-right">
                   <div className="font-bold text-gray-800 text-xs lg:text-sm">{item.customValue ?? item.value}</div>
@@ -369,7 +391,7 @@ const StatisticsCards = ({
     const p32Wins = calculated32P1Stats?.wins ?? 0;
 
     const strategies = [
-      { name: 'Torre', wins: torreWins, losses: torreLosses, total: (torreWins + torreLosses), winPercentage: (torreWins + torreLosses) > 0 ? Math.round((torreWins / (torreWins + torreLosses)) * 100) : 0 },
+      { name: 'Torre Móvel', wins: torreWins, losses: torreLosses, total: (torreWins + torreLosses), winPercentage: (torreWins + torreLosses) > 0 ? Math.round((torreWins / (torreWins + torreLosses)) * 100) : 0 },
       { name: 'P2', wins: p2Wins, losses: p2Losses, total: (p2Wins + p2Losses), winPercentage: (p2Wins + p2Losses) > 0 ? Math.round((p2Wins / (p2Wins + p2Losses)) * 100) : 0 },
       { name: 'BET Terminais', wins: betWins, losses: betTerminaisStatsDisplay?.losses ?? 0, total: (betWins + (betTerminaisStatsDisplay?.losses ?? 0)), winPercentage: betWinPercentage },
       { name: '171', wins: patternWins, losses: pattern171Stats?.losses ?? 0, total: patternEntradas, winPercentage: patternEntradas > 0 ? Math.round((patternWins / patternEntradas) * 100) : 0 },
@@ -656,6 +678,10 @@ const StatisticsCards = ({
           ]}
           colors={['bg-blue-500', 'bg-orange-500', 'bg-green-500']}
           cardType="evenOdd"
+          sequenceHighlight={evenOddSequence ? {
+            label: evenOddSequence.type === 'even' ? 'Par' : 'Ímpar',
+            count: evenOddSequence.count
+          } : null}
         />
         {/* Card Alto/Baixo (movido para 3ª linha, posição do Race Track) */}
         <StatCard
@@ -667,6 +693,10 @@ const StatisticsCards = ({
           ]}
           colors={['bg-purple-500', 'bg-yellow-500', 'bg-green-500']}
           cardType="highLow"
+          sequenceHighlight={highLowSequence ? {
+            label: highLowSequence.type === 'high' ? 'Alto (19-36)' : 'Baixo (1-18)',
+            count: highLowSequence.count
+          } : null}
         />
 
         <StatCard
@@ -678,6 +708,10 @@ const StatisticsCards = ({
           ]}
           colors={['bg-red-500', 'bg-gray-800', 'bg-green-500']}
           cardType="colors"
+          sequenceHighlight={colorSequence ? {
+            label: colorSequence.color === 'red' ? 'Vermelho' : 'Preto',
+            count: colorSequence.count
+          } : null}
         />
 
         <ColunasCard 
@@ -687,32 +721,38 @@ const StatisticsCards = ({
           lastNumbers={lastNumbers}
           getNumberColumnSafe={getNumberColumnSafe}
           columnsAbsences={columnsAbsences}
+          columnSequenceCount={columnSequenceCount}
+          columnSequences={columnSequences}
         />
         <div className="bg-white rounded-lg shadow-md p-2 lg:p-3 h-full min-h-24">
           <h3 className="text-xs lg:text-sm font-semibold text-gray-800 mb-1 lg:mb-2 flex justify-between items-center">
              <span>Dúzias</span>
-             <span className="text-[13px] lg:text-[15px] text-yellow-600 font-normal">LOSS: <span className="font-bold">{dozensLoss}</span></span>
            </h3>
           <div className="space-y-0.5 lg:space-y-1">
             {[
-              { label: '1ª (1-12)', value: statistics.dozens.first, percentage: derivedDozensPercentages.first, color: 'bg-yellow-600', dozenIndex: 1, absences: dozensAbsences.first },
-              { label: '2ª (13-24)', value: statistics.dozens.second, percentage: derivedDozensPercentages.second, color: 'bg-green-600', dozenIndex: 2, absences: dozensAbsences.second },
-              { label: '3ª (25-36)', value: statistics.dozens.third, percentage: derivedDozensPercentages.third, color: 'bg-blue-600', dozenIndex: 3, absences: dozensAbsences.third }
+              { label: '1ª (1-12)', value: statistics.dozens.first, percentage: derivedDozensPercentages.first, color: 'bg-yellow-600', dozenIndex: 1 },
+              { label: '2ª (13-24)', value: statistics.dozens.second, percentage: derivedDozensPercentages.second, color: 'bg-green-600', dozenIndex: 2 },
+              { label: '3ª (25-36)', value: statistics.dozens.third, percentage: derivedDozensPercentages.third, color: 'bg-blue-600', dozenIndex: 3 }
             ].map((item) => {
               const isRepeated = animatingDozens.has(item.dozenIndex);
+              const sequences = dozenSequences.get(item.dozenIndex) || { current: 0, max: 0 };
+              const hasSequence = sequences.current >= 3;
+              
               return (
-                <div key={item.label} className="grid items-center gap-1" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
+                <div key={item.label} className="grid items-center gap-1" style={{ gridTemplateColumns: '1.5fr 1.2fr 1fr' }}>
                   <div className="flex items-center gap-0.5 lg:gap-1">
                     <div className={`w-2 h-2 lg:w-3 lg:h-3 rounded-full ${item.color}`}></div>
-                    <span className="text-xs lg:text-xs text-gray-600">{item.label}</span>
+                    <span className={`text-xs lg:text-xs text-gray-600 ${hasSequence ? 'border border-yellow-400 px-1 rounded' : ''}`}>
+                      {item.label}
+                    </span>
                   </div>
-                  <div className="text-center" style={{ marginLeft: '12px', marginRight: '12px' }}>
+                  <div className="text-center" style={{ marginLeft: '8px', marginRight: '8px' }}>
                     <div 
-                      className="text-pink-400" 
-                      style={{ fontSize: '12px' }}
-                      title={`Ausências: ${item.absences.current} atual / ${item.absences.max} máxima consecutiva`}
+                      className={hasSequence ? 'text-red-600 font-bold animate-pulse' : 'text-pink-400'} 
+                      style={{ fontSize: hasSequence ? '14px' : '12px' }}
+                      title={`Sequência: ${sequences.current} atual / ${sequences.max} máxima consecutiva`}
                     >
-                      {item.absences.current} / {item.absences.max}
+                      {sequences.current} / {sequences.max}
                     </div>
                   </div>
                     <div className="text-right">
