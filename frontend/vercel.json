@@ -4,11 +4,6 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "framework": "vite",
-  "build": {
-    "env": {
-      "VITE_BUILD_TIME": "@now"
-    }
-  },
   "rewrites": [
     {
       "source": "/(.*)",
