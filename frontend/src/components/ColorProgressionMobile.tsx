@@ -10,6 +10,7 @@ interface ColorProgressionMobileProps {
 export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ isOpen, onClose }) => {
   const { balance } = useBalance();
   const [entryValue, setEntryValue] = useState<number>(1);
+  const [entryValueInput, setEntryValueInput] = useState<string>('1');
   const [currentBalance, setCurrentBalance] = useState<number>(0);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [currentPosition, setCurrentPosition] = useState<number>(0);
@@ -175,18 +176,28 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
               <div className="text-right">
                 <div className="text-[10px] text-gray-500">Valor de Entrada</div>
                 <input
-                  type="number"
-                  value={entryValue}
+                  type="text"
+                  value={entryValueInput}
                   onChange={(e) => {
-                    const val = parseFloat(e.target.value);
+                    const input = e.target.value;
+                    setEntryValueInput(input);
+                    
+                    // Aceita ponto (.) e vírgula (,) como separador decimal
+                    const cleaned = input.replace(/[^\d,.-]/g, '');
+                    let val = 0;
+                    if (cleaned.includes(',')) {
+                      val = parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+                    } else {
+                      val = parseFloat(cleaned) || 0;
+                    }
+                    
                     if (val > 0) {
                       setEntryValue(val);
                       setCurrentPosition(0);
                     }
                   }}
                   className="text-sm font-bold text-gray-800 text-right border border-gray-300 rounded px-2 py-1 w-full"
-                  step="0.01"
-                  min="0.01"
+                  placeholder="0.00"
                 />
               </div>
             </div>
