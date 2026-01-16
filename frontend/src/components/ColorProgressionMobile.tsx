@@ -368,7 +368,7 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
             <div className="bg-white rounded-lg p-2 shadow">
               <div className="flex justify-between items-center mb-1">
                 <div className="text-[10px] text-gray-500">Progressão de Apostas</div>
-                <div className="text-[10px] font-bold text-gray-800">
+                <div className="text-[10px] text-gray-600">
                   Total: R$ {progression.reduce((sum, val) => sum + val, 0).toFixed(2)}
                 </div>
               </div>

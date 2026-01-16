@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Trash2, Undo2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Undo2, Plus, X } from 'lucide-react';
 import { cn } from '../utils/cn';
 
 interface FourColorsMobileProps {
@@ -9,6 +9,7 @@ interface FourColorsMobileProps {
 
 export const FourColorsMobile: React.FC<FourColorsMobileProps> = ({ isOpen, onClose }) => {
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
+  const [showNumberPopup, setShowNumberPopup] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -70,12 +71,16 @@ export const FourColorsMobile: React.FC<FourColorsMobileProps> = ({ isOpen, onCl
     }
   };
 
-  const handleNumberClick = (num: number) => {
+  const handleNumberClick = (num: number, closePopup: boolean = false) => {
     setSelectedNumbers(prev => {
       const updated = [...prev, num];
       // Manter apenas os últimos 60 números
       return updated.length > 60 ? updated.slice(-60) : updated;
     });
+    
+    if (closePopup) {
+      setShowNumberPopup(false);
+    }
   };
 
   const handleClear = () => {
@@ -209,7 +214,16 @@ export const FourColorsMobile: React.FC<FourColorsMobileProps> = ({ isOpen, onCl
         </div>
 
         <div className="bg-white rounded-lg p-4 mb-4">
-          <h2 className="text-sm font-bold text-gray-700 mb-3">Selecione os Números</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-gray-700">Selecione os Números</h2>
+            <button
+              onClick={() => setShowNumberPopup(true)}
+              className="text-green-600 hover:text-green-700 active:text-green-800 p-1 rounded-full hover:bg-green-50 transition-colors"
+              title="Seleção ampliada"
+            >
+              <Plus size={20} />
+            </button>
+          </div>
           <div className="grid grid-cols-9 gap-1">
             {/* Zero no topo - linha completa */}
             <button
@@ -344,6 +358,131 @@ export const FourColorsMobile: React.FC<FourColorsMobileProps> = ({ isOpen, onCl
           </div>
         </div>
       </div>
+
+      {showNumberPopup && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/70 z-[60]"
+            onClick={() => setShowNumberPopup(false)}
+          />
+          
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-auto">
+              <div className="sticky top-0 bg-green-700 p-4 flex items-center justify-between rounded-t-xl">
+                <h3 className="text-white font-bold text-lg">Selecionar Número</h3>
+                <button
+                  onClick={() => setShowNumberPopup(false)}
+                  className="text-white hover:text-green-300 transition-colors p-1"
+                  title="Fechar"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="p-4 space-y-3">
+                <div className="mb-2">
+                  <button
+                    onClick={() => handleNumberClick(0, true)}
+                    className="w-full h-16 flex items-center justify-center text-white font-bold text-2xl rounded-lg bg-green-400 hover:bg-green-500 active:bg-green-600 shadow-md transition-colors"
+                  >
+                    0
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {[1, 2, 3, 4, 5, 6].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleNumberClick(num, true)}
+                      className={cn(
+                        "aspect-square flex items-center justify-center text-white font-bold text-xl rounded-lg shadow-md transition-colors",
+                        getNumberColor(num)
+                      )}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {[7, 8, 9, 10, 11, 12].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleNumberClick(num, true)}
+                      className={cn(
+                        "aspect-square flex items-center justify-center text-white font-bold text-xl rounded-lg shadow-md transition-colors",
+                        getNumberColor(num)
+                      )}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {[13, 14, 15, 16, 17, 18].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleNumberClick(num, true)}
+                      className={cn(
+                        "aspect-square flex items-center justify-center text-white font-bold text-xl rounded-lg shadow-md transition-colors",
+                        getNumberColor(num)
+                      )}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {[19, 20, 21, 22, 23, 24].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleNumberClick(num, true)}
+                      className={cn(
+                        "aspect-square flex items-center justify-center text-white font-bold text-xl rounded-lg shadow-md transition-colors",
+                        getNumberColor(num)
+                      )}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {[25, 26, 27, 28, 29, 30].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleNumberClick(num, true)}
+                      className={cn(
+                        "aspect-square flex items-center justify-center text-white font-bold text-xl rounded-lg shadow-md transition-colors",
+                        getNumberColor(num)
+                      )}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {[31, 32, 33, 34, 35, 36].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => handleNumberClick(num, true)}
+                      className={cn(
+                        "aspect-square flex items-center justify-center text-white font-bold text-xl rounded-lg shadow-md transition-colors",
+                        getNumberColor(num)
+                      )}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

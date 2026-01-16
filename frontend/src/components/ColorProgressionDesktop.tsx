@@ -372,7 +372,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="flex justify-between items-center mb-2">
               <div className="text-xs text-gray-500">Progressão de Apostas</div>
-              <div className="text-xs font-bold text-gray-800">
+              <div className="text-xs text-gray-600">
                 Total: R$ {progression.reduce((sum, val) => sum + val, 0).toFixed(2)}
               </div>
             </div>
