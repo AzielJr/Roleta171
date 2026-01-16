@@ -87,7 +87,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 20px;
       margin-bottom: 40px;
     }
@@ -125,7 +125,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .stat-value {
-      font-size: 28px;
+      font-size: 22px;
       font-weight: 700;
       color: #1e293b;
     }
@@ -439,11 +439,9 @@ export const generateSessionReport = (data: SessionReportData): void => {
 
         <div class="stat-card">
           <div class="stat-label">Data da Operação</div>
-          <div class="stat-value" style="font-size: 20px;">${new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}</div>
+          <div class="stat-value" style="font-size: 16px; line-height: 1.3;">${new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}</div>
         </div>
-      </div>
 
-      <div class="stats-grid" style="grid-template-columns: 1fr; margin-bottom: 40px;">
         <div class="stat-card">
           <div class="stat-label">Valor de Entrada</div>
           <div class="stat-value">R$ ${data.entryValue.toFixed(2)}</div>
