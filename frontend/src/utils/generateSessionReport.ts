@@ -385,9 +385,15 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     @media print {
+      @page {
+        size: A4;
+        margin: 10mm;
+      }
+
       body {
         background: white;
         padding: 0;
+        margin: 0;
       }
 
       .print-button {
@@ -396,6 +402,140 @@ export const generateSessionReport = (data: SessionReportData): void => {
 
       .container {
         box-shadow: none;
+        border-radius: 0;
+        max-width: 100%;
+        page-break-inside: avoid;
+      }
+
+      .header {
+        padding: 20px;
+        page-break-after: avoid;
+      }
+
+      .header h1 {
+        font-size: 24px;
+      }
+
+      .content {
+        padding: 20px;
+      }
+
+      .stats-grid {
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .stat-card {
+        padding: 12px;
+        page-break-inside: avoid;
+      }
+
+      .stat-label {
+        font-size: 11px;
+      }
+
+      .stat-value {
+        font-size: 18px;
+      }
+
+      .time-info {
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .time-card {
+        padding: 12px;
+      }
+
+      .time-label {
+        font-size: 10px;
+      }
+
+      .time-value {
+        font-size: 18px;
+      }
+
+      .section {
+        margin-bottom: 20px;
+        page-break-inside: avoid;
+      }
+
+      .section-title {
+        font-size: 18px;
+        margin-bottom: 10px;
+      }
+
+      .numbers-container {
+        padding: 12px;
+        margin-bottom: 10px;
+      }
+
+      .numbers-grid {
+        max-height: none;
+      }
+
+      .number-chip {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+      }
+
+      .color-stats {
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .color-stat {
+        padding: 12px;
+      }
+
+      .color-stat-label {
+        font-size: 11px;
+      }
+
+      .color-stat-value {
+        font-size: 18px;
+      }
+
+      .win-loss-grid {
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .win-loss-card {
+        padding: 12px;
+      }
+
+      .win-loss-label {
+        font-size: 13px;
+      }
+
+      .win-loss-value {
+        font-size: 20px;
+      }
+
+      .win-loss-percentage {
+        font-size: 14px;
+      }
+
+      .win-loss-money {
+        font-size: 16px;
+      }
+
+      .chart-container {
+        padding: 12px;
+        margin-bottom: 20px;
+        page-break-inside: avoid;
+      }
+
+      .chart-title {
+        font-size: 14px;
+        margin-bottom: 10px;
+      }
+
+      .chart {
+        height: 250px;
+        padding: 10px;
       }
 
       .stat-card:hover,
@@ -560,7 +700,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
 
       const width = svg.clientWidth;
       const height = svg.clientHeight;
-      const padding = 40;
+      const padding = 60;
       const chartWidth = width - padding * 2;
       const chartHeight = height - padding * 2;
 
@@ -586,7 +726,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       svg.appendChild(line);
 
       const zeroText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      zeroText.setAttribute('x', padding - 10);
+      zeroText.setAttribute('x', padding - 15);
       zeroText.setAttribute('y', zeroY + 5);
       zeroText.setAttribute('text-anchor', 'end');
       zeroText.setAttribute('fill', '#64748b');
@@ -634,7 +774,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       });
 
       const maxText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      maxText.setAttribute('x', padding - 10);
+      maxText.setAttribute('x', padding - 15);
       maxText.setAttribute('y', padding + 5);
       maxText.setAttribute('text-anchor', 'end');
       maxText.setAttribute('fill', '#10b981');
@@ -644,7 +784,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       svg.appendChild(maxText);
 
       const minText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      minText.setAttribute('x', padding - 10);
+      minText.setAttribute('x', padding - 15);
       minText.setAttribute('y', height - padding + 5);
       minText.setAttribute('text-anchor', 'end');
       minText.setAttribute('fill', '#ef4444');
@@ -673,7 +813,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
           svg.appendChild(metricLine);
           
           const metricText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          metricText.setAttribute('x', padding - 10);
+          metricText.setAttribute('x', padding - 15);
           metricText.setAttribute('y', y + 4);
           metricText.setAttribute('text-anchor', 'end');
           metricText.setAttribute('fill', '#94a3b8');
