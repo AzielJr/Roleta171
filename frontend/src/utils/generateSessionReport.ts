@@ -1066,12 +1066,12 @@ export const generateSessionReport = (data: SessionReportData): void => {
       xAxisLabel.textContent = 'Numero de Apostas: ' + balanceHistory.length;
       svg.appendChild(xAxisLabel);
 
-      // Draw Y-axis label (vertical text) - positioned to not overlap values
+      // Draw Y-axis label (vertical text) - positioned far left to avoid overlap
       const yAxisLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      yAxisLabel.setAttribute('transform', \`translate(10, \${height / 2}) rotate(-90)\`);
+      yAxisLabel.setAttribute('transform', \`translate(5, \${height / 2}) rotate(-90)\`);
       yAxisLabel.setAttribute('text-anchor', 'middle');
       yAxisLabel.setAttribute('fill', '#64748b');
-      yAxisLabel.setAttribute('font-size', '11');
+      yAxisLabel.setAttribute('font-size', '10');
       yAxisLabel.setAttribute('font-weight', 'bold');
       yAxisLabel.textContent = 'Saldo';
       svg.appendChild(yAxisLabel);
