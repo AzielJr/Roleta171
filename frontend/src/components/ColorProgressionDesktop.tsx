@@ -72,9 +72,20 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
         setSelectedNumbers(prev => {
           const newSelectedNumbers = [lastNumber, ...prev];
           
-          // Se o número atual é zero, apenas avançar posição (não computar WIN/LOSS ainda)
+          // Se o número atual é zero, computar LOSS e avançar posição
           if (lastNumber === 0) {
+            const betValue = progression[currentPosition];
+            setCurrentBalance(cb => cb - betValue);
+            setLosses(l => l + 1);
+            
             const newPosition = currentPosition < 11 ? currentPosition + 1 : currentPosition;
+            setBetHistory(bh => [...bh, {
+              position: currentPosition,
+              balanceChange: -betValue,
+              wasWin: false,
+              betColor: currentBetColor
+            }]);
+            
             if (currentPosition < 11) {
               setCurrentPosition(newPosition);
             }
@@ -84,54 +95,13 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
           const lastColor = prev.length > 0 ? getNumberColor(prev[0]) : null;
           const currentColor = getNumberColor(lastNumber);
 
-          // Atualizar a cor da aposta (borda) se o número atual for vermelho ou preto
           const newBetColor = (currentColor === 'red' || currentColor === 'black') ? currentColor as 'red' | 'black' : currentBetColor;
           if (currentColor === 'red' || currentColor === 'black') {
             setCurrentBetColor(newBetColor);
           }
 
-          // Se o último número foi zero, comparar com a cor da aposta (borda)
-          if (lastColor === 'green' && currentColor !== 'green') {
-            if (currentBetColor && currentColor === currentBetColor) {
-              // WIN: número é da mesma cor da borda
-              const betValue = progression[currentPosition];
-              setCurrentBalance(cb => cb + betValue);
-              setWins(w => w + 1);
-              
-              const newPosition = currentPosition > 0 ? currentPosition - 1 : currentPosition;
-              setBetHistory(bh => [...bh, {
-                position: currentPosition,
-                balanceChange: betValue,
-                wasWin: true,
-                betColor: newBetColor
-              }]);
-              
-              if (currentPosition > 0) {
-                setCurrentPosition(newPosition);
-              }
-            } else if (currentBetColor) {
-              // LOSS: número não é da mesma cor da borda
-              const betValue = progression[currentPosition];
-              setCurrentBalance(cb => cb - betValue);
-              setLosses(l => l + 1);
-              
-              const newPosition = currentPosition < 11 ? currentPosition + 1 : currentPosition;
-              setBetHistory(bh => [...bh, {
-                position: currentPosition,
-                balanceChange: -betValue,
-                wasWin: false,
-                betColor: newBetColor
-              }]);
-              
-              if (currentPosition < 11) {
-                setCurrentPosition(newPosition);
-              }
-            }
-          }
-          // Lógica normal: comparar cores consecutivas (exceto quando vem de zero)
-          else if (lastColor && lastColor !== 'green' && currentColor !== 'green') {
+          if (lastColor && lastColor !== 'green' && currentColor !== 'green') {
             if (lastColor === currentColor) {
-              // WIN: mesma cor
               const betValue = progression[currentPosition];
               setCurrentBalance(cb => cb + betValue);
               setWins(w => w + 1);
@@ -148,7 +118,6 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                 setCurrentPosition(newPosition);
               }
             } else {
-              // LOSS: cores diferentes
               const betValue = progression[currentPosition];
               setCurrentBalance(cb => cb - betValue);
               setLosses(l => l + 1);

@@ -465,7 +465,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Estados para configurações do sistema
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [alertaPadrao171Ativo, setAlertaPadrao171Ativo] = useState(false);
-  const [avisosSonorosAtivos, setAvisosSonorosAtivos] = useState(true);
+  const [avisosSonorosAtivos, setAvisosSonorosAtivos] = useState(false);
   const [espanholEnabled, setEspanholEnabled] = useState(false);
   
 // Converter lastNumbers para Statistics e usar useStatistics
