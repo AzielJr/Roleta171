@@ -392,18 +392,18 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-                <div className="text-xs text-green-700 font-medium">Total Win</div>
+                <div className="text-xs text-green-700 font-medium mb-1">Total Win</div>
                 <div className="text-base font-bold text-green-700">
                   {wins} <span className="text-sm text-green-600">({winPercentage}%)</span>
+                  <span className="text-sm text-green-700 font-semibold ml-5">R$ {calculateWinValue().toFixed(2)}</span>
                 </div>
-                <div className="text-sm text-green-700 font-semibold">R$ {calculateWinValue().toFixed(2)}</div>
               </div>
               <div className="bg-red-50 rounded-lg p-3 border border-red-200">
-                <div className="text-xs text-red-700 font-medium">Total Loss</div>
+                <div className="text-xs text-red-700 font-medium mb-1">Total Loss</div>
                 <div className="text-base font-bold text-red-700">
                   {losses} <span className="text-sm text-red-600">({lossPercentage}%)</span>
+                  <span className="text-sm text-red-700 font-semibold ml-5">R$ {calculateLossValue().toFixed(2)}</span>
                 </div>
-                <div className="text-sm text-red-700 font-semibold">R$ {calculateLossValue().toFixed(2)}</div>
               </div>
             </div>
           </div>
