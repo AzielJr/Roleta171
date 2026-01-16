@@ -60,6 +60,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       border-radius: 20px;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
       overflow: hidden;
+      position: relative;
     }
 
     .header {
@@ -86,7 +87,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      grid-template-columns: repeat(2, 1fr);
       gap: 20px;
       margin-bottom: 40px;
     }
@@ -161,6 +162,26 @@ export const generateSessionReport = (data: SessionReportData): void => {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+      max-height: 168px;
+      overflow-y: auto;
+    }
+
+    .numbers-grid::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .numbers-grid::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 4px;
+    }
+
+    .numbers-grid::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    .numbers-grid::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
     }
 
     .number-chip {
@@ -217,7 +238,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
 
     .win-loss-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 20px;
       margin-bottom: 40px;
     }
@@ -308,11 +329,11 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .print-button {
-      position: fixed;
-      bottom: 30px;
-      right: 30px;
-      width: 60px;
-      height: 60px;
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
       border-radius: 50%;
       background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
       color: white;
@@ -416,13 +437,13 @@ export const generateSessionReport = (data: SessionReportData): void => {
           <div class="stat-value">R$ ${data.initialBalance.toFixed(2)}</div>
         </div>
 
-        <div class="stat-card ${data.operationResult >= 0 ? 'positive' : 'negative'}">
-          <div class="stat-label">Resultado da Operação</div>
-          <div class="stat-value ${data.operationResult >= 0 ? 'positive' : 'negative'}">
-            R$ ${data.operationResult.toFixed(2)}
-          </div>
+        <div class="stat-card">
+          <div class="stat-label">Data da Operação</div>
+          <div class="stat-value" style="font-size: 20px;">${new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}</div>
         </div>
+      </div>
 
+      <div class="stats-grid" style="grid-template-columns: 1fr; margin-bottom: 40px;">
         <div class="stat-card">
           <div class="stat-label">Valor de Entrada</div>
           <div class="stat-value">R$ ${data.entryValue.toFixed(2)}</div>
@@ -500,6 +521,13 @@ export const generateSessionReport = (data: SessionReportData): void => {
               <span>${data.losses}</span>
               <span class="win-loss-percentage">(${data.lossPercentage}%)</span>
               <span class="win-loss-money">R$ ${data.lossValue.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div class="win-loss-card ${data.operationResult >= 0 ? 'win' : 'loss'}">
+            <div class="win-loss-label ${data.operationResult >= 0 ? 'win' : 'loss'}">Resultado da Operação</div>
+            <div class="win-loss-value ${data.operationResult >= 0 ? 'win' : 'loss'}">
+              <span style="font-size: 32px;">R$ ${data.operationResult.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -627,30 +655,34 @@ export const generateSessionReport = (data: SessionReportData): void => {
       minText.textContent = \`R$ \${minBalance.toFixed(2)}\`;
       svg.appendChild(minText);
 
-      // Add intermediate metric labels on the left side
-      const quarterRange = range / 4;
-      for (let i = 1; i <= 3; i++) {
-        const value = maxBalance - (quarterRange * i);
-        const y = padding + (chartHeight * i / 4);
+      // Add intermediate metric labels on the left side with better spacing
+      const numIntermediateLines = 2;
+      const stepRange = range / (numIntermediateLines + 1);
+      for (let i = 1; i <= numIntermediateLines; i++) {
+        const value = maxBalance - (stepRange * i);
+        const y = padding + (chartHeight * i / (numIntermediateLines + 1));
         
-        const metricLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        metricLine.setAttribute('x1', padding);
-        metricLine.setAttribute('y1', y);
-        metricLine.setAttribute('x2', width - padding);
-        metricLine.setAttribute('y2', y);
-        metricLine.setAttribute('stroke', '#e2e8f0');
-        metricLine.setAttribute('stroke-width', '1');
-        metricLine.setAttribute('stroke-dasharray', '3,3');
-        svg.appendChild(metricLine);
-        
-        const metricText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        metricText.setAttribute('x', padding - 10);
-        metricText.setAttribute('y', y + 4);
-        metricText.setAttribute('text-anchor', 'end');
-        metricText.setAttribute('fill', '#94a3b8');
-        metricText.setAttribute('font-size', '11');
-        metricText.textContent = \`R$ \${value.toFixed(2)}\`;
-        svg.appendChild(metricText);
+        // Only add line if it's not too close to zero line
+        if (Math.abs(y - zeroY) > 20) {
+          const metricLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          metricLine.setAttribute('x1', padding);
+          metricLine.setAttribute('y1', y);
+          metricLine.setAttribute('x2', width - padding);
+          metricLine.setAttribute('y2', y);
+          metricLine.setAttribute('stroke', '#e2e8f0');
+          metricLine.setAttribute('stroke-width', '1');
+          metricLine.setAttribute('stroke-dasharray', '3,3');
+          svg.appendChild(metricLine);
+          
+          const metricText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          metricText.setAttribute('x', padding - 10);
+          metricText.setAttribute('y', y + 4);
+          metricText.setAttribute('text-anchor', 'end');
+          metricText.setAttribute('fill', '#94a3b8');
+          metricText.setAttribute('font-size', '10');
+          metricText.textContent = \`R$ \${value.toFixed(2)}\`;
+          svg.appendChild(metricText);
+        }
       }
 
       // Add summary metrics on the right side
