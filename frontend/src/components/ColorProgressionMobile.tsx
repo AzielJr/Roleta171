@@ -482,16 +482,16 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
               <div className="text-[10px] text-gray-500 mb-1">Metas Sugeridas</div>
               <div className="grid grid-cols-4 gap-1.5">
                 {[
-                  { percentage: 2.34, label: '2,34%' },
-                  { percentage: 3.73, label: '3,73%' },
-                  { percentage: 4.73, label: '4,73%' },
-                  { percentage: 10.00, label: '10,00%' }
+                  { percentage: 2.34, label: '2,34%', bg: 'from-blue-50 to-blue-100', border: 'border-blue-400', text: 'text-blue-800', valueText: 'text-blue-900' },
+                  { percentage: 3.73, label: '3,73%', bg: 'from-blue-300 to-blue-400', border: 'border-blue-500', text: 'text-blue-900', valueText: 'text-blue-950' },
+                  { percentage: 4.73, label: '4,73%', bg: 'from-blue-500 to-blue-600', border: 'border-blue-700', text: 'text-blue-50', valueText: 'text-white' },
+                  { percentage: 10.00, label: '10,00%', bg: 'from-blue-800 to-blue-900', border: 'border-blue-950', text: 'text-blue-100', valueText: 'text-white' }
                 ].map((goal, idx) => {
                   const targetValue = balance * (goal.percentage / 100);
                   return (
-                    <div key={idx} className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-1.5 border-2 border-green-500 text-center">
-                      <div className="text-[9px] text-green-700 font-semibold">{goal.label}</div>
-                      <div className="text-[11px] text-green-800 font-bold">R$ {targetValue.toFixed(2)}</div>
+                    <div key={idx} className={`bg-gradient-to-br ${goal.bg} rounded-lg p-1.5 border-2 ${goal.border} text-center`}>
+                      <div className={`text-[9px] ${goal.text} font-semibold`}>{goal.label}</div>
+                      <div className={`text-[11px] ${goal.valueText} font-bold`}>R$ {targetValue.toFixed(2)}</div>
                     </div>
                   );
                 })}

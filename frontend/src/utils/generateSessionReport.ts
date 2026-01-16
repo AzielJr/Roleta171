@@ -390,25 +390,52 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .goal-card {
-      background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
       border-radius: 8px;
       padding: 12px;
       text-align: center;
-      border: 2px solid #10b981;
+      border: 2px solid;
+    }
+
+    .goal-card.shade-1 {
+      background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+      border-color: #60a5fa;
+    }
+
+    .goal-card.shade-2 {
+      background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%);
+      border-color: #3b82f6;
+    }
+
+    .goal-card.shade-3 {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      border-color: #1d4ed8;
+    }
+
+    .goal-card.shade-4 {
+      background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+      border-color: #1e3a8a;
     }
 
     .goal-percentage {
       font-size: 11px;
-      color: #065f46;
       font-weight: 600;
       margin-bottom: 6px;
     }
 
+    .goal-percentage.shade-1 { color: #1e40af; }
+    .goal-percentage.shade-2 { color: #1e3a8a; }
+    .goal-percentage.shade-3 { color: #dbeafe; }
+    .goal-percentage.shade-4 { color: #dbeafe; }
+
     .goal-value {
       font-size: 16px;
       font-weight: 700;
-      color: #047857;
     }
+
+    .goal-value.shade-1 { color: #1e40af; }
+    .goal-value.shade-2 { color: #1e3a8a; }
+    .goal-value.shade-3 { color: #ffffff; }
+    .goal-value.shade-4 { color: #ffffff; }
 
     .pdf-buttons {
       position: absolute;
@@ -787,16 +814,16 @@ export const generateSessionReport = (data: SessionReportData): void => {
         <div class="goals-container">
           <div class="goals-grid">
             ${[
-              { percentage: 2.34, label: '2,34%' },
-              { percentage: 3.73, label: '3,73%' },
-              { percentage: 4.73, label: '4,73%' },
-              { percentage: 10.00, label: '10,00%' }
+              { percentage: 2.34, label: '2,34%', shade: 1 },
+              { percentage: 3.73, label: '3,73%', shade: 2 },
+              { percentage: 4.73, label: '4,73%', shade: 3 },
+              { percentage: 10.00, label: '10,00%', shade: 4 }
             ].map(goal => {
               const targetValue = data.initialBalance * (goal.percentage / 100);
               return `
-                <div class="goal-card">
-                  <div class="goal-percentage">${goal.label}</div>
-                  <div class="goal-value">R$ ${targetValue.toFixed(2)}</div>
+                <div class="goal-card shade-${goal.shade}">
+                  <div class="goal-percentage shade-${goal.shade}">${goal.label}</div>
+                  <div class="goal-value shade-${goal.shade}">R$ ${targetValue.toFixed(2)}</div>
                 </div>
               `;
             }).join('')}
