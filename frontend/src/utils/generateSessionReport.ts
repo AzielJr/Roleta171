@@ -39,7 +39,8 @@ export const generateSessionReport = (data: SessionReportData): void => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resumo da Sessão de Apostas - Roleta 171</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -741,67 +742,90 @@ export const generateSessionReport = (data: SessionReportData): void => {
   </div>
 
   <script>
-    // PDF Generation
-    document.getElementById('downloadPdfBtn').addEventListener('click', function() {
+    // PDF Generation with jsPDF + html2canvas
+    document.getElementById('downloadPdfBtn').addEventListener('click', async function() {
       const button = this;
       button.disabled = true;
       button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
       
-      // Hide buttons before capturing
-      const buttons = document.querySelector('.pdf-buttons');
-      buttons.style.display = 'none';
-      
-      const element = document.querySelector('.container');
-      
-      // Get actual element dimensions
-      const elementHeight = element.scrollHeight;
-      const elementWidth = element.scrollWidth;
-      
-      // A4 dimensions in mm
-      const a4Width = 210;
-      const a4Height = 297;
-      const margin = 8;
-      const contentWidth = a4Width - (margin * 2);
-      const contentHeight = a4Height - (margin * 2);
-      
-      // Calculate scale to fit content on one page
-      const scaleX = contentWidth / (elementWidth * 0.264583); // px to mm conversion
-      const scaleY = contentHeight / (elementHeight * 0.264583);
-      const scale = Math.min(scaleX, scaleY, 1.2); // Cap at 1.2 for quality
-      
-      const opt = {
-        margin: margin,
-        filename: 'resumo-sessao-apostas-' + new Date().toISOString().split('T')[0] + '.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-          scale: scale,
-          useCORS: true, 
+      try {
+        // Hide buttons before capturing
+        const buttons = document.querySelector('.pdf-buttons');
+        buttons.style.display = 'none';
+        
+        const element = document.querySelector('.container');
+        
+        // Capture the element as canvas
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
           logging: false,
-          width: elementWidth,
-          height: elementHeight,
-          windowWidth: elementWidth,
-          windowHeight: elementHeight
-        },
-        jsPDF: { 
-          unit: 'mm', 
-          format: 'a4', 
+          backgroundColor: '#ffffff'
+        });
+        
+        // A4 dimensions in mm
+        const a4Width = 210;
+        const a4Height = 297;
+        const margin = 10;
+        
+        // Available space for content
+        const contentWidth = a4Width - (margin * 2);
+        const contentHeight = a4Height - (margin * 2);
+        
+        // Canvas dimensions in pixels
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        
+        // Calculate aspect ratio
+        const canvasRatio = canvasHeight / canvasWidth;
+        const contentRatio = contentHeight / contentWidth;
+        
+        // Calculate final dimensions to fit in A4
+        let finalWidth, finalHeight;
+        if (canvasRatio > contentRatio) {
+          // Height is the limiting factor
+          finalHeight = contentHeight;
+          finalWidth = finalHeight / canvasRatio;
+        } else {
+          // Width is the limiting factor
+          finalWidth = contentWidth;
+          finalHeight = finalWidth * canvasRatio;
+        }
+        
+        // Center the content
+        const xOffset = margin + (contentWidth - finalWidth) / 2;
+        const yOffset = margin;
+        
+        // Create PDF
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
           orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
           compress: true
-        },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-      };
-      
-      html2pdf().set(opt).from(element).save().then(function() {
+        });
+        
+        // Add image to PDF
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        pdf.addImage(imgData, 'JPEG', xOffset, yOffset, finalWidth, finalHeight);
+        
+        // Save PDF
+        const filename = 'resumo-sessao-apostas-' + new Date().toISOString().split('T')[0] + '.pdf';
+        pdf.save(filename);
+        
+        // Restore buttons
         buttons.style.display = 'flex';
         button.disabled = false;
         button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
-      }).catch(function(error) {
+        
+      } catch (error) {
         console.error('PDF generation error:', error);
+        const buttons = document.querySelector('.pdf-buttons');
         buttons.style.display = 'flex';
         button.disabled = false;
         button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
-        alert('Erro ao gerar PDF. Tente novamente.');
-      });
+        alert('Erro ao gerar PDF: ' + error.message);
+      }
     });
 
     function drawChart() {
