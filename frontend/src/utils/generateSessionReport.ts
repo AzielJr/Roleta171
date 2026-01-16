@@ -349,7 +349,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
 
     .progression-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      grid-template-columns: repeat(12, 1fr);
       gap: 8px;
     }
 
@@ -369,9 +369,11 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .progression-value {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       color: #78350f;
+      word-break: keep-all;
+      white-space: nowrap;
     }
 
     .pdf-buttons {
@@ -754,7 +756,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
             ${data.betProgression.map((value, index) => `
               <div class="progression-item">
                 <div class="progression-number">#${index + 1}</div>
-                <div class="progression-value">R$ ${value.toFixed(2)}</div>
+                <div class="progression-value">${value.toFixed(2)}</div>
               </div>
             `).join('')}
           </div>
@@ -1064,15 +1066,14 @@ export const generateSessionReport = (data: SessionReportData): void => {
       xAxisLabel.textContent = 'Numero de Apostas: ' + balanceHistory.length;
       svg.appendChild(xAxisLabel);
 
+      // Draw Y-axis label (vertical text) - positioned to not overlap values
       const yAxisLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      yAxisLabel.setAttribute('x', -height / 2);
-      yAxisLabel.setAttribute('y', 15);
+      yAxisLabel.setAttribute('transform', \`translate(10, \${height / 2}) rotate(-90)\`);
       yAxisLabel.setAttribute('text-anchor', 'middle');
       yAxisLabel.setAttribute('fill', '#64748b');
-      yAxisLabel.setAttribute('font-size', '14');
-      yAxisLabel.setAttribute('font-weight', '600');
-      yAxisLabel.setAttribute('transform', \`rotate(-90 0 0)\`);
-      yAxisLabel.textContent = 'Saldo (R$)';
+      yAxisLabel.setAttribute('font-size', '11');
+      yAxisLabel.setAttribute('font-weight', 'bold');
+      yAxisLabel.textContent = 'Saldo';
       svg.appendChild(yAxisLabel);
     }
 
