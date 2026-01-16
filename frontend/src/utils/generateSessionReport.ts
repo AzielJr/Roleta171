@@ -50,7 +50,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 20px;
+      padding: 10px;
       min-height: 100vh;
     }
 
@@ -83,7 +83,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .content {
-      padding: 20px;
+      padding: 15px;
     }
 
     .stats-grid {
@@ -329,7 +329,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       height: 250px;
       background: white;
       border-radius: 6px;
-      padding: 12px;
+      padding: 8px;
       border: 1px solid #e2e8f0;
     }
 
@@ -343,6 +343,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       top: 20px;
       right: 20px;
       display: flex;
+      flex-direction: column;
       gap: 10px;
       z-index: 1000;
     }
@@ -615,7 +616,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
 
         <div class="stat-card">
           <div class="stat-label">Data da Operação</div>
-          <div class="stat-value" style="font-size: 16px; line-height: 1.3;">${new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}</div>
+          <div class="stat-value" style="font-size: 13px; line-height: 1.2;">${new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}</div>
         </div>
 
         <div class="stat-card">
@@ -723,6 +724,13 @@ export const generateSessionReport = (data: SessionReportData): void => {
   </div>
 
   <div class="pdf-buttons">
+    <button class="pdf-button" onclick="window.print()" title="Imprimir">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+        <rect x="6" y="14" width="12" height="8"></rect>
+      </svg>
+    </button>
     <button class="pdf-button" id="downloadPdfBtn" title="Baixar PDF">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -741,10 +749,10 @@ export const generateSessionReport = (data: SessionReportData): void => {
       
       const element = document.querySelector('.container');
       const opt = {
-        margin: 5,
+        margin: [5, 3, 5, 3],
         filename: 'resumo-sessao-apostas-' + new Date().toISOString().split('T')[0] + '.pdf',
         image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 1.5, useCORS: true, logging: false },
+        html2canvas: { scale: 1.5, useCORS: true, logging: false, windowWidth: 1200 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: 'avoid-all' }
       };
