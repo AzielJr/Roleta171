@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Target } from 'lucide-react';
+import { X, Target, ChevronUp, ChevronDown } from 'lucide-react';
 import { useBalance } from '../contexts/BalanceContext';
 
 interface ColorProgressionDesktopProps {
@@ -10,8 +10,8 @@ interface ColorProgressionDesktopProps {
 
 export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = ({ isOpen, onClose, lastNumbers }) => {
   const { balance } = useBalance();
-  const [entryValue, setEntryValue] = useState<number>(1);
-  const [entryValueInput, setEntryValueInput] = useState<string>('1');
+  const [entryValue, setEntryValue] = useState<number>(0.5);
+  const [entryValueInput, setEntryValueInput] = useState<string>('0,50');
   const [currentBalance, setCurrentBalance] = useState<number>(0);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [currentPosition, setCurrentPosition] = useState<number>(0);
@@ -284,29 +284,57 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
             </div>
             <div className="text-right">
               <div className="text-xs text-gray-500 mb-1">Valor de Entrada</div>
-              <input
-                type="text"
-                value={entryValueInput}
-                onChange={(e) => {
-                  const input = e.target.value;
-                  setEntryValueInput(input);
-                  
-                  const cleaned = input.replace(/[^\d,.-]/g, '');
-                  let val = 0;
-                  if (cleaned.includes(',')) {
-                    val = parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
-                  } else {
-                    val = parseFloat(cleaned) || 0;
-                  }
-                  
-                  if (val > 0) {
-                    setEntryValue(val);
-                    setCurrentPosition(0);
-                  }
-                }}
-                className="text-sm font-bold text-gray-800 text-right border border-gray-300 rounded px-2 py-1 w-full"
-                placeholder="0.00"
-              />
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={entryValueInput}
+                  onChange={(e) => {
+                    const input = e.target.value;
+                    setEntryValueInput(input);
+                    
+                    const cleaned = input.replace(/[^\d,.-]/g, '');
+                    let val = 0;
+                    if (cleaned.includes(',')) {
+                      val = parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+                    } else {
+                      val = parseFloat(cleaned) || 0;
+                    }
+                    
+                    if (val > 0) {
+                      setEntryValue(val);
+                      setCurrentPosition(0);
+                    }
+                  }}
+                  className="text-sm font-bold text-gray-800 text-right border border-gray-300 rounded px-2 py-1 w-full"
+                  placeholder="0,50"
+                />
+                <div className="flex flex-col">
+                  <button
+                    onClick={() => {
+                      const newValue = Math.round((entryValue + 0.5) * 100) / 100;
+                      setEntryValue(newValue);
+                      setEntryValueInput(newValue.toFixed(2).replace('.', ','));
+                      setCurrentPosition(0);
+                    }}
+                    className="text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded p-0.5 transition-colors"
+                    title="Aumentar R$ 0,50"
+                  >
+                    <ChevronUp size={14} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newValue = Math.max(0.5, Math.round((entryValue - 0.5) * 100) / 100);
+                      setEntryValue(newValue);
+                      setEntryValueInput(newValue.toFixed(2).replace('.', ','));
+                      setCurrentPosition(0);
+                    }}
+                    className="text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded p-0.5 transition-colors"
+                    title="Diminuir R$ 0,50"
+                  >
+                    <ChevronDown size={14} />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
