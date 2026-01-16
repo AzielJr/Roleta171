@@ -809,9 +809,10 @@ export const generateSessionReport = (data: SessionReportData): void => {
         const imgData = canvas.toDataURL('image/jpeg', 0.95);
         pdf.addImage(imgData, 'JPEG', xOffset, yOffset, finalWidth, finalHeight);
         
-        // Save PDF
-        const filename = 'resumo-sessao-apostas-' + new Date().toISOString().split('T')[0] + '.pdf';
-        pdf.save(filename);
+        // Open PDF in new tab instead of downloading
+        const pdfBlob = pdf.output('blob');
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        window.open(pdfUrl, '_blank');
         
         // Restore buttons
         buttons.style.display = 'flex';
