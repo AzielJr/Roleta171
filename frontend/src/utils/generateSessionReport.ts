@@ -884,9 +884,12 @@ export const generateSessionReport = (data: SessionReportData): void => {
 
       const width = svg.clientWidth;
       const height = svg.clientHeight;
-      const padding = 60;
-      const chartWidth = width - padding * 2;
-      const chartHeight = height - padding * 2;
+      const paddingLeft = 70;
+      const paddingRight = 60;
+      const paddingTop = 60;
+      const paddingBottom = 60;
+      const chartWidth = width - paddingLeft - paddingRight;
+      const chartHeight = height - paddingTop - paddingBottom;
 
       svg.innerHTML = '';
 
@@ -897,12 +900,12 @@ export const generateSessionReport = (data: SessionReportData): void => {
       const xStep = chartWidth / (balanceHistory.length - 1 || 1);
       const yScale = chartHeight / range;
 
-      const zeroY = padding + (maxBalance * yScale);
+      const zeroY = paddingTop + (maxBalance * yScale);
 
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', padding);
+      line.setAttribute('x1', paddingLeft);
       line.setAttribute('y1', zeroY);
-      line.setAttribute('x2', width - padding);
+      line.setAttribute('x2', width - paddingRight);
       line.setAttribute('y2', zeroY);
       line.setAttribute('stroke', '#94a3b8');
       line.setAttribute('stroke-width', '2');
@@ -910,7 +913,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       svg.appendChild(line);
 
       const zeroText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      zeroText.setAttribute('x', padding - 15);
+      zeroText.setAttribute('x', paddingLeft - 10);
       zeroText.setAttribute('y', zeroY + 5);
       zeroText.setAttribute('text-anchor', 'end');
       zeroText.setAttribute('fill', '#64748b');
@@ -920,8 +923,8 @@ export const generateSessionReport = (data: SessionReportData): void => {
 
       let pathData = '';
       balanceHistory.forEach((balance, index) => {
-        const x = padding + (index * xStep);
-        const y = padding + ((maxBalance - balance) * yScale);
+        const x = paddingLeft + (index * xStep);
+        const y = paddingTop + ((maxBalance - balance) * yScale);
         
         if (index === 0) {
           pathData += \`M \${x} \${y}\`;
@@ -940,8 +943,8 @@ export const generateSessionReport = (data: SessionReportData): void => {
       svg.appendChild(path);
 
       balanceHistory.forEach((balance, index) => {
-        const x = padding + (index * xStep);
-        const y = padding + ((maxBalance - balance) * yScale);
+        const x = paddingLeft + (index * xStep);
+        const y = paddingTop + ((maxBalance - balance) * yScale);
 
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         circle.setAttribute('cx', x);
@@ -958,8 +961,8 @@ export const generateSessionReport = (data: SessionReportData): void => {
       });
 
       const maxText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      maxText.setAttribute('x', padding - 15);
-      maxText.setAttribute('y', padding + 5);
+      maxText.setAttribute('x', paddingLeft - 10);
+      maxText.setAttribute('y', paddingTop + 5);
       maxText.setAttribute('text-anchor', 'end');
       maxText.setAttribute('fill', '#10b981');
       maxText.setAttribute('font-size', '12');
@@ -968,8 +971,8 @@ export const generateSessionReport = (data: SessionReportData): void => {
       svg.appendChild(maxText);
 
       const minText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      minText.setAttribute('x', padding - 15);
-      minText.setAttribute('y', height - padding + 5);
+      minText.setAttribute('x', paddingLeft - 10);
+      minText.setAttribute('y', height - paddingBottom + 5);
       minText.setAttribute('text-anchor', 'end');
       minText.setAttribute('fill', '#ef4444');
       minText.setAttribute('font-size', '12');
@@ -982,14 +985,14 @@ export const generateSessionReport = (data: SessionReportData): void => {
       const stepRange = range / (numIntermediateLines + 1);
       for (let i = 1; i <= numIntermediateLines; i++) {
         const value = maxBalance - (stepRange * i);
-        const y = padding + (chartHeight * i / (numIntermediateLines + 1));
+        const y = paddingTop + (chartHeight * i / (numIntermediateLines + 1));
         
         // Only add line if it's not too close to zero line
         if (Math.abs(y - zeroY) > 20) {
           const metricLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          metricLine.setAttribute('x1', padding);
+          metricLine.setAttribute('x1', paddingLeft);
           metricLine.setAttribute('y1', y);
-          metricLine.setAttribute('x2', width - padding);
+          metricLine.setAttribute('x2', width - paddingRight);
           metricLine.setAttribute('y2', y);
           metricLine.setAttribute('stroke', '#e2e8f0');
           metricLine.setAttribute('stroke-width', '1');
@@ -997,7 +1000,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
           svg.appendChild(metricLine);
           
           const metricText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          metricText.setAttribute('x', padding - 15);
+          metricText.setAttribute('x', paddingLeft - 10);
           metricText.setAttribute('y', y + 4);
           metricText.setAttribute('text-anchor', 'end');
           metricText.setAttribute('fill', '#94a3b8');
@@ -1013,10 +1016,10 @@ export const generateSessionReport = (data: SessionReportData): void => {
       const profitLossText = finalBalance >= 0 ? 'Lucro' : 'Prejuízo';
       const profitLossColor = finalBalance >= 0 ? '#10b981' : '#ef4444';
       
-      const summaryY = padding + 20;
+      const summaryY = paddingTop + 20;
       
       const summaryBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      summaryBg.setAttribute('x', width - padding - 150);
+      summaryBg.setAttribute('x', width - paddingRight - 150);
       summaryBg.setAttribute('y', summaryY - 15);
       summaryBg.setAttribute('width', '140');
       summaryBg.setAttribute('height', '80');
@@ -1027,7 +1030,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       svg.appendChild(summaryBg);
       
       const summaryTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      summaryTitle.setAttribute('x', width - padding - 80);
+      summaryTitle.setAttribute('x', width - paddingRight - 80);
       summaryTitle.setAttribute('y', summaryY);
       summaryTitle.setAttribute('text-anchor', 'middle');
       summaryTitle.setAttribute('fill', '#64748b');
@@ -1037,7 +1040,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       svg.appendChild(summaryTitle);
       
       const summaryValue = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      summaryValue.setAttribute('x', width - padding - 80);
+      summaryValue.setAttribute('x', width - paddingRight - 80);
       summaryValue.setAttribute('y', summaryY + 25);
       summaryValue.setAttribute('text-anchor', 'middle');
       summaryValue.setAttribute('fill', profitLossColor);
@@ -1047,7 +1050,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       svg.appendChild(summaryValue);
       
       const summaryPercentage = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      summaryPercentage.setAttribute('x', width - padding - 80);
+      summaryPercentage.setAttribute('x', width - paddingRight - 80);
       summaryPercentage.setAttribute('y', summaryY + 45);
       summaryPercentage.setAttribute('text-anchor', 'middle');
       summaryPercentage.setAttribute('fill', profitLossColor);

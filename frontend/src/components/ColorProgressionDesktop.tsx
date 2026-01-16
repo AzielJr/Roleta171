@@ -228,7 +228,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                 initialBalance: balance,
                 operationResult: currentBalance,
                 entryValue: entryValue,
-                selectedNumbers: selectedNumbers.slice().reverse(),
+                selectedNumbers: selectedNumbers,
                 startTime: startTime || '--:--:--',
                 endTime: endTime,
                 totalDuration: startTime ? calculateDuration(startTime, endTime) : '0m 0s',
