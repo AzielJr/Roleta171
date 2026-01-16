@@ -747,19 +747,60 @@ export const generateSessionReport = (data: SessionReportData): void => {
       button.disabled = true;
       button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
       
+      // Hide buttons before capturing
+      const buttons = document.querySelector('.pdf-buttons');
+      buttons.style.display = 'none';
+      
       const element = document.querySelector('.container');
+      
+      // Get actual element dimensions
+      const elementHeight = element.scrollHeight;
+      const elementWidth = element.scrollWidth;
+      
+      // A4 dimensions in mm
+      const a4Width = 210;
+      const a4Height = 297;
+      const margin = 8;
+      const contentWidth = a4Width - (margin * 2);
+      const contentHeight = a4Height - (margin * 2);
+      
+      // Calculate scale to fit content on one page
+      const scaleX = contentWidth / (elementWidth * 0.264583); // px to mm conversion
+      const scaleY = contentHeight / (elementHeight * 0.264583);
+      const scale = Math.min(scaleX, scaleY, 1.2); // Cap at 1.2 for quality
+      
       const opt = {
-        margin: [5, 3, 5, 3],
+        margin: margin,
         filename: 'resumo-sessao-apostas-' + new Date().toISOString().split('T')[0] + '.pdf',
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 1.5, useCORS: true, logging: false, windowWidth: 1200 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: 'avoid-all' }
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: scale,
+          useCORS: true, 
+          logging: false,
+          width: elementWidth,
+          height: elementHeight,
+          windowWidth: elementWidth,
+          windowHeight: elementHeight
+        },
+        jsPDF: { 
+          unit: 'mm', 
+          format: 'a4', 
+          orientation: 'portrait',
+          compress: true
+        },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
       
       html2pdf().set(opt).from(element).save().then(function() {
+        buttons.style.display = 'flex';
         button.disabled = false;
         button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
+      }).catch(function(error) {
+        console.error('PDF generation error:', error);
+        buttons.style.display = 'flex';
+        button.disabled = false;
+        button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
+        alert('Erro ao gerar PDF. Tente novamente.');
       });
     });
 
