@@ -18,6 +18,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   const [wins, setWins] = useState<number>(0);
   const [losses, setLosses] = useState<number>(0);
   const [currentBetColor, setCurrentBetColor] = useState<'red' | 'black' | null>(null);
+  const [lastWasZero, setLastWasZero] = useState<boolean>(false);
   const [betHistory, setBetHistory] = useState<Array<{
     position: number;
     balanceChange: number;
@@ -72,11 +73,12 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
         setSelectedNumbers(prev => {
           const newSelectedNumbers = [lastNumber, ...prev];
           
-          // Se o número atual é zero, computar LOSS e avançar posição
+          // Se o número atual é zero, computar LOSS, avançar posição e marcar que saiu zero
           if (lastNumber === 0) {
             const betValue = progression[currentPosition];
             setCurrentBalance(cb => cb - betValue);
             setLosses(l => l + 1);
+            setLastWasZero(true);
             
             const newPosition = currentPosition < 11 ? currentPosition + 1 : currentPosition;
             setBetHistory(bh => [...bh, {
@@ -98,6 +100,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
           const newBetColor = (currentColor === 'red' || currentColor === 'black') ? currentColor as 'red' | 'black' : currentBetColor;
           if (currentColor === 'red' || currentColor === 'black') {
             setCurrentBetColor(newBetColor);
+            setLastWasZero(false);
           }
 
           if (lastColor && lastColor !== 'green' && currentColor !== 'green') {
@@ -410,7 +413,9 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                 <div key={idx} className="relative">
                   <div className={`p-2 rounded text-center font-bold ${
                     currentPosition === idx 
-                      ? currentBetColor === 'red' 
+                      ? lastWasZero
+                        ? 'bg-yellow-200 text-gray-800 border-4 border-green-600'
+                        : currentBetColor === 'red' 
                         ? 'bg-yellow-200 text-gray-800 border-4 border-red-600' 
                         : currentBetColor === 'black'
                         ? 'bg-yellow-200 text-gray-800 border-4 border-gray-800'
@@ -422,7 +427,9 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                   </div>
                   {currentPosition === idx && (
                     <div className={`absolute -bottom-1.5 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent ${
-                      currentBetColor === 'red' 
+                      lastWasZero
+                        ? 'border-t-green-600'
+                        : currentBetColor === 'red' 
                         ? 'border-t-red-600' 
                         : currentBetColor === 'black'
                         ? 'border-t-gray-800'
@@ -444,6 +451,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                 setCurrentBalance(0);
                 setBetHistory([]);
                 setCurrentBetColor(null);
+                setLastWasZero(false);
               }}
               className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold text-sm transition-colors"
             >

@@ -17,6 +17,7 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
   const [wins, setWins] = useState<number>(0);
   const [losses, setLosses] = useState<number>(0);
   const [currentBetColor, setCurrentBetColor] = useState<'red' | 'black' | null>(null);
+  const [lastWasZero, setLastWasZero] = useState<boolean>(false);
   const [betHistory, setBetHistory] = useState<Array<{
     position: number;
     balanceChange: number;
@@ -81,6 +82,7 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
       const betValue = progression[currentPosition];
       setCurrentBalance(currentBalance - betValue);
       setLosses(losses + 1);
+      setLastWasZero(true);
       
       const newPosition = currentPosition < 11 ? currentPosition + 1 : currentPosition;
       setBetHistory([...betHistory, {
@@ -102,6 +104,7 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
     const newBetColor = (currentColor === 'red' || currentColor === 'black') ? currentColor as 'red' | 'black' : currentBetColor;
     if (currentColor === 'red' || currentColor === 'black') {
       setCurrentBetColor(newBetColor);
+      setLastWasZero(false);
     }
 
     if (lastColor && lastColor !== 'green' && currentColor !== 'green') {
@@ -405,7 +408,9 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
                   <div key={idx} className="relative">
                     <div className={`p-1.5 rounded text-center font-bold ${
                       currentPosition === idx 
-                        ? currentBetColor === 'red' 
+                        ? lastWasZero
+                          ? 'bg-yellow-200 text-gray-800 border-[3px] border-green-600'
+                          : currentBetColor === 'red' 
                           ? 'bg-yellow-200 text-gray-800 border-[3px] border-red-600' 
                           : currentBetColor === 'black'
                           ? 'bg-yellow-200 text-gray-800 border-[3px] border-gray-800'
@@ -417,7 +422,9 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
                     </div>
                     {currentPosition === idx && (
                       <div className={`absolute -bottom-1.5 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent ${
-                        currentBetColor === 'red' 
+                        lastWasZero
+                          ? 'border-t-green-600'
+                          : currentBetColor === 'red' 
                           ? 'border-t-red-600' 
                           : currentBetColor === 'black'
                           ? 'border-t-gray-800'
@@ -439,6 +446,7 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
                   setCurrentBalance(0);
                   setBetHistory([]);
                   setCurrentBetColor(null);
+                  setLastWasZero(false);
                 }}
                 className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold text-sm active:bg-red-800"
               >
