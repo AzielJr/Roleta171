@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Target, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, Target, ChevronUp, ChevronDown, FileText } from 'lucide-react';
 import { useBalance } from '../contexts/BalanceContext';
+import { generateSessionReport } from '../utils/generateSessionReport';
 
 interface ColorProgressionDesktopProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
     betColor: 'red' | 'black' | null;
   }>>([]);
   const [showGoalsPopup, setShowGoalsPopup] = useState<boolean>(false);
+  const [startTime, setStartTime] = useState<string>('');
 
   const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
   const blackNumbers = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
@@ -58,6 +60,10 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
     });
     
     if (lastNumbers.length > 0 && isOpen) {
+      if (selectedNumbers.length === 0 && !startTime) {
+        const now = new Date();
+        setStartTime(now.toLocaleTimeString('pt-BR'));
+      }
       const lastNumber = lastNumbers[lastNumbers.length - 1]; // Pegar o ÚLTIMO número, não o primeiro
       
       console.log('[ColorProgressionDesktop] Checking number', { 
@@ -193,6 +199,59 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-bold text-gray-800">Progressão de Cores</h3>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const now = new Date();
+              const endTime = now.toLocaleTimeString('pt-BR');
+              
+              const calculateDuration = (start: string, end: string): string => {
+                try {
+                  const startDate = new Date(`1970-01-01 ${start}`);
+                  const endDate = new Date(`1970-01-01 ${end}`);
+                  const diff = endDate.getTime() - startDate.getTime();
+                  const minutes = Math.floor(diff / 60000);
+                  const seconds = Math.floor((diff % 60000) / 1000);
+                  return `${minutes}m ${seconds}s`;
+                } catch {
+                  return '0m 0s';
+                }
+              };
+
+              const balanceHistory: number[] = [];
+              let runningBalance = 0;
+              betHistory.forEach(bet => {
+                runningBalance += bet.balanceChange;
+                balanceHistory.push(runningBalance);
+              });
+
+              generateSessionReport({
+                initialBalance: balance,
+                operationResult: currentBalance,
+                entryValue: entryValue,
+                selectedNumbers: selectedNumbers.slice().reverse(),
+                startTime: startTime || '--:--:--',
+                endTime: endTime,
+                totalDuration: startTime ? calculateDuration(startTime, endTime) : '0m 0s',
+                blackCount: countByColor('black'),
+                blackPercentage: blackPercentage,
+                redCount: countByColor('red'),
+                redPercentage: redPercentage,
+                greenCount: countByColor('green'),
+                greenPercentage: greenPercentage,
+                wins: wins,
+                winPercentage: winPercentage,
+                winValue: calculateWinValue(),
+                losses: losses,
+                lossPercentage: lossPercentage,
+                lossValue: calculateLossValue(),
+                balanceHistory: balanceHistory
+              });
+            }}
+            className="text-purple-500 hover:text-purple-700 transition-colors p-1"
+            title="Resumo da Sessão"
+          >
+            <FileText size={20} />
+          </button>
           <button
             onClick={() => setShowGoalsPopup(true)}
             className="text-blue-500 hover:text-blue-700 transition-colors p-1"
@@ -461,6 +520,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                 setBetHistory([]);
                 setCurrentBetColor(null);
                 setLastWasZero(false);
+                setStartTime('');
               }}
               className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold text-sm transition-colors"
             >
