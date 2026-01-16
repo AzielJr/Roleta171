@@ -253,8 +253,11 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .win-loss-value {
-      font-size: 32px;
+      font-size: 28px;
       font-weight: 700;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
     }
 
     .win-loss-value.win {
@@ -263,6 +266,17 @@ export const generateSessionReport = (data: SessionReportData): void => {
 
     .win-loss-value.loss {
       color: #ef4444;
+    }
+
+    .win-loss-percentage {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .win-loss-money {
+      font-size: 20px;
+      font-weight: 600;
+      margin-left: auto;
     }
 
     .chart-container {
@@ -344,7 +358,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .time-value {
-      font-size: 18px;
+      font-size: 24px;
       font-weight: 700;
       color: #78350f;
     }
@@ -433,7 +447,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       </div>
 
       <div class="section">
-        <h2 class="section-title">Números Selecionados</h2>
+        <h2 class="section-title">Números Selecionados (${data.selectedNumbers.length})</h2>
         <div class="numbers-container">
           <div class="numbers-grid">
             ${data.selectedNumbers.map(num => `
@@ -474,20 +488,18 @@ export const generateSessionReport = (data: SessionReportData): void => {
           <div class="win-loss-card win">
             <div class="win-loss-label win">Total Win</div>
             <div class="win-loss-value win">
-              ${data.wins} (${data.winPercentage}%)
-            </div>
-            <div style="margin-top: 12px; font-size: 20px; font-weight: 600; color: #059669;">
-              R$ ${data.winValue.toFixed(2)}
+              <span>${data.wins}</span>
+              <span class="win-loss-percentage">(${data.winPercentage}%)</span>
+              <span class="win-loss-money">R$ ${data.winValue.toFixed(2)}</span>
             </div>
           </div>
 
           <div class="win-loss-card loss">
             <div class="win-loss-label loss">Total Loss</div>
             <div class="win-loss-value loss">
-              ${data.losses} (${data.lossPercentage}%)
-            </div>
-            <div style="margin-top: 12px; font-size: 20px; font-weight: 600; color: #dc2626;">
-              R$ ${data.lossValue.toFixed(2)}
+              <span>${data.losses}</span>
+              <span class="win-loss-percentage">(${data.lossPercentage}%)</span>
+              <span class="win-loss-money">R$ ${data.lossValue.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -615,6 +627,81 @@ export const generateSessionReport = (data: SessionReportData): void => {
       minText.textContent = \`R$ \${minBalance.toFixed(2)}\`;
       svg.appendChild(minText);
 
+      // Add intermediate metric labels on the left side
+      const quarterRange = range / 4;
+      for (let i = 1; i <= 3; i++) {
+        const value = maxBalance - (quarterRange * i);
+        const y = padding + (chartHeight * i / 4);
+        
+        const metricLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        metricLine.setAttribute('x1', padding);
+        metricLine.setAttribute('y1', y);
+        metricLine.setAttribute('x2', width - padding);
+        metricLine.setAttribute('y2', y);
+        metricLine.setAttribute('stroke', '#e2e8f0');
+        metricLine.setAttribute('stroke-width', '1');
+        metricLine.setAttribute('stroke-dasharray', '3,3');
+        svg.appendChild(metricLine);
+        
+        const metricText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        metricText.setAttribute('x', padding - 10);
+        metricText.setAttribute('y', y + 4);
+        metricText.setAttribute('text-anchor', 'end');
+        metricText.setAttribute('fill', '#94a3b8');
+        metricText.setAttribute('font-size', '11');
+        metricText.textContent = \`R$ \${value.toFixed(2)}\`;
+        svg.appendChild(metricText);
+      }
+
+      // Add summary metrics on the right side
+      const finalBalance = balanceHistory[balanceHistory.length - 1] || 0;
+      const profitLossPercentage = ${data.initialBalance} > 0 ? ((finalBalance / ${data.initialBalance}) * 100).toFixed(1) : '0.0';
+      const profitLossText = finalBalance >= 0 ? 'Lucro' : 'Prejuízo';
+      const profitLossColor = finalBalance >= 0 ? '#10b981' : '#ef4444';
+      
+      const summaryY = padding + 20;
+      
+      const summaryBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      summaryBg.setAttribute('x', width - padding - 150);
+      summaryBg.setAttribute('y', summaryY - 15);
+      summaryBg.setAttribute('width', '140');
+      summaryBg.setAttribute('height', '80');
+      summaryBg.setAttribute('fill', 'white');
+      summaryBg.setAttribute('stroke', '#e2e8f0');
+      summaryBg.setAttribute('stroke-width', '2');
+      summaryBg.setAttribute('rx', '8');
+      svg.appendChild(summaryBg);
+      
+      const summaryTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      summaryTitle.setAttribute('x', width - padding - 80);
+      summaryTitle.setAttribute('y', summaryY);
+      summaryTitle.setAttribute('text-anchor', 'middle');
+      summaryTitle.setAttribute('fill', '#64748b');
+      summaryTitle.setAttribute('font-size', '12');
+      summaryTitle.setAttribute('font-weight', 'bold');
+      summaryTitle.textContent = 'Resultado Final';
+      svg.appendChild(summaryTitle);
+      
+      const summaryValue = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      summaryValue.setAttribute('x', width - padding - 80);
+      summaryValue.setAttribute('y', summaryY + 25);
+      summaryValue.setAttribute('text-anchor', 'middle');
+      summaryValue.setAttribute('fill', profitLossColor);
+      summaryValue.setAttribute('font-size', '16');
+      summaryValue.setAttribute('font-weight', 'bold');
+      summaryValue.textContent = \`R$ \${finalBalance.toFixed(2)}\`;
+      svg.appendChild(summaryValue);
+      
+      const summaryPercentage = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      summaryPercentage.setAttribute('x', width - padding - 80);
+      summaryPercentage.setAttribute('y', summaryY + 45);
+      summaryPercentage.setAttribute('text-anchor', 'middle');
+      summaryPercentage.setAttribute('fill', profitLossColor);
+      summaryPercentage.setAttribute('font-size', '14');
+      summaryPercentage.setAttribute('font-weight', '600');
+      summaryPercentage.textContent = \`\${profitLossText}: \${profitLossPercentage}%\`;
+      svg.appendChild(summaryPercentage);
+
       const xAxisLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       xAxisLabel.setAttribute('x', width / 2);
       xAxisLabel.setAttribute('y', height - 5);
@@ -622,7 +709,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       xAxisLabel.setAttribute('fill', '#64748b');
       xAxisLabel.setAttribute('font-size', '14');
       xAxisLabel.setAttribute('font-weight', '600');
-      xAxisLabel.textContent = 'Número da Aposta';
+      xAxisLabel.textContent = 'Numero de Apostas: ' + balanceHistory.length;
       svg.appendChild(xAxisLabel);
 
       const yAxisLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
