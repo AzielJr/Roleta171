@@ -404,7 +404,10 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
           </div>
 
           <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-xs text-gray-500 mb-2">Números Selecionados</div>
+            <div className="text-xs text-gray-500 mb-2 flex justify-between items-center">
+              <span>Números Selecionados</span>
+              <span className="font-semibold text-gray-700">{selectedNumbers.length}</span>
+            </div>
             <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#d1d5db transparent' }}>
               <div className="flex gap-1 pb-1">
                 {selectedNumbers.length === 0 ? (

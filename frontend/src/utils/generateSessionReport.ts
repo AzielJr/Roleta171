@@ -767,7 +767,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       <div class="section">
         <h2 class="section-title">Gráfico de Progressão</h2>
         <div class="chart-container">
-          <div class="chart-title">Evolução do Saldo ao Longo da Operação</div>
+          <div class="chart-title">Saldo - Evolução ao Longo da Operação</div>
           <div class="chart">
             <svg class="chart-svg" id="progressChart"></svg>
           </div>
@@ -1066,15 +1066,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       xAxisLabel.textContent = 'Numero de Apostas: ' + balanceHistory.length;
       svg.appendChild(xAxisLabel);
 
-      // Draw Y-axis label (vertical text) - positioned far left to avoid overlap
-      const yAxisLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      yAxisLabel.setAttribute('transform', \`translate(5, \${height / 2}) rotate(-90)\`);
-      yAxisLabel.setAttribute('text-anchor', 'middle');
-      yAxisLabel.setAttribute('fill', '#64748b');
-      yAxisLabel.setAttribute('font-size', '10');
-      yAxisLabel.setAttribute('font-weight', 'bold');
-      yAxisLabel.textContent = 'Saldo';
-      svg.appendChild(yAxisLabel);
+      // Y-axis label removed - now in chart title
     }
 
     window.addEventListener('load', drawChart);
