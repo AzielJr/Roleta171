@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Target, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, Plus, Target, ChevronUp, ChevronDown, FileText } from 'lucide-react';
 import { useBalance } from '../contexts/BalanceContext';
+import { generateSessionReport } from '../utils/generateSessionReport';
 
 interface ColorProgressionMobileProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
   }>>([]);
   const [showNumberPopup, setShowNumberPopup] = useState<boolean>(false);
   const [showGoalsPopup, setShowGoalsPopup] = useState<boolean>(false);
+  const [startTime, setStartTime] = useState<string | null>(null);
 
   const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
   const blackNumbers = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
@@ -49,6 +51,13 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
   };
 
   const progression = calculateProgression();
+
+  useEffect(() => {
+    if (selectedNumbers.length === 1 && !startTime) {
+      const now = new Date();
+      setStartTime(now.toLocaleTimeString('pt-BR'));
+    }
+  }, [selectedNumbers.length, startTime]);
 
   const calculateGoals = () => {
     const currentBalance = balance;
@@ -179,6 +188,70 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
           <div className="bg-green-700 p-3 flex items-center justify-between sticky top-0 z-10">
             <h2 className="text-white font-bold text-lg">Progressão de Cores</h2>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const endTime = new Date().toLocaleTimeString('pt-BR');
+                  const calculateDuration = (start: string, end: string): string => {
+                    const [sh, sm, ss] = start.split(':').map(Number);
+                    const [eh, em, es] = end.split(':').map(Number);
+                    const startSeconds = sh * 3600 + sm * 60 + ss;
+                    const endSeconds = eh * 3600 + em * 60 + es;
+                    const diffSeconds = endSeconds - startSeconds;
+                    const minutes = Math.floor(diffSeconds / 60);
+                    const seconds = diffSeconds % 60;
+                    return `${minutes}m ${seconds}s`;
+                  };
+
+                  const progression = calculateProgression();
+                  const countByColor = (color: string) => selectedNumbers.filter(n => getNumberColor(n) === color).length;
+                  const blackCount = countByColor('black');
+                  const redCount = countByColor('red');
+                  const greenCount = countByColor('green');
+                  const total = selectedNumbers.length || 1;
+                  const blackPercentage = ((blackCount / total) * 100).toFixed(1) + '%';
+                  const redPercentage = ((redCount / total) * 100).toFixed(1) + '%';
+                  const greenPercentage = ((greenCount / total) * 100).toFixed(1) + '%';
+                  const winPercentage = ((wins / (wins + losses || 1)) * 100).toFixed(1) + '%';
+                  const lossPercentage = ((losses / (wins + losses || 1)) * 100).toFixed(1) + '%';
+                  const calculateWinValue = () => betHistory.filter(b => b.wasWin).reduce((sum, b) => sum + b.balanceChange, 0);
+                  const calculateLossValue = () => Math.abs(betHistory.filter(b => !b.wasWin).reduce((sum, b) => sum + b.balanceChange, 0));
+
+                  const balanceHistory: number[] = [];
+                  let runningBalance = 0;
+                  betHistory.forEach(bet => {
+                    runningBalance += bet.balanceChange;
+                    balanceHistory.push(runningBalance);
+                  });
+
+                  generateSessionReport({
+                    initialBalance: balance,
+                    operationResult: currentBalance,
+                    entryValue: entryValue,
+                    selectedNumbers: selectedNumbers,
+                    startTime: startTime || '--:--:--',
+                    endTime: endTime,
+                    totalDuration: startTime ? calculateDuration(startTime, endTime) : '0m 0s',
+                    blackCount: blackCount,
+                    blackPercentage: blackPercentage,
+                    redCount: redCount,
+                    redPercentage: redPercentage,
+                    greenCount: greenCount,
+                    greenPercentage: greenPercentage,
+                    wins: wins,
+                    winPercentage: winPercentage,
+                    winValue: calculateWinValue(),
+                    losses: losses,
+                    lossPercentage: lossPercentage,
+                    lossValue: calculateLossValue(),
+                    balanceHistory: balanceHistory,
+                    betProgression: progression
+                  });
+                }}
+                className="text-purple-300 hover:text-purple-100 transition-colors p-1"
+                title="Resumo da Sessão"
+              >
+                <FileText size={24} />
+              </button>
               <button
                 onClick={() => setShowGoalsPopup(true)}
                 className="text-white hover:text-green-300 transition-colors p-1"
@@ -456,6 +529,7 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
                   setBetHistory([]);
                   setCurrentBetColor(null);
                   setLastWasZero(false);
+                  setStartTime(null);
                 }}
                 className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold text-sm active:bg-red-800"
               >
