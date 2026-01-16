@@ -159,6 +159,7 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
   const totalNumbers = selectedNumbers.length;
   const blackPercentage = totalNumbers > 0 ? ((countByColor('black') / totalNumbers) * 100).toFixed(1) : '0.0';
   const redPercentage = totalNumbers > 0 ? ((countByColor('red') / totalNumbers) * 100).toFixed(1) : '0.0';
+  const greenPercentage = totalNumbers > 0 ? ((countByColor('green') / totalNumbers) * 100).toFixed(1) : '0.0';
   
   const totalBets = wins + losses;
   const winPercentage = totalBets > 0 ? ((wins / totalBets) * 100).toFixed(1) : '0.0';
@@ -366,7 +367,7 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
             </div>
 
             <div className="bg-white rounded-lg p-2 shadow">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-2 mb-2">
                 <div>
                   <div className="text-[10px] text-gray-500">Total Preto</div>
                   <div className="text-sm font-bold text-gray-800">
@@ -380,18 +381,26 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-gray-500">Total Win</div>
+                  <div className="text-[10px] text-gray-500">Total Verde</div>
                   <div className="text-sm font-bold text-green-600">
-                    {wins} <span className="text-xs text-gray-500">({winPercentage}%)</span>
+                    {countByColor('green')} <span className="text-xs text-gray-500">({greenPercentage}%)</span>
                   </div>
-                  <div className="text-[10px] text-green-600">R$ {calculateWinValue().toFixed(2)}</div>
                 </div>
-                <div>
-                  <div className="text-[10px] text-gray-500">Total Loss</div>
-                  <div className="text-sm font-bold text-red-600">
-                    {losses} <span className="text-xs text-gray-500">({lossPercentage}%)</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-green-50 rounded-lg p-2 border border-green-200">
+                  <div className="text-[10px] text-green-700 font-medium">Total Win</div>
+                  <div className="text-sm font-bold text-green-700">
+                    {wins} <span className="text-xs text-green-600">({winPercentage}%)</span>
                   </div>
-                  <div className="text-[10px] text-red-600">R$ {calculateLossValue().toFixed(2)}</div>
+                  <div className="text-[11px] text-green-700 font-semibold">R$ {calculateWinValue().toFixed(2)}</div>
+                </div>
+                <div className="bg-red-50 rounded-lg p-2 border border-red-200">
+                  <div className="text-[10px] text-red-700 font-medium">Total Loss</div>
+                  <div className="text-sm font-bold text-red-700">
+                    {losses} <span className="text-xs text-red-600">({lossPercentage}%)</span>
+                  </div>
+                  <div className="text-[11px] text-red-700 font-semibold">R$ {calculateLossValue().toFixed(2)}</div>
                 </div>
               </div>
             </div>
