@@ -396,7 +396,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
     @media print {
       @page {
         size: A4;
-        margin: 10mm;
+        margin: 8mm;
       }
 
       body {
@@ -417,149 +417,150 @@ export const generateSessionReport = (data: SessionReportData): void => {
       }
 
       .header {
-        padding: 15px;
+        padding: 8px 12px;
         page-break-after: avoid;
       }
 
       .header h1 {
-        font-size: 20px;
-        margin-bottom: 5px;
+        font-size: 16px;
+        margin-bottom: 3px;
       }
 
       .header p {
-        font-size: 13px;
+        font-size: 11px;
       }
 
       .content {
-        padding: 15px;
+        padding: 10px 12px;
       }
 
       .stats-grid {
-        gap: 8px;
-        margin-bottom: 15px;
+        gap: 6px;
+        margin-bottom: 8px;
       }
 
       .stat-card {
-        padding: 8px;
+        padding: 6px 8px;
         page-break-inside: avoid;
       }
 
       .stat-label {
-        font-size: 9px;
-        margin-bottom: 4px;
+        font-size: 8px;
+        margin-bottom: 2px;
       }
 
       .stat-value {
-        font-size: 14px;
+        font-size: 12px;
       }
 
       .time-info {
-        gap: 8px;
-        margin-bottom: 15px;
+        gap: 6px;
+        margin-bottom: 8px;
       }
 
       .time-card {
-        padding: 8px;
+        padding: 6px 8px;
       }
 
       .time-label {
-        font-size: 9px;
-        margin-bottom: 4px;
+        font-size: 8px;
+        margin-bottom: 2px;
       }
 
       .time-value {
-        font-size: 14px;
+        font-size: 12px;
       }
 
       .section {
-        margin-bottom: 15px;
+        margin-bottom: 8px;
         page-break-inside: avoid;
       }
 
       .section-title {
-        font-size: 14px;
-        margin-bottom: 8px;
-        padding-bottom: 5px;
+        font-size: 12px;
+        margin-bottom: 5px;
+        padding-bottom: 3px;
+        border-bottom-width: 2px;
       }
 
       .section-title-count {
-        font-size: 12px;
+        font-size: 10px;
       }
 
       .numbers-container {
-        padding: 8px;
-        margin-bottom: 8px;
+        padding: 6px;
+        margin-bottom: 5px;
       }
 
       .numbers-grid {
         max-height: none;
-        gap: 4px;
+        gap: 3px;
       }
 
       .number-chip {
-        width: 28px;
-        height: 28px;
-        font-size: 11px;
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
       }
 
       .color-stats {
-        gap: 8px;
-        margin-bottom: 8px;
+        gap: 6px;
+        margin-bottom: 5px;
       }
 
       .color-stat {
-        padding: 8px;
+        padding: 5px 6px;
       }
 
       .color-stat-label {
-        font-size: 9px;
-        margin-bottom: 4px;
+        font-size: 8px;
+        margin-bottom: 2px;
       }
 
       .color-stat-value {
-        font-size: 14px;
-      }
-
-      .win-loss-grid {
-        gap: 8px;
-        margin-bottom: 15px;
-      }
-
-      .win-loss-card {
-        padding: 8px;
-      }
-
-      .win-loss-label {
-        font-size: 11px;
-        margin-bottom: 6px;
-      }
-
-      .win-loss-value {
-        font-size: 16px;
-      }
-
-      .win-loss-percentage {
         font-size: 12px;
       }
 
+      .win-loss-grid {
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+
+      .win-loss-card {
+        padding: 6px 8px;
+      }
+
+      .win-loss-label {
+        font-size: 10px;
+        margin-bottom: 4px;
+      }
+
+      .win-loss-value {
+        font-size: 14px;
+      }
+
+      .win-loss-percentage {
+        font-size: 11px;
+      }
+
       .win-loss-money {
-        font-size: 13px;
+        font-size: 12px;
       }
 
       .chart-container {
-        padding: 10px;
+        padding: 8px;
         margin-bottom: 0;
         page-break-inside: avoid;
       }
 
       .chart-title {
-        font-size: 13px;
-        margin-bottom: 8px;
+        font-size: 11px;
+        margin-bottom: 5px;
       }
 
       .chart {
-        height: 350px;
-        padding: 10px;
+        height: 280px;
+        padding: 8px;
       }
 
       .stat-card:hover,
