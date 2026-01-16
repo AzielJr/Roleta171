@@ -479,6 +479,26 @@ export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ 
             </div>
 
             <div className="bg-white rounded-lg p-2 shadow">
+              <div className="text-[10px] text-gray-500 mb-1">Metas Sugeridas</div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { percentage: 2.34, label: '2,34%' },
+                  { percentage: 3.73, label: '3,73%' },
+                  { percentage: 4.73, label: '4,73%' },
+                  { percentage: 10.00, label: '10,00%' }
+                ].map((goal, idx) => {
+                  const targetValue = balance * (goal.percentage / 100);
+                  return (
+                    <div key={idx} className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-1.5 border-2 border-green-500 text-center">
+                      <div className="text-[9px] text-green-700 font-semibold">{goal.label}</div>
+                      <div className="text-[11px] text-green-800 font-bold">R$ {targetValue.toFixed(2)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-2 shadow">
               <div className="flex justify-between items-center mb-1">
                 <div className="text-[10px] text-gray-500">Progressão de Apostas</div>
                 <div className="text-[10px] text-gray-600">

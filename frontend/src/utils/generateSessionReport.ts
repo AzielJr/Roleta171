@@ -376,6 +376,40 @@ export const generateSessionReport = (data: SessionReportData): void => {
       white-space: nowrap;
     }
 
+    .goals-container {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .goals-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .goal-card {
+      background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      border: 2px solid #10b981;
+    }
+
+    .goal-percentage {
+      font-size: 11px;
+      color: #065f46;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .goal-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #047857;
+    }
+
     .pdf-buttons {
       position: absolute;
       top: 20px;
@@ -744,6 +778,28 @@ export const generateSessionReport = (data: SessionReportData): void => {
             <div class="win-loss-value ${data.operationResult >= 0 ? 'win' : 'loss'}">
               <span style="font-size: 32px;">R$ ${data.operationResult.toFixed(2)}</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2 class="section-title">Metas Sugeridas</h2>
+        <div class="goals-container">
+          <div class="goals-grid">
+            ${[
+              { percentage: 2.34, label: '2,34%' },
+              { percentage: 3.73, label: '3,73%' },
+              { percentage: 4.73, label: '4,73%' },
+              { percentage: 10.00, label: '10,00%' }
+            ].map(goal => {
+              const targetValue = data.initialBalance * (goal.percentage / 100);
+              return `
+                <div class="goal-card">
+                  <div class="goal-percentage">${goal.label}</div>
+                  <div class="goal-value">R$ ${targetValue.toFixed(2)}</div>
+                </div>
+              `;
+            }).join('')}
           </div>
         </div>
       </div>
