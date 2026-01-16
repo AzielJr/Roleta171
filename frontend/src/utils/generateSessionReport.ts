@@ -39,6 +39,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resumo da Sessão de Apostas - Roleta 171</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -337,10 +338,16 @@ export const generateSessionReport = (data: SessionReportData): void => {
       height: 100%;
     }
 
-    .print-button {
+    .pdf-buttons {
       position: absolute;
       top: 20px;
       right: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 1000;
+    }
+
+    .pdf-button {
       width: 50px;
       height: 50px;
       border-radius: 50%;
@@ -353,16 +360,20 @@ export const generateSessionReport = (data: SessionReportData): void => {
       justify-content: center;
       box-shadow: 0 8px 16px rgba(249, 115, 22, 0.4);
       transition: transform 0.2s, box-shadow 0.2s;
-      z-index: 1000;
     }
 
-    .print-button:hover {
+    .pdf-button:hover {
       transform: scale(1.1);
       box-shadow: 0 12px 24px rgba(249, 115, 22, 0.5);
     }
 
-    .print-button:active {
+    .pdf-button:active {
       transform: scale(0.95);
+    }
+
+    .pdf-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .time-info {
@@ -405,7 +416,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
         margin: 0;
       }
 
-      .print-button {
+      .pdf-buttons {
         display: none;
       }
 
@@ -564,7 +575,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       }
 
       .stat-card:hover,
-      .print-button:hover {
+      .pdf-button:hover {
         transform: none;
         box-shadow: none;
       }
@@ -711,15 +722,38 @@ export const generateSessionReport = (data: SessionReportData): void => {
     </div>
   </div>
 
-  <button class="print-button" onclick="window.print()" title="Imprimir Relatório">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="6 9 6 2 18 2 18 9"></polyline>
-      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-      <rect x="6" y="14" width="12" height="8"></rect>
-    </svg>
-  </button>
+  <div class="pdf-buttons">
+    <button class="pdf-button" id="downloadPdfBtn" title="Baixar PDF">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+    </button>
+  </div>
 
   <script>
+    // PDF Generation
+    document.getElementById('downloadPdfBtn').addEventListener('click', function() {
+      const button = this;
+      button.disabled = true;
+      button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
+      
+      const element = document.querySelector('.container');
+      const opt = {
+        margin: 10,
+        filename: 'resumo-sessao-apostas-' + new Date().toISOString().split('T')[0] + '.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      html2pdf().set(opt).from(element).save().then(function() {
+        button.disabled = false;
+        button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
+      });
+    });
+
     function drawChart() {
       const svg = document.getElementById('progressChart');
       const balanceHistory = ${JSON.stringify(data.balanceHistory)};
