@@ -149,6 +149,15 @@ export const generateSessionReport = (data: SessionReportData): void => {
       margin-bottom: 20px;
       padding-bottom: 10px;
       border-bottom: 3px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section-title-count {
+      font-size: 18px;
+      font-weight: 600;
+      color: #64748b;
     }
 
     .numbers-container {
@@ -408,133 +417,148 @@ export const generateSessionReport = (data: SessionReportData): void => {
       }
 
       .header {
-        padding: 20px;
+        padding: 15px;
         page-break-after: avoid;
       }
 
       .header h1 {
-        font-size: 24px;
+        font-size: 20px;
+        margin-bottom: 5px;
+      }
+
+      .header p {
+        font-size: 13px;
       }
 
       .content {
-        padding: 20px;
+        padding: 15px;
       }
 
       .stats-grid {
-        gap: 10px;
-        margin-bottom: 20px;
+        gap: 8px;
+        margin-bottom: 15px;
       }
 
       .stat-card {
-        padding: 12px;
+        padding: 8px;
         page-break-inside: avoid;
       }
 
       .stat-label {
-        font-size: 11px;
+        font-size: 9px;
+        margin-bottom: 4px;
       }
 
       .stat-value {
-        font-size: 18px;
+        font-size: 14px;
       }
 
       .time-info {
-        gap: 10px;
-        margin-bottom: 20px;
+        gap: 8px;
+        margin-bottom: 15px;
       }
 
       .time-card {
-        padding: 12px;
+        padding: 8px;
       }
 
       .time-label {
-        font-size: 10px;
+        font-size: 9px;
+        margin-bottom: 4px;
       }
 
       .time-value {
-        font-size: 18px;
+        font-size: 14px;
       }
 
       .section {
-        margin-bottom: 20px;
+        margin-bottom: 15px;
         page-break-inside: avoid;
       }
 
       .section-title {
-        font-size: 18px;
-        margin-bottom: 10px;
+        font-size: 14px;
+        margin-bottom: 8px;
+        padding-bottom: 5px;
+      }
+
+      .section-title-count {
+        font-size: 12px;
       }
 
       .numbers-container {
-        padding: 12px;
-        margin-bottom: 10px;
+        padding: 8px;
+        margin-bottom: 8px;
       }
 
       .numbers-grid {
         max-height: none;
+        gap: 4px;
       }
 
       .number-chip {
-        width: 36px;
-        height: 36px;
-        font-size: 14px;
-      }
-
-      .color-stats {
-        gap: 10px;
-        margin-bottom: 10px;
-      }
-
-      .color-stat {
-        padding: 12px;
-      }
-
-      .color-stat-label {
+        width: 28px;
+        height: 28px;
         font-size: 11px;
       }
 
+      .color-stats {
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .color-stat {
+        padding: 8px;
+      }
+
+      .color-stat-label {
+        font-size: 9px;
+        margin-bottom: 4px;
+      }
+
       .color-stat-value {
-        font-size: 18px;
-      }
-
-      .win-loss-grid {
-        gap: 10px;
-        margin-bottom: 20px;
-      }
-
-      .win-loss-card {
-        padding: 12px;
-      }
-
-      .win-loss-label {
-        font-size: 13px;
-      }
-
-      .win-loss-value {
-        font-size: 20px;
-      }
-
-      .win-loss-percentage {
         font-size: 14px;
       }
 
-      .win-loss-money {
+      .win-loss-grid {
+        gap: 8px;
+        margin-bottom: 15px;
+      }
+
+      .win-loss-card {
+        padding: 8px;
+      }
+
+      .win-loss-label {
+        font-size: 11px;
+        margin-bottom: 6px;
+      }
+
+      .win-loss-value {
         font-size: 16px;
       }
 
+      .win-loss-percentage {
+        font-size: 12px;
+      }
+
+      .win-loss-money {
+        font-size: 13px;
+      }
+
       .chart-container {
-        padding: 12px;
-        margin-bottom: 20px;
+        padding: 10px;
+        margin-bottom: 0;
         page-break-inside: avoid;
       }
 
       .chart-title {
-        font-size: 14px;
-        margin-bottom: 10px;
+        font-size: 13px;
+        margin-bottom: 8px;
       }
 
       .chart {
-        height: 250px;
+        height: 350px;
         padding: 10px;
       }
 
@@ -606,7 +630,10 @@ export const generateSessionReport = (data: SessionReportData): void => {
       </div>
 
       <div class="section">
-        <h2 class="section-title">Números Selecionados (${data.selectedNumbers.length})</h2>
+        <h2 class="section-title">
+          <span>Números Selecionados</span>
+          <span class="section-title-count">${data.selectedNumbers.length} números</span>
+        </h2>
         <div class="numbers-container">
           <div class="numbers-grid">
             ${data.selectedNumbers.map(num => `
