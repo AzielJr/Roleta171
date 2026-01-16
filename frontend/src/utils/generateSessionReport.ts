@@ -19,6 +19,7 @@ export interface SessionReportData {
   lossPercentage: string;
   lossValue: number;
   balanceHistory: number[];
+  betProgression?: number[];
 }
 
 export const generateSessionReport = (data: SessionReportData): void => {
@@ -339,6 +340,40 @@ export const generateSessionReport = (data: SessionReportData): void => {
       height: 100%;
     }
 
+    .progression-container {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .progression-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 8px;
+    }
+
+    .progression-item {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      border-radius: 8px;
+      padding: 8px;
+      text-align: center;
+      border: 2px solid #f59e0b;
+    }
+
+    .progression-number {
+      font-size: 10px;
+      color: #92400e;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .progression-value {
+      font-size: 14px;
+      font-weight: 700;
+      color: #78350f;
+    }
+
     .pdf-buttons {
       position: absolute;
       top: 20px;
@@ -645,8 +680,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
 
       <div class="section">
         <h2 class="section-title">
-          <span>Números Selecionados</span>
-          <span class="section-title-count">${data.selectedNumbers.length} números</span>
+          <span>${String(data.selectedNumbers.length).padStart(2, '0')} - Números Selecionados</span>
         </h2>
         <div class="numbers-container">
           <div class="numbers-grid">
@@ -713,6 +747,22 @@ export const generateSessionReport = (data: SessionReportData): void => {
       </div>
 
       <div class="section">
+        <h2 class="section-title">Progressão de Apostas</h2>
+        ${data.betProgression && data.betProgression.length > 0 ? `
+        <div class="progression-container">
+          <div class="progression-grid">
+            ${data.betProgression.map((value, index) => `
+              <div class="progression-item">
+                <div class="progression-number">#${index + 1}</div>
+                <div class="progression-value">R$ ${value.toFixed(2)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
+      </div>
+
+      <div class="section">
         <h2 class="section-title">Gráfico de Progressão</h2>
         <div class="chart-container">
           <div class="chart-title">Evolução do Saldo ao Longo da Operação</div>
@@ -725,18 +775,13 @@ export const generateSessionReport = (data: SessionReportData): void => {
   </div>
 
   <div class="pdf-buttons">
-    <button class="pdf-button" onclick="window.print()" title="Imprimir">
+    <button class="pdf-button" id="downloadPdfBtn" title="Gerar PDF">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="6 9 6 2 18 2 18 9"></polyline>
-        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-        <rect x="6" y="14" width="12" height="8"></rect>
-      </svg>
-    </button>
-    <button class="pdf-button" id="downloadPdfBtn" title="Baixar PDF">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-        <polyline points="7 10 12 15 17 10"></polyline>
-        <line x1="12" y1="15" x2="12" y2="3"></line>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
       </svg>
     </button>
   </div>

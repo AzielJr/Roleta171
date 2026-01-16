@@ -244,7 +244,8 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                 losses: losses,
                 lossPercentage: lossPercentage,
                 lossValue: calculateLossValue(),
-                balanceHistory: balanceHistory
+                balanceHistory: balanceHistory,
+                betProgression: progression
               });
             }}
             className="text-purple-500 hover:text-purple-700 transition-colors p-1"
