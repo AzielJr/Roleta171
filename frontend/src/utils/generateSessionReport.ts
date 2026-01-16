@@ -67,37 +67,37 @@ export const generateSessionReport = (data: SessionReportData): void => {
     .header {
       background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
       color: white;
-      padding: 40px;
+      padding: 20px;
       text-align: center;
     }
 
     .header h1 {
-      font-size: 32px;
+      font-size: 22px;
       font-weight: 700;
-      margin-bottom: 10px;
+      margin-bottom: 5px;
     }
 
     .header p {
-      font-size: 16px;
+      font-size: 13px;
       opacity: 0.9;
     }
 
     .content {
-      padding: 40px;
+      padding: 20px;
     }
 
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-      margin-bottom: 40px;
+      gap: 12px;
+      margin-bottom: 20px;
     }
 
     .stat-card {
       background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-      border-radius: 12px;
-      padding: 24px;
-      border-left: 4px solid #3b82f6;
+      border-radius: 8px;
+      padding: 12px;
+      border-left: 3px solid #3b82f6;
       transition: transform 0.2s, box-shadow 0.2s;
     }
 
@@ -117,16 +117,16 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .stat-label {
-      font-size: 14px;
+      font-size: 10px;
       color: #64748b;
       font-weight: 600;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.3px;
     }
 
     .stat-value {
-      font-size: 22px;
+      font-size: 16px;
       font-weight: 700;
       color: #1e293b;
     }
@@ -140,39 +140,39 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .section {
-      margin-bottom: 40px;
+      margin-bottom: 20px;
     }
 
     .section-title {
-      font-size: 24px;
+      font-size: 16px;
       font-weight: 700;
       color: #1e293b;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 3px solid #e2e8f0;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #e2e8f0;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
     .section-title-count {
-      font-size: 18px;
+      font-size: 13px;
       font-weight: 600;
       color: #64748b;
     }
 
     .numbers-container {
       background: #f8fafc;
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 20px;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
     }
 
     .numbers-grid {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      max-height: 168px;
+      gap: 4px;
+      max-height: 120px;
       overflow-y: auto;
     }
 
@@ -195,16 +195,16 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .number-chip {
-      width: 48px;
-      height: 48px;
+      width: 32px;
+      height: 32px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 8px;
+      border-radius: 6px;
       color: white;
       font-weight: 700;
-      font-size: 16px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      font-size: 12px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     }
 
     .number-chip.red {
@@ -222,40 +222,40 @@ export const generateSessionReport = (data: SessionReportData): void => {
     .color-stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 20px;
+      gap: 10px;
+      margin-bottom: 12px;
     }
 
     .color-stat {
       background: white;
-      border-radius: 12px;
-      padding: 20px;
+      border-radius: 8px;
+      padding: 10px;
       text-align: center;
-      border: 2px solid #e2e8f0;
+      border: 1px solid #e2e8f0;
     }
 
     .color-stat-label {
-      font-size: 14px;
+      font-size: 10px;
       color: #64748b;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       font-weight: 600;
     }
 
     .color-stat-value {
-      font-size: 24px;
+      font-size: 16px;
       font-weight: 700;
     }
 
     .win-loss-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-      margin-bottom: 40px;
+      gap: 12px;
+      margin-bottom: 20px;
     }
 
     .win-loss-card {
-      border-radius: 12px;
-      padding: 24px;
+      border-radius: 8px;
+      padding: 12px;
       border: 2px solid;
     }
 
@@ -270,9 +270,9 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .win-loss-label {
-      font-size: 16px;
+      font-size: 12px;
       font-weight: 600;
-      margin-bottom: 12px;
+      margin-bottom: 6px;
     }
 
     .win-loss-label.win {
@@ -284,11 +284,11 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .win-loss-value {
-      font-size: 28px;
+      font-size: 18px;
       font-weight: 700;
       display: flex;
       align-items: baseline;
-      gap: 8px;
+      gap: 6px;
     }
 
     .win-loss-value.win {
@@ -300,37 +300,37 @@ export const generateSessionReport = (data: SessionReportData): void => {
     }
 
     .win-loss-percentage {
-      font-size: 18px;
+      font-size: 13px;
       font-weight: 600;
     }
 
     .win-loss-money {
-      font-size: 20px;
+      font-size: 14px;
       font-weight: 600;
       margin-left: auto;
     }
 
     .chart-container {
       background: #f8fafc;
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 40px;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 20px;
     }
 
     .chart-title {
-      font-size: 18px;
+      font-size: 14px;
       font-weight: 700;
       color: #1e293b;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
     }
 
     .chart {
       position: relative;
-      height: 400px;
+      height: 250px;
       background: white;
-      border-radius: 8px;
-      padding: 20px;
-      border: 2px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 12px;
+      border: 1px solid #e2e8f0;
     }
 
     .chart-svg {
@@ -379,27 +379,27 @@ export const generateSessionReport = (data: SessionReportData): void => {
     .time-info {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 40px;
+      gap: 10px;
+      margin-bottom: 20px;
     }
 
     .time-card {
       background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-      border-radius: 12px;
-      padding: 20px;
-      border-left: 4px solid #f59e0b;
+      border-radius: 8px;
+      padding: 10px;
+      border-left: 3px solid #f59e0b;
     }
 
     .time-label {
-      font-size: 12px;
+      font-size: 9px;
       color: #92400e;
       font-weight: 600;
-      margin-bottom: 6px;
+      margin-bottom: 3px;
       text-transform: uppercase;
     }
 
     .time-value {
-      font-size: 24px;
+      font-size: 14px;
       font-weight: 700;
       color: #78350f;
     }
@@ -741,11 +741,12 @@ export const generateSessionReport = (data: SessionReportData): void => {
       
       const element = document.querySelector('.container');
       const opt = {
-        margin: 10,
+        margin: 5,
         filename: 'resumo-sessao-apostas-' + new Date().toISOString().split('T')[0] + '.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 1.5, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: 'avoid-all' }
       };
       
       html2pdf().set(opt).from(element).save().then(function() {
