@@ -95,7 +95,9 @@ app.get('/api/saldo/last/:id_senha', async (req, res) => {
     const { id_senha } = req.params;
 
     const [rows] = await pool.query(
-      `SELECT * FROM r171_saldo 
+      `SELECT id, created_at, id_senha, DATE_FORMAT(data, "%Y-%m-%d") as data, 
+              saldo_inicial, saldo_atual, vlr_lucro, per_lucro 
+       FROM r171_saldo 
        WHERE id_senha = ? 
        ORDER BY created_at DESC, id DESC 
        LIMIT 1`,
@@ -132,7 +134,7 @@ app.get('/api/saldo/history/:id_senha', async (req, res) => {
       params.push(dataFinal);
     }
 
-    query += ' ORDER BY data ASC';
+    query += ' ORDER BY data DESC';
 
     const [rows] = await pool.query(query, params);
     res.json({ saldos: rows });
