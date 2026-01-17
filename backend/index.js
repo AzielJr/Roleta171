@@ -21,14 +21,22 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { nome, senha } = req.body;
 
-    if (!nome || !senha) {
-      return res.status(400).json({ error: 'Nome e senha são obrigatórios' });
+    if (!senha) {
+      return res.status(400).json({ error: 'Senha é obrigatória' });
     }
 
-    const [rows] = await pool.query(
-      'SELECT * FROM r171_senha WHERE nome = ? AND senha = ?',
-      [nome, senha]
-    );
+    // Se nome foi fornecido, buscar por nome e senha
+    // Se não, buscar apenas por senha (compatibilidade com sistema antigo)
+    let query, params;
+    if (nome) {
+      query = 'SELECT * FROM r171_senha WHERE nome = ? AND senha = ?';
+      params = [nome, senha];
+    } else {
+      query = 'SELECT * FROM r171_senha WHERE senha = ?';
+      params = [senha];
+    }
+
+    const [rows] = await pool.query(query, params);
 
     if (rows.length === 0) {
       return res.status(401).json({ error: 'Credenciais inválidas' });
@@ -111,18 +119,22 @@ app.get('/api/saldo/history/:id_senha', async (req, res) => {
     const { id_senha } = req.params;
     const { dataInicial, dataFinal } = req.query;
 
-    let query = 'SELECT * FROM r171_saldo WHERE id_senha = ?';
+    let query = 'SELECT id, created_at, id_senha, DATE_FORMAT(data, "%Y-%m-%d") as data, saldo_inicial, saldo_atual, vlr_lucro, per_lucro FROM r171_saldo WHERE id_senha = ?';
     const params = [id_senha];
 
-    if (dataInicial && dataFinal) {
-      query += ' AND data BETWEEN ? AND ?';
-      params.push(dataInicial, dataFinal);
+    if (dataInicial) {
+      query += ' AND data >= ?';
+      params.push(dataInicial);
     }
 
-    query += ' ORDER BY data DESC, created_at DESC';
+    if (dataFinal) {
+      query += ' AND data <= ?';
+      params.push(dataFinal);
+    }
+
+    query += ' ORDER BY data ASC';
 
     const [rows] = await pool.query(query, params);
-
     res.json({ saldos: rows });
   } catch (error) {
     console.error('Erro ao buscar histórico:', error);

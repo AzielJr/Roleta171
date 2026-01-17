@@ -17,10 +17,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     setError('');
 
     try {
-      // Login usando a nova API MySQL
-      // Nota: API atual usa senha direta, mas idealmente deveria ter nome de usuário
-      // Por enquanto, vamos usar 'admin' como nome padrão
-      const { user } = await authAPI.login('admin', senha);
+      // Login usando a nova API MySQL (apenas senha)
+      const { user } = await authAPI.login('', senha);
 
       if (!user) {
         setError('Senha incorreta. Tente novamente.');
