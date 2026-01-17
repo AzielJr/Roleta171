@@ -31,6 +31,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [showLossAlert, setShowLossAlert] = useState<boolean>(false);
   const [alertRepetitionAverage, setAlertRepetitionAverage] = useState<number>(0);
+  const [shouldResetOnUnpause, setShouldResetOnUnpause] = useState<boolean>(false);
 
   const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
   const blackNumbers = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
@@ -70,16 +71,43 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   }, [isOpen]);
 
   const lastProcessedLengthRef = useRef<number>(0);
+  const selectedNumbersRef = useRef<number[]>([]);
+
+  // Sincronizar ref com state
+  useEffect(() => {
+    selectedNumbersRef.current = selectedNumbers;
+  }, [selectedNumbers]);
 
   useEffect(() => {
     if (!isOpen) {
       // Quando fecha, resetar para processar do zero na próxima abertura
       lastProcessedLengthRef.current = 0;
+      selectedNumbersRef.current = [];
     } else {
       // Quando abre, marcar o tamanho atual do array para ignorar números antigos
       lastProcessedLengthRef.current = lastNumbers.length;
     }
   }, [isOpen]);
+
+  // Ajustar lastProcessedLengthRef quando lastNumbers diminuir (botão -5, limpar, etc)
+  useEffect(() => {
+    if (isOpen && lastNumbers.length < lastProcessedLengthRef.current) {
+      console.log('[ColorProgressionDesktop] lastNumbers diminuiu, ajustando ref:', {
+        oldRef: lastProcessedLengthRef.current,
+        newLength: lastNumbers.length
+      });
+      lastProcessedLengthRef.current = lastNumbers.length;
+    }
+  }, [lastNumbers.length, isOpen]);
+
+  // Resetar betHistory quando despausar após popup de 3 LOSS
+  useEffect(() => {
+    if (!isPaused && shouldResetOnUnpause) {
+      console.log('[ColorProgressionDesktop] Resetando betHistory após despausar');
+      setBetHistory([]);
+      setShouldResetOnUnpause(false);
+    }
+  }, [isPaused, shouldResetOnUnpause]);
 
   useEffect(() => {
     console.log('[ColorProgressionDesktop] useEffect triggered', { 
@@ -112,10 +140,12 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
         
         // Só adicionar número e calcular WIN/LOSS se NÃO estiver pausado
         if (!isPaused) {
+          // IMPORTANTE: Pegar prevNumber ANTES de adicionar o novo
+          const prevNumber = selectedNumbersRef.current.length > 0 ? selectedNumbersRef.current[0] : null;
+          const currentColor = getNumberColor(lastNumber);
+          
           // Adicionar o número ao selectedNumbers
           setSelectedNumbers(prev => [lastNumber, ...prev]);
-          const prevNumber = selectedNumbers.length > 0 ? selectedNumbers[0] : null;
-          const currentColor = getNumberColor(lastNumber);
           
           // Definir currentBetColor sempre que o número não for zero
           if (currentColor === 'red' || currentColor === 'black') {
@@ -150,6 +180,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                   setAlertRepetitionAverage(currentAverage);
                   setShowLossAlert(true);
                   setIsPaused(true);
+                  setShouldResetOnUnpause(true);
                 }
               }
               
@@ -204,6 +235,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                       setAlertRepetitionAverage(currentAverage);
                       setShowLossAlert(true);
                       setIsPaused(true);
+                      setShouldResetOnUnpause(true);
                     }
                   }
                   
@@ -730,7 +762,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-2">
+          <div className="bg-gray-50 rounded-lg py-3 px-2">
             <div className="flex justify-between items-center mb-1.5">
               <div className="text-xs text-gray-500">Progressão de Apostas</div>
               <div className="text-xs text-gray-600">
