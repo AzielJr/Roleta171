@@ -125,5 +125,77 @@ O token está armazenado em: `d:\Programas\React\171\.vercel\token.txt`
 
 ---
 
-**Última atualização**: 14/01/2026
-**Versão**: 1.0.0
+## 🚀 Deploy do Backend (Node.js/Express + MySQL)
+
+### Passo 1: Deploy do Backend
+
+```powershell
+# 1. Navegar para o diretório do backend
+cd d:\Programas\React\171\backend
+
+# 2. Deploy do backend no Vercel
+vercel --prod --yes --token LwQMGnZpwxcE3s749poZtuWk
+```
+
+### Passo 2: Configurar Variáveis de Ambiente no Vercel
+
+Acesse o dashboard do backend no Vercel e configure as seguintes variáveis de ambiente:
+
+**Variáveis Obrigatórias:**
+```
+DB_HOST=92.113.38.158
+DB_PORT=3306
+DB_USER=novo_usuario
+DB_PASSWORD=sua_senha
+DB_NAME=roleta171
+VITE_SUPABASE_URL=https://ykqpqhvjqgbmvtqgpvwt.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+### Passo 3: Copiar URL do Backend
+
+Após o deploy, copie a URL do backend (ex: `https://seu-backend.vercel.app`)
+
+### Passo 4: Atualizar Frontend com URL do Backend
+
+Edite o arquivo `frontend/.env.production`:
+
+```env
+VITE_API_URL=https://seu-backend.vercel.app/api
+```
+
+### Passo 5: Deploy do Frontend
+
+```powershell
+# 1. Voltar para o diretório raiz
+cd d:\Programas\React\171
+
+# 2. Fazer commit das alterações
+git add .
+git commit -m "feat: Atualizar URL da API para produção"
+git push
+
+# 3. Deploy do frontend
+vercel --prod --yes --token LwQMGnZpwxcE3s749poZtuWk
+```
+
+---
+
+## 📊 Bancos de Dados Migrados
+
+### Banco: roleta171
+- ✅ r171_senha (3 usuários)
+- ✅ r171_saldo (29 registros)
+- ✅ r171_duzcol (1 registro)
+
+### Banco: biblia
+- ✅ biblia_cc (581 hinos do Cantor Cristão)
+- ✅ biblia_livros (66 livros da Bíblia)
+- ✅ biblia_versiculo (31.105 versículos)
+
+**Total**: 31.752 registros migrados do Supabase para MySQL
+
+---
+
+**Última atualização**: 17/01/2026
+**Versão**: 2.0.0 - Migração MySQL
