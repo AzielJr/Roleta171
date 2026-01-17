@@ -110,11 +110,10 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
         lastProcessedLengthRef.current = lastNumbers.length;
         console.log('[ColorProgressionDesktop] Processing new number:', lastNumber);
         
-        // SEMPRE adicionar o número ao selectedNumbers (independente de pausa)
-        setSelectedNumbers(prev => [lastNumber, ...prev]);
-        
-        // Só calcular WIN/LOSS se NÃO estiver pausado
+        // Só adicionar número e calcular WIN/LOSS se NÃO estiver pausado
         if (!isPaused) {
+          // Adicionar o número ao selectedNumbers
+          setSelectedNumbers(prev => [lastNumber, ...prev]);
           const prevNumber = selectedNumbers.length > 0 ? selectedNumbers[0] : null;
           const currentColor = getNumberColor(lastNumber);
           
