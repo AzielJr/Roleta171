@@ -6,7 +6,6 @@ import { cn } from '../utils/cn';
 import StatisticsCards from './StatisticsCards';
 import { BalanceManager } from './BalanceManager';
 import { useStatistics } from '../hooks/useStatistics';
-import { useImageOCR } from '../hooks/useImageOCR';
 import { calculateStatistics } from '../utils/statisticsCalculator';
 import { getNumberColor as getNumberColorUtil } from '../utils/rouletteConfig';
 import { checkForRaceCondition } from '../utils/alertLogic';
@@ -512,9 +511,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   // Estado para controlar o modal de adicionar números
   const [showAddNumbersModal, setShowAddNumbersModal] = useState(false);
   const [addNumbersInput, setAddNumbersInput] = useState('');
-  
-  // Hook de OCR para processar imagens
-  const { isProcessing: isProcessingOCR, progress: ocrProgress, handlePasteImage } = useImageOCR();
   
   // Estados para reconhecimento de voz
   const [isListening, setIsListening] = useState(false);
@@ -1459,31 +1455,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
       setRecognition(recognitionInstance);
     }
   }, [isListening]);
-
-  // useEffect para adicionar event listener de Ctrl+V (colar imagem)
-  useEffect(() => {
-    if (!showAddNumbersModal) return;
-
-    const handlePaste = async (event: ClipboardEvent) => {
-      const numbers = await handlePasteImage(event);
-      
-      if (numbers) {
-        // Adicionar números extraídos ao input existente
-        const currentInput = addNumbersInput.trim();
-        const newInput = currentInput 
-          ? `${currentInput},${numbers}` 
-          : numbers;
-        
-        setAddNumbersInput(newInput);
-      }
-    };
-
-    document.addEventListener('paste', handlePaste);
-
-    return () => {
-      document.removeEventListener('paste', handlePaste);
-    };
-  }, [showAddNumbersModal, addNumbersInput, handlePasteImage]);
 
   // Função para processar entrada de voz contínua em tempo real
   const processVoiceInputContinuous = (transcript: string, commitMode: 'interim' | 'final' = 'final') => {
@@ -3686,32 +3657,6 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 <div className="mt-2 text-xs text-gray-600 flex items-center gap-2">
                   <span className="inline-flex w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                   <span>Reconhecendo: {voiceBuffer}</span>
-                </div>
-              )}
-              
-              {/* Feedback de processamento de imagem OCR */}
-              {isProcessingOCR && (
-                <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm font-semibold text-purple-800">Processando imagem...</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${ocrProgress}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-xs text-purple-600 mt-1 text-center">{ocrProgress}%</p>
-                </div>
-              )}
-              
-              {/* Dica sobre Ctrl+V */}
-              {!isProcessingOCR && !isListening && (
-                <div className="mt-3 p-2 bg-gray-50 border border-gray-200 rounded-lg">
-                  <p className="text-xs text-gray-600 text-center">
-                    💡 <strong>Dica:</strong> Copie a tela de números do site e pressione <kbd className="px-1 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">Ctrl+V</kbd> para extrair automaticamente
-                  </p>
                 </div>
               )}
               

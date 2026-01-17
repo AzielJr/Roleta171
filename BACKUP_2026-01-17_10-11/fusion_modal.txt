@@ -1,0 +1,52 @@
+      {/* Modal Fusion - Números Gatilho */}
+      {showFusionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 pt-24" onClick={() => setShowFusionModal(false)}>
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">FUSION - NÚMEROS GATILHO</h2>
+              <button 
+                onClick={() => setShowFusionModal(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex justify-center space-x-2">
+                <RouletteBall number={0} />
+                <RouletteBall number={32} />
+                <RouletteBall number={15} />
+                <RouletteBall number={19} />
+              </div>
+              
+              <div className="flex justify-center space-x-2">
+                <RouletteBall number={4} />
+                <RouletteBall number={21} />
+                <RouletteBall number={2} />
+                <RouletteBall number={25} />
+              </div>
+              
+              <div className="flex justify-center space-x-2">
+                <RouletteBall number={7} />
+                <RouletteBall number={29} />
+                <RouletteBall number={18} />
+                <RouletteBall number={22} />
+              </div>
+              
+              <div className="flex justify-center space-x-2">
+                <RouletteBall number={9} />
+              </div>
+            </div>
+            
+            <div className="mt-4 text-center text-gray-300 text-sm">
+              <p>Números <strong>GATILHO</strong> incrementam as <strong>ENTRADAS</strong></p>
+              <p><strong>LOSS:</strong> Se o próximo número for um dos gatilhos acima</p>
+              <p><strong>WIN:</strong> Se o próximo número for qualquer outro número</p>
+              <p className="mt-2 text-yellow-300">
+                <strong>WIN:</strong> 01, 03, 05, 06, 08, 10, 11, 12, 13, 14, 16, 17, 20, 23, 24, 26, 27, 28, 30, 31, 33, 34, 35, 36
+              </p>
+            </div>
+          </div>
+        </div>
+      )}

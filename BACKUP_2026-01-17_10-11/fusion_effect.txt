@@ -1,0 +1,18 @@
+  // Efeito para controlar animações do Fusion e tocar som
+  useEffect(() => {
+    if (calculatedFusionStats.hasConsecutiveEntries) {
+      setAnimatingFusion('yellow'); // Borda laranja para Fusion consecutivos (LOSS)
+      
+      // Tocar som APENAS quando Fusion muda para consecutivo (borda laranja) E avisos sonoros estão ativos
+      if (!lastFusionConsecutiveState.current && avisosSonorosAtivos) {
+        soundGenerator.playBellSound();
+        lastFusionConsecutiveState.current = true;
+      }
+    } else if (calculatedFusionStats.hasRecentEntry) {
+      setAnimatingFusion('green'); // Borda verde para primeira entrada Fusion (SEM SOM)
+      lastFusionConsecutiveState.current = false; // Reset quando não é mais consecutivo
+    } else {
+      setAnimatingFusion('none');
+      lastFusionConsecutiveState.current = false;
+    }
+  }, [calculatedFusionStats.hasConsecutiveEntries, calculatedFusionStats.hasRecentEntry]);

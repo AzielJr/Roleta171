@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Target, ChevronUp, ChevronDown, FileText, Pause, Play, AlertTriangle } from 'lucide-react';
+import { X, Target, ChevronUp, ChevronDown, FileText } from 'lucide-react';
 import { useBalance } from '../contexts/BalanceContext';
 import { generateSessionReport } from '../utils/generateSessionReport';
 
@@ -28,9 +28,6 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   }>>([]);
   const [showGoalsPopup, setShowGoalsPopup] = useState<boolean>(false);
   const [startTime, setStartTime] = useState<string>('');
-  const [isPaused, setIsPaused] = useState<boolean>(false);
-  const [showLossAlert, setShowLossAlert] = useState<boolean>(false);
-  const [alertRepetitionAverage, setAlertRepetitionAverage] = useState<number>(0);
 
   const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
   const blackNumbers = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
@@ -56,36 +53,9 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   const progression = calculateProgression();
 
   useEffect(() => {
-    if (!isOpen) {
-      setSelectedNumbers([]);
-      setCurrentPosition(0);
-      setWins(0);
-      setLosses(0);
-      setCurrentBalance(0);
-      setBetHistory([]);
-      setCurrentBetColor(null);
-      setLastWasZero(false);
-      return;
-    }
-  }, [isOpen]);
-
-  const lastProcessedIndexRef = useRef<number>(-1);
-
-  useEffect(() => {
-    if (!isOpen) {
-      lastProcessedIndexRef.current = -1;
-      return;
-    } else {
-      // Quando abre, marcar todos os números atuais como já processados
-      lastProcessedIndexRef.current = lastNumbers.length - 1;
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
     console.log('[ColorProgressionDesktop] useEffect triggered', { 
       lastNumbers, 
       isOpen,
-      isPaused,
       selectedNumbers: selectedNumbers[0]
     });
     
@@ -94,34 +64,20 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
         const now = new Date();
         setStartTime(now.toLocaleTimeString('pt-BR'));
       }
-      const lastNumber = lastNumbers[lastNumbers.length - 1];
-      const currentIndex = lastNumbers.length - 1;
+      const lastNumber = lastNumbers[lastNumbers.length - 1]; // Pegar o ÚLTIMO número, não o primeiro
       
       console.log('[ColorProgressionDesktop] Checking number', { 
         lastNumber, 
         lastNumbersLength: lastNumbers.length,
-        selectedNumbersLength: selectedNumbers.length,
-        lastProcessedIndex: lastProcessedIndexRef.current,
-        currentIndex
+        selectedNumbersLength: selectedNumbers.length
       });
       
-      // Verificar se é um número novo que ainda não foi processado
-      if (currentIndex > lastProcessedIndexRef.current) {
-        lastProcessedIndexRef.current = currentIndex;
+      // Verificar se o tamanho do array mudou (novo número adicionado)
+      if (lastNumbers.length !== selectedNumbers.length) {
         console.log('[ColorProgressionDesktop] Processing new number:', lastNumber);
         
-        // Só adicionar número e calcular WIN/LOSS se NÃO estiver pausado
-        if (!isPaused) {
-          // Adicionar o número ao selectedNumbers
-          setSelectedNumbers(prev => [lastNumber, ...prev]);
-          const prevNumber = selectedNumbers.length > 0 ? selectedNumbers[0] : null;
-          const currentColor = getNumberColor(lastNumber);
-          
-          // Definir currentBetColor sempre que o número não for zero
-          if (currentColor === 'red' || currentColor === 'black') {
-            setCurrentBetColor(currentColor as 'red' | 'black');
-            setLastWasZero(false);
-          }
+        setSelectedNumbers(prev => {
+          const newSelectedNumbers = [lastNumber, ...prev];
           
           // Se o número atual é zero, computar LOSS, avançar posição e marcar que saiu zero
           if (lastNumber === 0) {
@@ -141,62 +97,59 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
             if (currentPosition < 11) {
               setCurrentPosition(newPosition);
             }
-          } else if (prevNumber !== null) {
-            const lastColor = getNumberColor(prevNumber);
+            return newSelectedNumbers;
+          }
 
-            if (lastColor && lastColor !== 'green' && currentColor !== 'green') {
-              if (lastColor === currentColor) {
-                const betValue = progression[currentPosition];
-                setCurrentBalance(cb => cb + betValue);
-                setWins(w => w + 1);
-                
-                const newPosition = currentPosition > 0 ? currentPosition - 1 : currentPosition;
-                setBetHistory(bh => [...bh, {
-                  position: currentPosition,
-                  balanceChange: betValue,
-                  wasWin: true,
-                  betColor: currentColor as 'red' | 'black'
-                }]);
-                
-                if (currentPosition > 0) {
-                  setCurrentPosition(newPosition);
-                }
-              } else {
-                const betValue = progression[currentPosition];
-                setCurrentBalance(cb => cb - betValue);
-                setLosses(l => l + 1);
-                
-                const newPosition = currentPosition < 11 ? currentPosition + 1 : currentPosition;
-                setBetHistory(bh => [...bh, {
-                  position: currentPosition,
-                  balanceChange: -betValue,
-                  wasWin: false,
-                  betColor: currentColor as 'red' | 'black'
-                }]);
-                
-                if (currentPosition < 11) {
-                  setCurrentPosition(newPosition);
-                }
+          const lastColor = prev.length > 0 ? getNumberColor(prev[0]) : null;
+          const currentColor = getNumberColor(lastNumber);
+
+          const newBetColor = (currentColor === 'red' || currentColor === 'black') ? currentColor as 'red' | 'black' : currentBetColor;
+          if (currentColor === 'red' || currentColor === 'black') {
+            setCurrentBetColor(newBetColor);
+            setLastWasZero(false);
+          }
+
+          if (lastColor && lastColor !== 'green' && currentColor !== 'green') {
+            if (lastColor === currentColor) {
+              const betValue = progression[currentPosition];
+              setCurrentBalance(cb => cb + betValue);
+              setWins(w => w + 1);
+              
+              const newPosition = currentPosition > 0 ? currentPosition - 1 : currentPosition;
+              setBetHistory(bh => [...bh, {
+                position: currentPosition,
+                balanceChange: betValue,
+                wasWin: true,
+                betColor: newBetColor
+              }]);
+              
+              if (currentPosition > 0) {
+                setCurrentPosition(newPosition);
+              }
+            } else {
+              const betValue = progression[currentPosition];
+              setCurrentBalance(cb => cb - betValue);
+              setLosses(l => l + 1);
+              
+              const newPosition = currentPosition < 11 ? currentPosition + 1 : currentPosition;
+              setBetHistory(bh => [...bh, {
+                position: currentPosition,
+                balanceChange: -betValue,
+                wasWin: false,
+                betColor: newBetColor
+              }]);
+              
+              if (currentPosition < 11) {
+                setCurrentPosition(newPosition);
               }
             }
           }
           
-          // Verificar se houve 3 LOSS consecutivos
-          if (betHistory.length >= 3) {
-            const lastThreeBets = betHistory.slice(-3);
-            const threeConsecutiveLosses = lastThreeBets.every(bet => !bet.wasWin);
-            
-            if (threeConsecutiveLosses) {
-              const currentAverage = calculateColorRepetitionAverage();
-              setAlertRepetitionAverage(currentAverage);
-              setShowLossAlert(true);
-              setIsPaused(true);
-            }
-          }
-        }
+          return newSelectedNumbers;
+        });
       }
     }
-  }, [lastNumbers, isOpen, isPaused]);
+  }, [lastNumbers, isOpen]);
 
   const countByColor = (color: string): number => {
     return selectedNumbers.filter(num => getNumberColor(num) === color).length;
@@ -218,90 +171,6 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   const totalBets = wins + losses;
   const winPercentage = totalBets > 0 ? ((wins / totalBets) * 100).toFixed(1) : '0.0';
   const lossPercentage = totalBets > 0 ? ((losses / totalBets) * 100).toFixed(1) : '0.0';
-
-  const calculateColorRepetitionAverage = (): number => {
-    if (lastNumbers.length < 2) return 0;
-    
-    const reversedNumbers = [...lastNumbers].reverse();
-    const sequences: number[] = [];
-    let currentSequenceLength = 1;
-    
-    for (let i = 1; i < reversedNumbers.length; i++) {
-      const prevColor = getNumberColor(reversedNumbers[i - 1]);
-      const currentColor = getNumberColor(reversedNumbers[i]);
-      
-      if (prevColor === 'green' || currentColor === 'green') {
-        if (currentSequenceLength > 1) {
-          sequences.push(currentSequenceLength);
-        }
-        currentSequenceLength = 1;
-        continue;
-      }
-      
-      if (prevColor === currentColor) {
-        currentSequenceLength++;
-      } else {
-        sequences.push(currentSequenceLength);
-        currentSequenceLength = 1;
-      }
-    }
-    
-    if (currentSequenceLength > 0) {
-      sequences.push(currentSequenceLength);
-    }
-    
-    if (sequences.length === 0) return 0;
-    
-    const sum = sequences.reduce((acc, val) => acc + val, 0);
-    return sum / sequences.length;
-  };
-
-  const calculateLastNumbersStats = () => {
-    if (lastNumbers.length < 2) {
-      return { wins: 0, losses: 0, winValue: 0, lossValue: 0, result: 0 };
-    }
-    
-    const reversedNumbers = [...lastNumbers].reverse();
-    let wins = 0;
-    let losses = 0;
-    let winValue = 0;
-    let lossValue = 0;
-    const baseValue = progression[0];
-    
-    for (let i = 1; i < reversedNumbers.length; i++) {
-      const prevNumber = reversedNumbers[i - 1];
-      const currentNumber = reversedNumbers[i];
-      
-      const prevColor = getNumberColor(prevNumber);
-      const currentColor = getNumberColor(currentNumber);
-      
-      if (currentColor === 'green') {
-        losses++;
-        lossValue += baseValue;
-        continue;
-      }
-      
-      if (prevColor === 'green') {
-        continue;
-      }
-      
-      if (prevColor === currentColor) {
-        wins++;
-        winValue += baseValue;
-      } else {
-        losses++;
-        lossValue += baseValue;
-      }
-    }
-    
-    return {
-      wins,
-      losses,
-      winValue,
-      lossValue,
-      result: winValue - lossValue
-    };
-  };
 
   const calculateGoals = () => {
     const currentBalance = balance;
@@ -325,25 +194,11 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
 
   if (!isOpen) return null;
 
-  const currentRepetitionAverage = calculateColorRepetitionAverage();
-  const containerBgColor = currentRepetitionAverage < 2 ? 'bg-red-100' : 'bg-white';
-
   return (
-    <div className={`${containerBgColor} rounded-lg shadow-lg p-4`} style={{marginTop: '-15px', marginBottom: '20px'}}>
+    <div className="bg-white rounded-lg shadow-lg p-4" style={{marginTop: '-15px', marginBottom: '20px'}}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-bold text-gray-800">Progressão de Cores</h3>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsPaused(!isPaused)}
-            className={`${
-              isPaused 
-                ? 'text-green-500 hover:text-green-700' 
-                : 'text-orange-500 hover:text-orange-700'
-            } transition-colors p-1`}
-            title={isPaused ? 'Retomar Progressão' : 'Pausar Progressão'}
-          >
-            {isPaused ? <Play size={20} /> : <Pause size={20} />}
-          </button>
           <button
             onClick={() => {
               const now = new Date();
@@ -471,54 +326,6 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                 );
               })}
             </div>
-          </div>
-        </div>
-      )}
-
-      {showLossAlert && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" onClick={() => setShowLossAlert(false)}>
-          <div className="bg-gradient-to-br from-red-50 via-red-100 to-red-200 rounded-2xl shadow-2xl p-8 max-w-lg w-full mx-4 border-4 border-red-400" style={{animation: 'pulse 0.5s ease-in-out 2'}} onClick={(e) => e.stopPropagation()}>
-            <div className="flex flex-col items-center mb-6">
-              <div className="bg-red-500 rounded-full p-4 mb-4 shadow-lg">
-                <AlertTriangle size={48} className="text-white" strokeWidth={2.5} />
-              </div>
-              <h3 className="text-3xl font-black text-red-800 text-center mb-2">
-                ⚠️ ATENÇÃO ⚠️
-              </h3>
-              <div className="w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent rounded-full"></div>
-            </div>
-            
-            <div className="bg-white rounded-xl p-6 mb-6 border-2 border-red-300 shadow-inner">
-              <div className="text-center mb-4">
-                <p className="text-lg font-bold text-red-900 mb-3">
-                  Detectamos 3 LOSS consecutivos!
-                </p>
-                <div className="bg-red-100 rounded-lg p-4 mb-4 border border-red-300">
-                  <p className="text-sm text-red-800 font-semibold mb-2">
-                    📊 Sua média de repetição atual é:
-                  </p>
-                  <p className="text-4xl font-black text-red-600">
-                    {alertRepetitionAverage.toFixed(2)}
-                  </p>
-                </div>
-                <p className="text-base text-gray-700 leading-relaxed">
-                  A progressão foi <span className="font-bold text-red-700">pausada automaticamente</span> por segurança. 
-                  Aguarde a média de repetição subir um pouco antes de retomar as apostas.
-                </p>
-              </div>
-              
-              <div className="flex items-center justify-center gap-2 text-sm text-red-700 bg-red-50 rounded-lg p-3 border border-red-200">
-                <AlertTriangle size={16} />
-                <span className="font-semibold">Recomendação: Aguarde uma sequência favorável</span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowLossAlert(false)}
-              className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
-            >
-              Entendi, vou aguardar
-            </button>
           </div>
         </div>
       )}
@@ -665,50 +472,9 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-2 border border-blue-200">
-            <div className="grid grid-cols-4 gap-2">
-              {(() => {
-                const stats = calculateLastNumbersStats();
-                const repetitionAvg = calculateColorRepetitionAverage();
-                const resultado = stats.winValue - stats.lossValue;
-                
-                return (
-                  <>
-                    <div className="text-center">
-                      <div className="text-xs text-blue-700 font-medium mb-0.5">Média de Repetição</div>
-                      <div className="text-base font-bold text-blue-900">
-                        {repetitionAvg.toFixed(2)}
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xs text-green-700 font-medium mb-0.5">Qtde WIN</div>
-                      <div className="text-base font-bold text-green-900">
-                        {stats.wins}
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xs text-red-700 font-medium mb-0.5">Qtde LOSS</div>
-                      <div className="text-base font-bold text-red-900">
-                        {stats.losses}
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xs text-purple-700 font-medium mb-0.5">Resultado</div>
-                      <div className={`text-base font-bold ${
-                        resultado >= 0 ? 'text-green-900' : 'text-red-900'
-                      }`}>
-                        R$ {resultado.toFixed(2)}
-                      </div>
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-
-          <div className="bg-gray-50 rounded-lg p-2">
-            <div className="flex justify-between items-center mb-1.5">
+        <div className="space-y-3">
+          <div className="bg-gray-50 rounded-lg p-3">
+            <div className="flex justify-between items-center mb-2">
               <div className="text-xs text-gray-500">Progressão de Apostas</div>
               <div className="text-xs text-gray-600">
                 Total: R$ {progression.reduce((sum, val) => sum + val, 0).toFixed(2)}
@@ -747,7 +513,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
             </div>
           </div>
 
-          <div className="flex gap-2 mt-1">
+          <div className="flex gap-2">
             <button
               onClick={() => {
                 setSelectedNumbers([]);
