@@ -110,10 +110,11 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
         lastProcessedLengthRef.current = lastNumbers.length;
         console.log('[ColorProgressionDesktop] Processing new number:', lastNumber);
         
-        // Só adicionar número e calcular WIN/LOSS se NÃO estiver pausado
+        // SEMPRE adicionar o número ao selectedNumbers (independente de pausa)
+        setSelectedNumbers(prev => [lastNumber, ...prev]);
+        
+        // Só calcular WIN/LOSS se NÃO estiver pausado
         if (!isPaused) {
-          // Adicionar o número ao selectedNumbers
-          setSelectedNumbers(prev => [lastNumber, ...prev]);
           const prevNumber = selectedNumbers.length > 0 ? selectedNumbers[0] : null;
           const currentColor = getNumberColor(lastNumber);
           
@@ -131,12 +132,30 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
             setLastWasZero(true);
             
             const newPosition = currentPosition < 11 ? currentPosition + 1 : currentPosition;
-            setBetHistory(bh => [...bh, {
+            const newBetEntry = {
               position: currentPosition,
               balanceChange: -betValue,
               wasWin: false,
               betColor: currentBetColor
-            }]);
+            };
+            setBetHistory(bh => {
+              const updatedHistory = [...bh, newBetEntry];
+              
+              // Verificar 3 LOSS consecutivos com histórico atualizado
+              if (updatedHistory.length >= 3) {
+                const lastThreeBets = updatedHistory.slice(-3);
+                const threeConsecutiveLosses = lastThreeBets.every(bet => !bet.wasWin);
+                
+                if (threeConsecutiveLosses) {
+                  const currentAverage = calculateColorRepetitionAverage();
+                  setAlertRepetitionAverage(currentAverage);
+                  setShowLossAlert(true);
+                  setIsPaused(true);
+                }
+              }
+              
+              return updatedHistory;
+            });
             
             if (currentPosition < 11) {
               setCurrentPosition(newPosition);
@@ -167,30 +186,35 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                 setLosses(l => l + 1);
                 
                 const newPosition = currentPosition < 11 ? currentPosition + 1 : currentPosition;
-                setBetHistory(bh => [...bh, {
+                const newBetEntry = {
                   position: currentPosition,
                   balanceChange: -betValue,
                   wasWin: false,
                   betColor: currentColor as 'red' | 'black'
-                }]);
+                };
+                setBetHistory(bh => {
+                  const updatedHistory = [...bh, newBetEntry];
+                  
+                  // Verificar 3 LOSS consecutivos com histórico atualizado
+                  if (updatedHistory.length >= 3) {
+                    const lastThreeBets = updatedHistory.slice(-3);
+                    const threeConsecutiveLosses = lastThreeBets.every(bet => !bet.wasWin);
+                    
+                    if (threeConsecutiveLosses) {
+                      const currentAverage = calculateColorRepetitionAverage();
+                      setAlertRepetitionAverage(currentAverage);
+                      setShowLossAlert(true);
+                      setIsPaused(true);
+                    }
+                  }
+                  
+                  return updatedHistory;
+                });
                 
                 if (currentPosition < 11) {
                   setCurrentPosition(newPosition);
                 }
               }
-            }
-          }
-          
-          // Verificar se houve 3 LOSS consecutivos
-          if (betHistory.length >= 3) {
-            const lastThreeBets = betHistory.slice(-3);
-            const threeConsecutiveLosses = lastThreeBets.every(bet => !bet.wasWin);
-            
-            if (threeConsecutiveLosses) {
-              const currentAverage = calculateColorRepetitionAverage();
-              setAlertRepetitionAverage(currentAverage);
-              setShowLossAlert(true);
-              setIsPaused(true);
             }
           }
         }
