@@ -69,15 +69,15 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
     }
   }, [isOpen]);
 
-  const lastProcessedIndexRef = useRef<number>(-1);
+  const lastProcessedLengthRef = useRef<number>(0);
 
   useEffect(() => {
     if (!isOpen) {
-      lastProcessedIndexRef.current = -1;
-      return;
+      // Quando fecha, resetar para processar do zero na próxima abertura
+      lastProcessedLengthRef.current = 0;
     } else {
-      // Quando abre, marcar todos os números atuais como já processados
-      lastProcessedIndexRef.current = lastNumbers.length - 1;
+      // Quando abre, marcar o tamanho atual do array para ignorar números antigos
+      lastProcessedLengthRef.current = lastNumbers.length;
     }
   }, [isOpen]);
 
@@ -101,13 +101,13 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
         lastNumber, 
         lastNumbersLength: lastNumbers.length,
         selectedNumbersLength: selectedNumbers.length,
-        lastProcessedIndex: lastProcessedIndexRef.current,
+        lastProcessedLength: lastProcessedLengthRef.current,
         currentIndex
       });
       
-      // Verificar se é um número novo que ainda não foi processado
-      if (currentIndex > lastProcessedIndexRef.current) {
-        lastProcessedIndexRef.current = currentIndex;
+      // Verificar se é um número novo (array cresceu)
+      if (lastNumbers.length > lastProcessedLengthRef.current) {
+        lastProcessedLengthRef.current = lastNumbers.length;
         console.log('[ColorProgressionDesktop] Processing new number:', lastNumber);
         
         // Só adicionar número e calcular WIN/LOSS se NÃO estiver pausado
