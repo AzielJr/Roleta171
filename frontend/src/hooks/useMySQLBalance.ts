@@ -46,26 +46,37 @@ export const useMySQLBalance = () => {
       // Buscar último saldo do usuário
       const { saldo: lastSaldo } = await saldoAPI.getLast(user.id);
       
+      // Função para normalizar valores numéricos (MySQL retorna como string)
+      const normalizeSaldo = (saldo: R171Saldo): R171Saldo => ({
+        ...saldo,
+        saldo_inicial: saldo.saldo_inicial != null ? Number(saldo.saldo_inicial) : null,
+        saldo_atual: saldo.saldo_atual != null ? Number(saldo.saldo_atual) : null,
+        vlr_lucro: saldo.vlr_lucro != null ? Number(saldo.vlr_lucro) : null,
+        per_lucro: saldo.per_lucro != null ? Number(saldo.per_lucro) : null
+      });
+      
       if (lastSaldo) {
-        setLastSaldoRecord(lastSaldo);
+        const normalizedLastSaldo = normalizeSaldo(lastSaldo);
+        setLastSaldoRecord(normalizedLastSaldo);
         
         // Se o último saldo é de hoje, usar ele
-        if (lastSaldo.data === today) {
-          setCurrentSaldoRecord(lastSaldo);
-          setBalance(lastSaldo.saldo_atual || 0);
+        if (normalizedLastSaldo.data === today) {
+          setCurrentSaldoRecord(normalizedLastSaldo);
+          setBalance(normalizedLastSaldo.saldo_atual || 0);
         } else {
           // Criar novo registro para hoje baseado no saldo anterior
           const newSaldo = await saldoAPI.create({
             id_senha: user.id,
             data: today,
-            saldo_inicial: lastSaldo.saldo_atual || 0,
-            saldo_atual: lastSaldo.saldo_atual || 0,
+            saldo_inicial: normalizedLastSaldo.saldo_atual || 0,
+            saldo_atual: normalizedLastSaldo.saldo_atual || 0,
             vlr_lucro: 0,
             per_lucro: 0
           });
           
-          setCurrentSaldoRecord(newSaldo.saldo);
-          setBalance(newSaldo.saldo.saldo_atual || 0);
+          const normalizedNewSaldo = normalizeSaldo(newSaldo.saldo);
+          setCurrentSaldoRecord(normalizedNewSaldo);
+          setBalance(normalizedNewSaldo.saldo_atual || 0);
         }
       } else {
         // Primeiro acesso - criar registro inicial
@@ -78,8 +89,9 @@ export const useMySQLBalance = () => {
           per_lucro: 0
         });
         
-        setCurrentSaldoRecord(newSaldo.saldo);
-        setLastSaldoRecord(newSaldo.saldo);
+        const normalizedNewSaldo = normalizeSaldo(newSaldo.saldo);
+        setCurrentSaldoRecord(normalizedNewSaldo);
+        setLastSaldoRecord(normalizedNewSaldo);
         setBalance(0);
       }
     } catch (error) {
@@ -102,7 +114,7 @@ export const useMySQLBalance = () => {
     updatingRef.current = true;
 
     try {
-      const saldoInicial = currentSaldoRecord.saldo_inicial || 0;
+      const saldoInicial = Number(currentSaldoRecord.saldo_inicial) || 0;
       const vlrLucro = newBalance - saldoInicial;
       const perLucro = saldoInicial !== 0 ? (vlrLucro / saldoInicial) * 100 : 0;
 
@@ -112,7 +124,16 @@ export const useMySQLBalance = () => {
         per_lucro: perLucro
       });
 
-      setCurrentSaldoRecord(updated.saldo);
+      // Normalizar valores numéricos
+      const normalizedSaldo = {
+        ...updated.saldo,
+        saldo_inicial: Number(updated.saldo.saldo_inicial),
+        saldo_atual: Number(updated.saldo.saldo_atual),
+        vlr_lucro: Number(updated.saldo.vlr_lucro),
+        per_lucro: Number(updated.saldo.per_lucro)
+      };
+
+      setCurrentSaldoRecord(normalizedSaldo);
       setBalance(newBalance);
 
       if (description) {
@@ -154,7 +175,17 @@ export const useMySQLBalance = () => {
     
     try {
       const updated = await saldoAPI.update(currentSaldoRecord.id, updates);
-      setCurrentSaldoRecord(updated.saldo);
+      
+      // Normalizar valores numéricos
+      const normalizedSaldo = {
+        ...updated.saldo,
+        saldo_inicial: Number(updated.saldo.saldo_inicial),
+        saldo_atual: Number(updated.saldo.saldo_atual),
+        vlr_lucro: Number(updated.saldo.vlr_lucro),
+        per_lucro: Number(updated.saldo.per_lucro)
+      };
+      
+      setCurrentSaldoRecord(normalizedSaldo);
       if (updates.saldo_atual !== undefined) {
         setBalance(updates.saldo_atual);
       }
@@ -178,7 +209,16 @@ export const useMySQLBalance = () => {
         per_lucro: saldoInicial !== 0 ? ((saldoAtual - saldoInicial) / saldoInicial) * 100 : 0
       });
       
-      setCurrentSaldoRecord(newSaldo.saldo);
+      // Normalizar valores numéricos
+      const normalizedSaldo = {
+        ...newSaldo.saldo,
+        saldo_inicial: Number(newSaldo.saldo.saldo_inicial),
+        saldo_atual: Number(newSaldo.saldo.saldo_atual),
+        vlr_lucro: Number(newSaldo.saldo.vlr_lucro),
+        per_lucro: Number(newSaldo.saldo.per_lucro)
+      };
+      
+      setCurrentSaldoRecord(normalizedSaldo);
       setBalance(saldoAtual);
       return true;
     } catch (error) {
