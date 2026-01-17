@@ -559,6 +559,13 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                 balanceHistory.push(runningBalance);
               });
 
+              console.log('[Gráfico] Debug:', {
+                selectedNumbersCount: selectedNumbers.length,
+                betHistoryCount: betHistory.length,
+                balanceHistoryCount: balanceHistory.length,
+                balanceHistory: balanceHistory
+              });
+
               generateSessionReport({
                 initialBalance: balance,
                 operationResult: currentBalance,
