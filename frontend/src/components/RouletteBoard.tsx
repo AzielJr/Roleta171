@@ -4025,7 +4025,25 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               title="Remover último número"
 >
               🗑️
-            </button>            
+            </button>
+            
+            <button
+              onClick={() => {
+                if (lastNumbers.length >= 5) {
+                  const newNumbers = lastNumbers.slice(5);
+                  setLastNumbers(newNumbers);
+                  // Marcar o novo número mais recente na race
+                  setLastSelectedNumber(newNumbers.length > 0 ? newNumbers[newNumbers.length - 1] : null);
+                }
+              }}
+              disabled={lastNumbers.length < 5}
+              className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white px-2 py-1 rounded transition-colors flex items-center justify-center text-xs font-semibold"
+              style={{height: '22px', fontSize: '11px'}}
+              title="Remover os 5 primeiros números da lista"
+            >
+              -5
+            </button>
+            
             <button
               onClick={() => setShowConfigModal(true)}
               className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors flex items-center justify-center"
