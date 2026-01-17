@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { saldoAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useBalance } from '../contexts/BalanceContext';
-import { R171Saldo } from '../lib/supabase';
+import { R171Saldo } from '../lib/api';
  
 interface HistoricoSaldosProps {
   onClose: () => void;
@@ -53,61 +53,12 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose, varia
       console.log('🚨 Data Inicial:', dataInicial);
       console.log('🚨 Data Final:', dataFinal);
       
-      // CONSULTA DIRETA SEM FILTROS PRIMEIRO
-      console.log('🚨 FAZENDO CONSULTA SEM FILTROS PARA VER TODOS OS REGISTROS...');
-      const { data: todosRegistros, error: erroTodos } = await supabase
-        .from('r171_saldo')
-        .select('*')
-        .eq('id_senha', user.id)
-        .order('data', { ascending: true });
-
-      if (erroTodos) {
-        console.error('🚨 ERRO NA CONSULTA SEM FILTROS:', erroTodos);
-      } else {
-        console.log('🚨 TODOS OS REGISTROS NO BANCO (SEM FILTROS):', todosRegistros);
-        console.log('🚨 QUANTIDADE TOTAL DE REGISTROS:', todosRegistros?.length || 0);
-        
-        const todasAsDatasDisponiveis = todosRegistros?.map(r => r.data).sort() || [];
-        console.log('🚨 TODAS AS DATAS DISPONÍVEIS NO BANCO:', todasAsDatasDisponiveis);
-        
-        // 🔍 VERIFICAR SE AS DATAS ESTÃO REALMENTE EM 2025
-        console.log('🔍 === ANÁLISE DAS DATAS ===');
-        todosRegistros?.forEach(registro => {
-          const [ano, mes, dia] = registro.data.split('-');
-          console.log(`📅 Data: ${registro.data} -> Ano: ${ano}, Mês: ${mes}, Dia: ${dia}`);
-          if (ano === '2025') {
-            console.log('⚠️ ATENÇÃO: Data com ano 2025 encontrada!', registro.data);
-          }
-        });
-      }
-
-      // Agora fazer a consulta com filtros
-      let query = supabase
-        .from('r171_saldo')
-        .select('*')
-        .eq('id_senha', user.id);
-
-      // Aplicar filtros de data se definidos
-      if (dataInicial) {
-        query = query.gte('data', dataInicial);
-      }
-      
-      if (dataFinal) {
-        // CORREÇÃO: Usar lte (<=) ao invés de lt (<) para incluir a data final selecionada
-        console.log('🔍 DEBUG - Data final original:', dataFinal);
-        console.log('🔍 DEBUG - Usando filtro: data <= ', dataFinal);
-        console.log('🔍 DEBUG - Teste: "2025-09-25" <= "' + dataFinal + '"?', '2025-09-25' <= dataFinal);
-        console.log('🔍 DEBUG - Teste: "2025-09-24" <= "' + dataFinal + '"?', '2025-09-24' <= dataFinal);
-        
-        query = query.lte('data', dataFinal);
-      }
-
-      const { data, error } = await query.order('data', { ascending: true });
-
-      if (error) {
-        console.error('Erro ao carregar histórico:', error);
-        return;
-      }
+      // Buscar histórico usando a nova API MySQL
+      const { saldos: data } = await saldoAPI.getHistory(
+        user.id,
+        dataInicial || undefined,
+        dataFinal || undefined
+      );
 
       console.log('🔍 DEBUG - TODOS OS REGISTROS RETORNADOS:', data);
       console.log('🔍 DEBUG - Quantidade de registros:', data?.length || 0);
@@ -190,30 +141,12 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose, varia
     }
   }, [user, dataInicial, dataFinal, balance]); // Adicionar balance para recarregar quando o saldo mudar
 
-  // Assinar alterações em tempo real para manter a lista sempre atualizada
+  // Recarregar histórico quando balance mudar (indica que houve atualização)
   useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel('historico_saldos_changes')
-      .on('postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'r171_saldo',
-          filter: `id_senha=eq.${user.id}`
-        },
-        (payload) => {
-          console.log('🟢 Alteração detectada em r171_saldo:', payload.eventType, payload.new || payload.old);
-          // Recarregar mantendo filtros atuais
-          carregarHistorico();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      try { channel.unsubscribe(); } catch {}
-    };
-  }, [user, dataInicial, dataFinal]);
+    if (user && dataInicial && dataFinal) {
+      carregarHistorico();
+    }
+  }, [user, balance]);
 
   const aplicarFiltro = () => {
     console.log('🔥 BOTÃO FILTRAR CLICADO! 🔥');

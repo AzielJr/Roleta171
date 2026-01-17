@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useSupabaseBalance, Transaction } from '../hooks/useSupabaseBalance';
-import { R171Saldo } from '../lib/supabase';
+import { useMySQLBalance, Transaction } from '../hooks/useMySQLBalance';
+import { R171Saldo } from '../lib/api';
 
 interface BalanceContextType {
   balance: number;
@@ -23,7 +23,7 @@ interface BalanceProviderProps {
 }
 
 export const BalanceProvider: React.FC<BalanceProviderProps> = ({ children }) => {
-  const balanceData = useSupabaseBalance();
+  const balanceData = useMySQLBalance();
 
   return (
     <BalanceContext.Provider value={balanceData}>

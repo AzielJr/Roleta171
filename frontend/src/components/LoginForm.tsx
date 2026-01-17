@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase, R171Senha } from '../lib/supabase';
+import { authAPI, R171Senha } from '../lib/api';
 
 interface LoginFormProps {
   onLogin: (user: R171Senha) => void;
@@ -17,30 +17,21 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     setError('');
 
     try {
-      
-      // Busca usuário pela senha na tabela r171_senha
-      const { data, error } = await supabase
-        .from('r171_senha')
-        .select('id, created_at, nome, senha')
-        .eq('senha', senha)
-        .maybeSingle();
+      // Login usando a nova API MySQL
+      // Nota: API atual usa senha direta, mas idealmente deveria ter nome de usuário
+      // Por enquanto, vamos usar 'admin' como nome padrão
+      const { user } = await authAPI.login('admin', senha);
 
-      if (error) {
-        console.error('Erro do Supabase:', error);
-        setError(`Erro na consulta: ${error.message}`);
-        return;
-      }
-
-      if (!data) {
+      if (!user) {
         setError('Senha incorreta. Tente novamente.');
         return;
       }
 
       // Login bem-sucedido
-      onLogin(data);
-    } catch (err) {
+      onLogin(user);
+    } catch (err: any) {
       console.error('Erro no login:', err);
-      setError('Erro ao fazer login. Tente novamente.');
+      setError(err.message || 'Erro ao fazer login. Tente novamente.');
     } finally {
       setLoading(false);
     }

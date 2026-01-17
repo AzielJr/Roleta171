@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { R171Senha } from '../lib/supabase';
+import { R171Senha } from '../lib/api';
 
 interface AuthContextType {
   user: R171Senha | null;
