@@ -72,6 +72,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
 
   const lastProcessedLengthRef = useRef<number>(0);
   const selectedNumbersRef = useRef<number[]>([]);
+  const isFirstOpenRef = useRef<boolean>(true);
 
   // Sincronizar ref com state
   useEffect(() => {
@@ -83,9 +84,11 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
       // Quando fecha, resetar para processar do zero na próxima abertura
       lastProcessedLengthRef.current = 0;
       selectedNumbersRef.current = [];
-    } else {
-      // Quando abre, marcar o tamanho atual do array para ignorar números antigos
-      lastProcessedLengthRef.current = lastNumbers.length;
+      isFirstOpenRef.current = true;
+    } else if (isFirstOpenRef.current) {
+      // Quando abre pela primeira vez, resetar para processar todos os números desde o início
+      lastProcessedLengthRef.current = 0;
+      isFirstOpenRef.current = false;
     }
   }, [isOpen]);
 
@@ -264,6 +267,138 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   const calculateLossValue = (): number => {
     return Math.abs(betHistory.filter(bet => !bet.wasWin).reduce((sum, bet) => sum + bet.balanceChange, 0));
   };
+
+  // Calcular WIN/LOSS e sequências diretamente de lastNumbers
+  const calculateWinLossStats = () => {
+    if (lastNumbers.length < 2) {
+      return {
+        wins: 0,
+        losses: 0,
+        currentWinStreak: 0,
+        maxWinStreak: 0,
+        currentLossStreak: 0,
+        maxLossStreak: 0
+      };
+    }
+
+    // PASSO 1: Processar do mais recente para o mais antigo (direita para esquerda)
+    // lastNumbers vem [antigo...recente], então inverter para [recente...antigo]
+    const reversedNumbers = [...lastNumbers].reverse();
+    let wins = 0;
+    let losses = 0;
+    let tempWinStreak = 0;
+    let tempLossStreak = 0;
+    let maxWinStreak = 0;
+    let maxLossStreak = 0;
+
+    for (let i = 1; i < reversedNumbers.length; i++) {
+      const prevNumber = reversedNumbers[i - 1];
+      const currentNumber = reversedNumbers[i];
+      const prevColor = getNumberColor(prevNumber);
+      const currentColor = getNumberColor(currentNumber);
+
+      // Se o número atual é zero, é LOSS
+      if (currentNumber === 0) {
+        losses++;
+        tempWinStreak = 0;
+        tempLossStreak++;
+        maxLossStreak = Math.max(maxLossStreak, tempLossStreak);
+        continue;
+      }
+
+      // Ignorar se o anterior era zero
+      if (prevColor === 'green') {
+        continue;
+      }
+
+      // Comparar cores
+      if (prevColor === currentColor && prevColor !== 'green' && currentColor !== 'green') {
+        // WIN
+        wins++;
+        tempLossStreak = 0;
+        tempWinStreak++;
+        maxWinStreak = Math.max(maxWinStreak, tempWinStreak);
+      } else if (prevColor !== currentColor && prevColor !== 'green' && currentColor !== 'green') {
+        // LOSS
+        losses++;
+        tempWinStreak = 0;
+        tempLossStreak++;
+        maxLossStreak = Math.max(maxLossStreak, tempLossStreak);
+      }
+    }
+
+    // PASSO 2: Contar do INÍCIO (mais recente) quantos WIN/LOSS consecutivos existem AGORA
+    let currentWinStreak = 0;
+    let currentLossStreak = 0;
+    let lastResultType: 'win' | 'loss' | null = null;
+    
+    // Começar do primeiro resultado (mais recente) e ir para frente
+    for (let i = 1; i < reversedNumbers.length; i++) {
+      const prevNumber = reversedNumbers[i - 1];
+      const currentNumber = reversedNumbers[i];
+      const prevColor = getNumberColor(prevNumber);
+      const currentColor = getNumberColor(currentNumber);
+
+      // Se o número atual é zero, é LOSS
+      if (currentNumber === 0) {
+        if (lastResultType === null) {
+          lastResultType = 'loss';
+          currentLossStreak = 1;
+        } else if (lastResultType === 'loss') {
+          currentLossStreak++;
+        } else {
+          break; // Era WIN, parar
+        }
+        continue;
+      }
+
+      // Ignorar se o anterior era zero
+      if (prevColor === 'green') {
+        continue;
+      }
+
+      // Comparar cores
+      if (prevColor === currentColor && prevColor !== 'green' && currentColor !== 'green') {
+        // WIN
+        if (lastResultType === null) {
+          lastResultType = 'win';
+          currentWinStreak = 1;
+        } else if (lastResultType === 'win') {
+          currentWinStreak++;
+        } else {
+          break; // Era LOSS, parar
+        }
+      } else if (prevColor !== currentColor && prevColor !== 'green' && currentColor !== 'green') {
+        // LOSS
+        if (lastResultType === null) {
+          lastResultType = 'loss';
+          currentLossStreak = 1;
+        } else if (lastResultType === 'loss') {
+          currentLossStreak++;
+        } else {
+          break; // Era WIN, parar
+        }
+      }
+    }
+
+    const result = {
+      wins,
+      losses,
+      currentWinStreak,
+      maxWinStreak,
+      currentLossStreak,
+      maxLossStreak
+    };
+    
+    console.log('[calculateWinLossStats] Resultado:', {
+      lastNumbers: lastNumbers.slice(-5),
+      result
+    });
+    
+    return result;
+  };
+
+  const winLossStats = calculateWinLossStats();
 
   const totalNumbers = selectedNumbers.length;
   const blackPercentage = totalNumbers > 0 ? ((countByColor('black') / totalNumbers) * 100).toFixed(1) : '0.0';
@@ -739,13 +874,13 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                     <div className="text-center">
                       <div className="text-xs text-green-700 font-medium mb-0.5">Qtde WIN</div>
                       <div className="text-base font-bold text-green-900">
-                        {stats.wins}
+                        {winLossStats.wins} <span className="text-xs">({winLossStats.currentWinStreak}/{winLossStats.maxWinStreak})</span>
                       </div>
                     </div>
                     <div className="text-center">
                       <div className="text-xs text-red-700 font-medium mb-0.5">Qtde LOSS</div>
                       <div className="text-base font-bold text-red-900">
-                        {stats.losses}
+                        {winLossStats.losses} <span className="text-xs">({winLossStats.currentLossStreak}/{winLossStats.maxLossStreak})</span>
                       </div>
                     </div>
                     <div className="text-center">
