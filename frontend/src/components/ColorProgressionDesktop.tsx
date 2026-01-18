@@ -183,9 +183,8 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
           // Verificar se há cor manual definida para a posição atual
           const manualColor = manualBorderColors[currentPosition] as 'green' | 'red' | 'black' | undefined;
           
-          // Se a cor manual é verde, não conta win nem loss - apenas adiciona o número
+          // Se a cor manual é verde, não faz nada - verde não conta win nem loss
           if (manualColor === 'green') {
-            // Não faz nada, apenas adiciona o número (já foi adicionado acima)
             console.log('[ColorProgressionDesktop] Cor manual verde - não conta win/loss');
           }
           // Se o número atual é zero, computar LOSS, avançar posição e marcar que saiu zero
@@ -227,6 +226,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
             }
           } else if (prevNumber !== null) {
             // Se a cor manual é verde, não conta win nem loss
+            // @ts-expect-error - manualColor pode ser 'green' via type assertion
             if (manualColor === 'green') {
               console.log('[ColorProgressionDesktop] Cor da aposta é verde - não conta win/loss');
             } else {
