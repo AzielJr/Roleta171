@@ -440,8 +440,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   
   // Estados para os campos do modal de cadastrar saldo
   const [createDataCadastro, setCreateDataCadastro] = useState(new Date().toISOString().split('T')[0]);
-  const [createSaldoInicial, setCreateSaldoInicial] = useState(currentSaldoRecord?.saldo_atual || 0);
-  const [createSaldoAtual, setCreateSaldoAtual] = useState(currentSaldoRecord?.saldo_atual || 0);
+  const [createSaldoInicial, setCreateSaldoInicial] = useState(Number(currentSaldoRecord?.saldo_atual) || 0);
+  const [createSaldoAtual, setCreateSaldoAtual] = useState(Number(currentSaldoRecord?.saldo_atual) || 0);
   
   // Cálculos automáticos baseados nos valores
   const valorLucro = editSaldoAtual - editSaldoInicial;
@@ -1139,7 +1139,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   const [recentSaldos, setRecentSaldos] = useState<Array<{ data: string; saldo_inicial: number; saldo_atual: number }>>([]);
   useEffect(() => {
     if (showMobileCreateBalancePage) {
-      const last = (lastSaldoRecord?.saldo_atual ?? currentSaldoRecord?.saldo_atual ?? balance) || 0;
+      const last = Number(lastSaldoRecord?.saldo_atual ?? currentSaldoRecord?.saldo_atual ?? balance) || 0;
       setCreateSaldoInicial(last);
       setCreateSaldoAtual(last);
       setCreateDataCadastro(new Date().toISOString().split('T')[0]);
@@ -5354,7 +5354,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                   if (!user) return;
                   const { saldo } = await saldoAPI.getLast(user.id);
                   
-                  const lastSaldo = saldo?.saldo_atual || 0;
+                  const lastSaldo = Number(saldo?.saldo_atual) || 0;
                   setCreateSaldoInicial(lastSaldo);
                   setCreateSaldoAtual(lastSaldo);
                   setCreateDataCadastro(new Date().toISOString().split('T')[0]);
@@ -5680,8 +5680,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                     setShowCreateBalanceModal(false);
                     // Resetar os campos - usar o novo saldo atual como base
                     setCreateDataCadastro(new Date().toISOString().split('T')[0]);
-                    setCreateSaldoInicial(createSaldoAtual); // Usar o saldo atual como novo saldo inicial
-                    setCreateSaldoAtual(createSaldoAtual);
+                    setCreateSaldoInicial(Number(createSaldoAtual)); // Usar o saldo atual como novo saldo inicial
+                    setCreateSaldoAtual(Number(createSaldoAtual));
                   } else {
                     console.error('Erro ao criar registro de saldo');
                   }
