@@ -7,7 +7,7 @@ interface BalanceManagerProps {
 
 export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }) => {
   const { 
-    balance, 
+    balance: rawBalance, 
     transactions, 
     loading, 
     addEntry, 
@@ -16,6 +16,8 @@ export const BalanceManager: React.FC<BalanceManagerProps> = ({ className = '' }
     currentSaldoRecord,
     refreshBalance 
   } = useBalance();
+  
+  const balance = Number(rawBalance) || 0;
 
   const [showTransactions, setShowTransactions] = useState(false);
   const [entryAmount, setEntryAmount] = useState('');
