@@ -25,9 +25,9 @@ interface SessionSummaryReportProps {
 }
 
 export const SessionSummaryReport: React.FC<SessionSummaryReportProps> = ({
-  initialBalance,
-  operationResult,
-  entryValue,
+  initialBalance: rawInitialBalance,
+  operationResult: rawOperationResult,
+  entryValue: rawEntryValue,
   selectedNumbers,
   startTime,
   endTime,
@@ -40,12 +40,19 @@ export const SessionSummaryReport: React.FC<SessionSummaryReportProps> = ({
   greenPercentage,
   wins,
   winPercentage,
-  winValue,
+  winValue: rawWinValue,
   losses,
   lossPercentage,
-  lossValue,
-  balanceHistory
+  lossValue: rawLossValue,
+  balanceHistory: rawBalanceHistory
 }) => {
+  // Garantir que todos os valores sejam números
+  const initialBalance = Number(rawInitialBalance) || 0;
+  const operationResult = Number(rawOperationResult) || 0;
+  const entryValue = Number(rawEntryValue) || 0;
+  const winValue = Number(rawWinValue) || 0;
+  const lossValue = Number(rawLossValue) || 0;
+  const balanceHistory = (rawBalanceHistory || []).map(v => Number(v) || 0);
   const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
   const blackNumbers = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
 
