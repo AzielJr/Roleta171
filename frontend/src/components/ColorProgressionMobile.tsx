@@ -9,7 +9,8 @@ interface ColorProgressionMobileProps {
 }
 
 export const ColorProgressionMobile: React.FC<ColorProgressionMobileProps> = ({ isOpen, onClose }) => {
-  const { balance } = useBalance();
+  const { balance: rawBalance } = useBalance();
+  const balance = Number(rawBalance) || 0;
   const [entryValue, setEntryValue] = useState<number>(0.5);
   const [entryValueInput, setEntryValueInput] = useState<string>('0,50');
   const [currentBalance, setCurrentBalance] = useState<number>(0);
