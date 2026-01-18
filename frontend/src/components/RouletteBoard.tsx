@@ -3309,7 +3309,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                   </div>
                   <div>
                     <div className="text-gray-600">Saldo Inicial</div>
-                    <div className="font-bold text-gray-800">R$ {(currentSaldoRecord?.saldo_inicial || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div className="font-bold text-gray-800">R$ {(Number(currentSaldoRecord?.saldo_inicial) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   </div>
                   <div>
                     <div className="text-gray-600">Saldo Atual</div>
@@ -3346,8 +3346,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                   ].map((it, idx) => (
                     <div key={idx} className={`text-center ${it.bg} rounded p-2 border border-blue-400 -mt-[6px] -mb-[6px]`}>
                       <div className="text-blue-700 text-xs">{(it.p * 100).toFixed(2)}%</div>
-                      <div className={`${it.text} font-bold text-xs`}>R$ {((currentSaldoRecord?.saldo_inicial || 0) * (1 + it.p)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      <div className={`${it.sub} text-[11px]`}>({((currentSaldoRecord?.saldo_inicial || 0) * it.p).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</div>
+                      <div className={`${it.text} font-bold text-xs`}>R$ {((Number(currentSaldoRecord?.saldo_inicial) || 0) * (1 + it.p)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className={`${it.sub} text-[11px]`}>({((Number(currentSaldoRecord?.saldo_inicial) || 0) * it.p).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</div>
                     </div>
                   ))}
                 </div>
@@ -4811,7 +4811,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               <div className="text-center">
                 <div className="text-white/80 text-sm mb-1">Saldo Inicial</div>
                 <div className="text-white font-bold text-base">
-                  R$ {(currentSaldoRecord?.saldo_inicial || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  R$ {(Number(currentSaldoRecord?.saldo_inicial) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
               <div className="text-center">
@@ -4822,8 +4822,8 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               </div>
               <div className="text-center">
                 <div className="text-white/80 text-sm mb-1">Valor do Lucro</div>
-                <div className={`font-bold text-base ${(currentSaldoRecord?.vlr_lucro || 0) >= 0 ? 'text-green-200' : 'text-amber-900'}`}>
-                  {(currentSaldoRecord?.vlr_lucro || 0) >= 0 ? '+' : ''}R$ {(currentSaldoRecord?.vlr_lucro || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div className={`font-bold text-base ${(Number(currentSaldoRecord?.vlr_lucro) || 0) >= 0 ? 'text-green-200' : 'text-amber-900'}`}>
+                  {(Number(currentSaldoRecord?.vlr_lucro) || 0) >= 0 ? '+' : ''}R$ {(Number(currentSaldoRecord?.vlr_lucro) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
               <div className="text-center">
@@ -4844,36 +4844,36 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 <div className="text-center">
                   <div className="text-yellow-200 text-base mb-1">2,34%</div>
                   <div className="text-white font-bold text-base flex items-center justify-center gap-1">
-                    <span>R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0234).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span>R$ {((Number(currentSaldoRecord?.saldo_inicial) || 0) * 1.0234).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     <span className="text-green-300 text-sm">
-                      ({((currentSaldoRecord?.saldo_inicial || 0) * 0.0234).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                      ({((Number(currentSaldoRecord?.saldo_inicial) || 0) * 0.0234).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                     </span>
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-yellow-200 text-base mb-1">3,73%</div>
                   <div className="text-white font-bold text-base flex items-center justify-center gap-1">
-                    <span>R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0373).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span>R$ {((Number(currentSaldoRecord?.saldo_inicial) || 0) * 1.0373).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     <span className="text-green-300 text-sm">
-                      ({((currentSaldoRecord?.saldo_inicial || 0) * 0.0373).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                      ({((Number(currentSaldoRecord?.saldo_inicial) || 0) * 0.0373).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                     </span>
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-yellow-200 text-base mb-1">4,73%</div>
                   <div className="text-white font-bold text-base flex items-center justify-center gap-1">
-                    <span>R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.0473).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span>R$ {((Number(currentSaldoRecord?.saldo_inicial) || 0) * 1.0473).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     <span className="text-green-300 text-sm">
-                      ({((currentSaldoRecord?.saldo_inicial || 0) * 0.0473).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                      ({((Number(currentSaldoRecord?.saldo_inicial) || 0) * 0.0473).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                     </span>
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-yellow-200 text-base mb-1">10,00%</div>
                   <div className="text-white font-bold text-base flex items-center justify-center gap-1">
-                    <span>R$ {((currentSaldoRecord?.saldo_inicial || 0) * 1.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span>R$ {((Number(currentSaldoRecord?.saldo_inicial) || 0) * 1.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     <span className="text-green-300 text-sm">
-                      ({((currentSaldoRecord?.saldo_inicial || 0) * 0.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                      ({((Number(currentSaldoRecord?.saldo_inicial) || 0) * 0.10).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                     </span>
                   </div>
                 </div>
@@ -4932,7 +4932,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 </div>
                 <div>
                   <div className="text-gray-600">Saldo Inicial</div>
-                  <div className="font-bold text-gray-800">R$ {(currentSaldoRecord?.saldo_inicial || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div className="font-bold text-gray-800">R$ {(Number(currentSaldoRecord?.saldo_inicial) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
                 <div>
                   <div className="text-gray-600">Saldo Atual</div>
@@ -4940,7 +4940,7 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
                 </div>
                 <div>
                   <div className="text-gray-600">Valor do Lucro</div>
-                  <div className={(currentSaldoRecord?.vlr_lucro || 0) >= 0 ? 'text-green-600 font-bold' : 'text-amber-900 font-bold'}>{(currentSaldoRecord?.vlr_lucro || 0) >= 0 ? '+' : ''}R$ {(currentSaldoRecord?.vlr_lucro || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div className={(Number(currentSaldoRecord?.vlr_lucro) || 0) >= 0 ? 'text-green-600 font-bold' : 'text-amber-900 font-bold'}>{(Number(currentSaldoRecord?.vlr_lucro) || 0) >= 0 ? '+' : ''}R$ {(Number(currentSaldoRecord?.vlr_lucro) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
                 <div>
                   <div className="text-gray-600">Percentual do Lucro</div>

@@ -37,12 +37,15 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
         console.log('Data do registro:', currentSaldoRecord.data);
       
       if (hasRealData) {
-        // Formatar com 2 casas decimais
-        const saldoAtualFormatted = (currentSaldoRecord.saldo_atual || 0).toLocaleString('pt-BR', { 
+        // Formatar com 2 casas decimais - garantir que sejam números
+        const saldoAtualNum = Number(currentSaldoRecord.saldo_atual) || 0;
+        const saldoInicialNum = Number(currentSaldoRecord.saldo_inicial) || 0;
+        
+        const saldoAtualFormatted = saldoAtualNum.toLocaleString('pt-BR', { 
           minimumFractionDigits: 2, 
           maximumFractionDigits: 2 
         }).replace('.', '').replace(',', '.');
-        const saldoInicialFormatted = (currentSaldoRecord.saldo_inicial || 0).toLocaleString('pt-BR', { 
+        const saldoInicialFormatted = saldoInicialNum.toLocaleString('pt-BR', { 
           minimumFractionDigits: 2, 
           maximumFractionDigits: 2 
         }).replace('.', '').replace(',', '.');
@@ -79,7 +82,8 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
         .single();
 
       if (data && !error) {
-        const saldoFormatted = (data.saldo_atual || 0).toLocaleString('pt-BR', { 
+        const saldoAtualNum = Number(data.saldo_atual) || 0;
+        const saldoFormatted = saldoAtualNum.toLocaleString('pt-BR', { 
           minimumFractionDigits: 2, 
           maximumFractionDigits: 2 
         }).replace('.', '').replace(',', '.');
@@ -218,12 +222,15 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
 
   const handleCancel = () => {
     if (currentSaldoRecord) {
-      // Formatar com 2 casas decimais
-      const saldoAtualFormatted = (currentSaldoRecord.saldo_atual || 0).toLocaleString('pt-BR', { 
+      // Formatar com 2 casas decimais - garantir que sejam números
+      const saldoAtualNum = Number(currentSaldoRecord.saldo_atual) || 0;
+      const saldoInicialNum = Number(currentSaldoRecord.saldo_inicial) || 0;
+      
+      const saldoAtualFormatted = saldoAtualNum.toLocaleString('pt-BR', { 
         minimumFractionDigits: 2, 
         maximumFractionDigits: 2 
       }).replace('.', '').replace(',', '.');
-      const saldoInicialFormatted = (currentSaldoRecord.saldo_inicial || 0).toLocaleString('pt-BR', { 
+      const saldoInicialFormatted = saldoInicialNum.toLocaleString('pt-BR', { 
         minimumFractionDigits: 2, 
         maximumFractionDigits: 2 
       }).replace('.', '').replace(',', '.');
@@ -480,7 +487,7 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
                 Saldo Inicial
               </label>
               <div className="text-4xl font-bold text-blue-800">
-                R$ {(currentSaldoRecord.saldo_inicial || 0).toLocaleString('pt-BR', { 
+                R$ {(Number(currentSaldoRecord.saldo_inicial) || 0).toLocaleString('pt-BR', { 
                   minimumFractionDigits: 2, 
                   maximumFractionDigits: 2 
                 })}
@@ -492,8 +499,8 @@ export const SaldoManager: React.FC<SaldoManagerProps> = ({ className = '' }) =>
               <label className="block text-base font-medium text-green-700 mb-1">
                 Saldo Atual
               </label>
-              <div className={`text-4xl font-bold ${(currentSaldoRecord.saldo_atual || 0) >= 0 ? 'text-green-800' : 'text-amber-900'}`}>
-                R$ {(currentSaldoRecord.saldo_atual || 0).toLocaleString('pt-BR', { 
+              <div className={`text-4xl font-bold ${(Number(currentSaldoRecord.saldo_atual) || 0) >= 0 ? 'text-green-800' : 'text-amber-900'}`}>
+                R$ {(Number(currentSaldoRecord.saldo_atual) || 0).toLocaleString('pt-BR', { 
                   minimumFractionDigits: 2, 
                   maximumFractionDigits: 2 
                 })}
