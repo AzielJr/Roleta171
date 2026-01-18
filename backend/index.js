@@ -8,7 +8,22 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware - CORS permitindo todas as origens
+// Middleware manual de CORS - DEVE vir ANTES de qualquer outra coisa
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  // Responder imediatamente ao preflight OPTIONS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
+
+// Middleware - CORS do Express como backup
 app.use(cors({
   origin: true,
   credentials: true,
