@@ -52,6 +52,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ saldos: rows });
   } catch (error) {
     console.error('Erro ao buscar histórico:', error);
-    return res.status(500).json({ error: 'Erro ao buscar histórico' });
+    return res.status(500).json({ 
+      error: 'Erro ao buscar histórico',
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
   }
 }

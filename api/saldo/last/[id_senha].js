@@ -42,6 +42,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ saldo: rows[0] });
   } catch (error) {
     console.error('Erro ao buscar último saldo:', error);
-    return res.status(500).json({ error: 'Erro ao buscar saldo' });
+    return res.status(500).json({ 
+      error: 'Erro ao buscar saldo',
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
   }
 }
