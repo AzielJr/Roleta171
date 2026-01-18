@@ -38,7 +38,7 @@ export default async function handler(req, res) {
         per_lucro,
         created_at,
         updated_at
-      FROM saldos 
+      FROM r171_saldo 
       WHERE id_senha = ? 
       ORDER BY data DESC 
       LIMIT 1`,

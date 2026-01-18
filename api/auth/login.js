@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     }
 
     const [rows] = await pool.query(
-      'SELECT * FROM usuarios WHERE senha = ?',
+      'SELECT * FROM r171_senha WHERE senha = ?',
       [senha]
     );
 
