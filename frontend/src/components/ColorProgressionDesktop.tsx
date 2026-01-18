@@ -34,6 +34,9 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   const [alertRepetitionAverage, setAlertRepetitionAverage] = useState<number>(0);
   const [shouldResetOnUnpause, setShouldResetOnUnpause] = useState<boolean>(false);
   const [manualBorderColors, setManualBorderColors] = useState<{[key: number]: 'green' | 'red' | 'black' | null}>({});
+  const [selectedStartPosition, setSelectedStartPosition] = useState<number | null>(null);
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isLongPressing, setIsLongPressing] = useState<number | null>(null);
 
   const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
   const blackNumbers = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
@@ -59,8 +62,13 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   const progression = calculateProgression();
 
   // Função para alternar a cor da borda ao clicar no card
-  const toggleBorderColor = (position: number) => {
-    if (!isPaused) return; // Só permite alternar quando pausado
+  const toggleBorderColor = (position: number, event: React.MouseEvent) => {
+    // Se Shift estiver pressionado, seleciona a posição inicial
+    if (event.shiftKey) {
+      setSelectedStartPosition(position);
+      setCurrentPosition(position);
+      return;
+    }
     
     const currentColor = manualBorderColors[position];
     let nextColor: 'green' | 'red' | 'black';
@@ -79,6 +87,60 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
     }));
   };
 
+  // Handlers para long press (tablet/mobile)
+  const handleTouchStart = (position: number) => {
+    setIsLongPressing(position);
+    const timer = setTimeout(() => {
+      // Long press detectado - seleciona posição inicial
+      setSelectedStartPosition(position);
+      setCurrentPosition(position);
+      setIsLongPressing(null);
+      
+      // Feedback visual/haptic
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 500); // 500ms para long press
+    
+    setLongPressTimer(timer);
+  };
+
+  const handleTouchEnd = (position: number) => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+    
+    // Se não foi long press, alterna cor da borda
+    if (isLongPressing === position) {
+      const currentColor = manualBorderColors[position];
+      let nextColor: 'green' | 'red' | 'black';
+      
+      if (!currentColor || currentColor === 'green') {
+        nextColor = 'red';
+      } else if (currentColor === 'red') {
+        nextColor = 'black';
+      } else {
+        nextColor = 'green';
+      }
+      
+      setManualBorderColors(prev => ({
+        ...prev,
+        [position]: nextColor
+      }));
+    }
+    
+    setIsLongPressing(null);
+  };
+
+  const handleTouchCancel = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+    setIsLongPressing(null);
+  };
+
   useEffect(() => {
     if (!isOpen) {
       setSelectedNumbers([]);
@@ -90,6 +152,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
       setCurrentBetColor(null);
       setLastWasZero(false);
       setManualBorderColors({});
+      setSelectedStartPosition(null);
       return;
     }
   }, [isOpen]);
@@ -174,18 +237,32 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
           // Adicionar o número ao selectedNumbers
           setSelectedNumbers(prev => [lastNumber, ...prev]);
           
+          // Se o último foi zero e este número não é zero, apenas define a cor
+          if (lastWasZero && currentColor !== 'green') {
+            console.log('[ColorProgressionDesktop] Número após zero - apenas definindo cor');
+            setCurrentBetColor(currentColor as 'red' | 'black');
+            setLastWasZero(false);
+            // NÃO incrementa LOSS, NÃO adiciona ao betHistory, NÃO muda posição
+            return;
+          }
+          
           // Definir currentBetColor sempre que o número não for zero
           if (currentColor === 'red' || currentColor === 'black') {
             setCurrentBetColor(currentColor as 'red' | 'black');
-            setLastWasZero(false);
           }
           
           // Verificar se há cor manual definida para a posição atual
           const manualColor = manualBorderColors[currentPosition] as 'green' | 'red' | 'black' | undefined;
           
-          // Se a cor manual é verde, não faz nada - verde não conta win nem loss
+          // Se a cor manual é verde, não conta win nem loss mas adiciona ao histórico com mudança zero
           if (manualColor === 'green') {
             console.log('[ColorProgressionDesktop] Cor manual verde - não conta win/loss');
+            setBetHistory(bh => [...bh, {
+              position: currentPosition,
+              balanceChange: 0,
+              wasWin: false,
+              betColor: null
+            }]);
           }
           // Se o número atual é zero, computar LOSS, avançar posição e marcar que saiu zero
           else if (lastNumber === 0) {
@@ -225,10 +302,16 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
               setCurrentPosition(newPosition);
             }
           } else if (prevNumber !== null) {
-            // Se a cor manual é verde, não conta win nem loss
+            // Se a cor manual é verde, não conta win nem loss mas adiciona ao histórico
             // @ts-expect-error - manualColor pode ser 'green' via type assertion
             if (manualColor === 'green') {
               console.log('[ColorProgressionDesktop] Cor da aposta é verde - não conta win/loss');
+              setBetHistory(bh => [...bh, {
+                position: currentPosition,
+                balanceChange: 0,
+                wasWin: false,
+                betColor: null
+              }]);
             } else {
               // Usar cor manual se definida (red ou black), senão usar cor automática
               const betColorToUse: 'red' | 'black' | null = manualColor === 'red' || manualColor === 'black' ? manualColor : currentBetColor;
@@ -290,11 +373,20 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
               }
             }
             }
+          } else {
+            // Primeiro número - adicionar ao histórico com mudança zero
+            console.log('[ColorProgressionDesktop] Primeiro número - adicionando ao histórico');
+            setBetHistory(bh => [...bh, {
+              position: currentPosition,
+              balanceChange: 0,
+              wasWin: false,
+              betColor: currentColor as 'red' | 'black' | null
+            }]);
           }
         }
       }
     }
-  }, [lastNumbers, isOpen, isPaused]);
+  }, [lastNumbers, isOpen, isPaused, manualBorderColors, currentPosition, currentBetColor, lastWasZero, progression]);
 
   const countByColor = (color: string): number => {
     return selectedNumbers.filter(num => getNumberColor(num) === color).length;
@@ -308,9 +400,9 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
     return Math.abs(betHistory.filter(bet => !bet.wasWin).reduce((sum, bet) => sum + bet.balanceChange, 0));
   };
 
-  // Calcular WIN/LOSS e sequências diretamente de lastNumbers
+  // Calcular WIN/LOSS e sequências diretamente de betHistory
   const calculateWinLossStats = () => {
-    if (lastNumbers.length < 2) {
+    if (betHistory.length === 0) {
       return {
         wins: 0,
         losses: 0,
@@ -321,9 +413,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
       };
     }
 
-    // PASSO 1: Processar do mais recente para o mais antigo (direita para esquerda)
-    // lastNumbers vem [antigo...recente], então inverter para [recente...antigo]
-    const reversedNumbers = [...lastNumbers].reverse();
+    // Contar total de wins e losses
     let wins = 0;
     let losses = 0;
     let tempWinStreak = 0;
@@ -331,93 +421,33 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
     let maxWinStreak = 0;
     let maxLossStreak = 0;
 
-    for (let i = 1; i < reversedNumbers.length; i++) {
-      const prevNumber = reversedNumbers[i - 1];
-      const currentNumber = reversedNumbers[i];
-      const prevColor = getNumberColor(prevNumber);
-      const currentColor = getNumberColor(currentNumber);
-
-      // Se o número atual é zero, é LOSS
-      if (currentNumber === 0) {
-        losses++;
-        tempWinStreak = 0;
-        tempLossStreak++;
-        maxLossStreak = Math.max(maxLossStreak, tempLossStreak);
-        continue;
-      }
-
-      // Ignorar se o anterior era zero
-      if (prevColor === 'green') {
-        continue;
-      }
-
-      // Comparar cores
-      if (prevColor === currentColor && prevColor !== 'green' && currentColor !== 'green') {
-        // WIN
+    // Processar betHistory (já está em ordem cronológica)
+    betHistory.forEach(bet => {
+      if (bet.wasWin) {
         wins++;
         tempLossStreak = 0;
         tempWinStreak++;
         maxWinStreak = Math.max(maxWinStreak, tempWinStreak);
-      } else if (prevColor !== currentColor && prevColor !== 'green' && currentColor !== 'green') {
-        // LOSS
+      } else {
         losses++;
         tempWinStreak = 0;
         tempLossStreak++;
         maxLossStreak = Math.max(maxLossStreak, tempLossStreak);
       }
-    }
+    });
 
-    // PASSO 2: Contar do INÍCIO (mais recente) quantos WIN/LOSS consecutivos existem AGORA
+    // Contar streak atual (do final para trás)
     let currentWinStreak = 0;
     let currentLossStreak = 0;
-    let lastResultType: 'win' | 'loss' | null = null;
     
-    // Começar do primeiro resultado (mais recente) e ir para frente
-    for (let i = 1; i < reversedNumbers.length; i++) {
-      const prevNumber = reversedNumbers[i - 1];
-      const currentNumber = reversedNumbers[i];
-      const prevColor = getNumberColor(prevNumber);
-      const currentColor = getNumberColor(currentNumber);
-
-      // Se o número atual é zero, é LOSS
-      if (currentNumber === 0) {
-        if (lastResultType === null) {
-          lastResultType = 'loss';
-          currentLossStreak = 1;
-        } else if (lastResultType === 'loss') {
-          currentLossStreak++;
-        } else {
-          break; // Era WIN, parar
-        }
-        continue;
-      }
-
-      // Ignorar se o anterior era zero
-      if (prevColor === 'green') {
-        continue;
-      }
-
-      // Comparar cores
-      if (prevColor === currentColor && prevColor !== 'green' && currentColor !== 'green') {
-        // WIN
-        if (lastResultType === null) {
-          lastResultType = 'win';
-          currentWinStreak = 1;
-        } else if (lastResultType === 'win') {
-          currentWinStreak++;
-        } else {
-          break; // Era LOSS, parar
-        }
-      } else if (prevColor !== currentColor && prevColor !== 'green' && currentColor !== 'green') {
-        // LOSS
-        if (lastResultType === null) {
-          lastResultType = 'loss';
-          currentLossStreak = 1;
-        } else if (lastResultType === 'loss') {
-          currentLossStreak++;
-        } else {
-          break; // Era WIN, parar
-        }
+    for (let i = betHistory.length - 1; i >= 0; i--) {
+      const bet = betHistory[i];
+      if (bet.wasWin) {
+        if (currentLossStreak > 0) break; // Já estava contando LOSS
+        currentWinStreak++;
+      } else {
+        if (currentWinStreak > 0) break; // Já estava contando WIN
+        currentLossStreak++;
       }
     }
 
@@ -431,7 +461,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
     };
     
     console.log('[calculateWinLossStats] Resultado:', {
-      lastNumbers: lastNumbers.slice(-5),
+      betHistoryLength: betHistory.length,
       result
     });
     
@@ -592,8 +622,11 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                 }
               };
 
+              // Construir balanceHistory: cada aposta gera um ponto no gráfico
+              // betHistory está em ordem cronológica (mais antigo primeiro)
               const balanceHistory: number[] = [];
               let runningBalance = 0;
+              
               betHistory.forEach(bet => {
                 runningBalance += bet.balanceChange;
                 balanceHistory.push(runningBalance);
@@ -982,18 +1015,29 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                 return (
                   <div key={idx} className="relative">
                     <div 
-                      onClick={() => toggleBorderColor(idx)}
-                      className={`p-2 rounded text-center font-bold ${
-                        currentPosition === idx 
-                          ? `bg-yellow-200 text-gray-800 border-4 ${borderColor} ${isPaused ? 'cursor-pointer hover:opacity-80' : ''}`
-                          : 'bg-gray-100 text-gray-600'
+                      onClick={(e) => toggleBorderColor(idx, e)}
+                      onTouchStart={() => handleTouchStart(idx)}
+                      onTouchEnd={() => handleTouchEnd(idx)}
+                      onTouchCancel={handleTouchCancel}
+                      className={`p-2 rounded text-center font-bold transition-all select-none cursor-pointer ${
+                        isLongPressing === idx
+                          ? 'bg-blue-300 text-gray-800 border-2 border-blue-500 scale-105'
+                          : currentPosition === idx 
+                          ? `bg-yellow-200 text-gray-800 border-4 ${borderColor} hover:opacity-80` 
+                          : selectedStartPosition === idx
+                          ? 'bg-blue-100 text-gray-800 border-2 border-blue-400 hover:opacity-80'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
+                      title='Desktop: Clique=alternar cor | Shift+Clique=selecionar posição | Tablet: Toque=alternar cor | Toque longo=selecionar posição'
                     >
                       <div className="text-xs">#{idx + 1}</div>
                       <div className="text-sm">{value.toFixed(2)}</div>
                     </div>
                     {currentPosition === idx && (
                       <div className={`absolute -bottom-1.5 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent ${arrowColor}`}></div>
+                    )}
+                    {selectedStartPosition === idx && currentPosition !== idx && (
+                      <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">✓</div>
                     )}
                   </div>
                 );
@@ -1013,6 +1057,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                 setCurrentBetColor(null);
                 setLastWasZero(false);
                 setStartTime('');
+                setSelectedStartPosition(null);
               }}
               className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold text-sm transition-colors"
             >

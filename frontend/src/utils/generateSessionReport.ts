@@ -1149,7 +1149,7 @@ export const generateSessionReport = (data: SessionReportData): void => {
       xAxisLabel.setAttribute('fill', '#64748b');
       xAxisLabel.setAttribute('font-size', '14');
       xAxisLabel.setAttribute('font-weight', '600');
-      xAxisLabel.textContent = 'Numero de Apostas: ' + balanceHistory.length;
+      xAxisLabel.textContent = 'Numero de Apostas: ' + ${data.selectedNumbers.length};
       svg.appendChild(xAxisLabel);
 
       // Y-axis label removed - now in chart title
