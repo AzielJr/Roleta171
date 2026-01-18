@@ -22,6 +22,7 @@ import FourColorsMobile from './FourColorsMobile';
 import ColorProgressionMobile from './ColorProgressionMobile';
 import ColorProgressionDesktop from './ColorProgressionDesktop';
 import { supabase } from '../lib/supabase';
+import { saldoAPI } from '../lib/api';
 import { detectSequenceAlerts } from '../utils/sequenceAlerts';
 import { LogOut } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
@@ -1221,36 +1222,40 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
   useEffect(() => {
     const loadRecent = async () => {
       if (!user) return;
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const { data } = await supabase
-        .from('r171_saldo')
-        .select('data,saldo_inicial,saldo_atual')
-        .eq('id_senha', user.id)
-        .lt('data', today)
-        .order('data', { ascending: false })
-        .limit(5);
-      const list = (data as any[]) || [];
-      const filtered = list.filter((s) => s.data !== today).slice(0, 4);
-      setRecentSaldos(filtered);
+      try {
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const dataFinal = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+        
+        const { saldos } = await saldoAPI.getHistory(user.id, undefined, dataFinal);
+        const filtered = (saldos || []).slice(0, 4);
+        setRecentSaldos(filtered);
+      } catch (error) {
+        console.error('Erro ao carregar saldos recentes:', error);
+        setRecentSaldos([]);
+      }
     };
     loadRecent();
   }, [user, showMobileDashboard]);
   const refreshAllUI = async () => {
     if (!user) return;
     await refreshBalance();
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const { data } = await supabase
-      .from('r171_saldo')
-      .select('data,saldo_inicial,saldo_atual')
-      .eq('id_senha', user.id)
-      .lt('data', today)
-      .order('data', { ascending: false })
-      .limit(5);
-    const list = (data as any[]) || [];
-    const filtered = list.filter((s) => s.data !== today).slice(0, 4);
-    setRecentSaldos(filtered);
+    try {
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const dataFinal = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+      
+      const { saldos } = await saldoAPI.getHistory(user.id, undefined, dataFinal);
+      const filtered = (saldos || []).slice(0, 4);
+      setRecentSaldos(filtered);
+    } catch (error) {
+      console.error('Erro ao carregar saldos recentes:', error);
+      setRecentSaldos([]);
+    }
   };
   const [editBalanceValue, setEditBalanceValue] = useState<string>('');
   const editBalanceInputRef = useRef<HTMLInputElement>(null);
@@ -5346,15 +5351,10 @@ const RouletteBoard: React.FC<RouletteProps> = ({ onLogout }) => {
               onClick={async () => {
                 // Buscar o último saldo cadastrado do banco de dados
                 try {
-                  const { data: lastRecord } = await supabase
-                    .from('r171_saldo')
-                    .select('saldo_atual')
-                    .eq('id_senha', user?.id)
-                    .order('data', { ascending: false })
-                    .limit(1)
-                    .single();
+                  if (!user) return;
+                  const { saldo } = await saldoAPI.getLast(user.id);
                   
-                  const lastSaldo = lastRecord?.saldo_atual || 0;
+                  const lastSaldo = saldo?.saldo_atual || 0;
                   setCreateSaldoInicial(lastSaldo);
                   setCreateSaldoAtual(lastSaldo);
                   setCreateDataCadastro(new Date().toISOString().split('T')[0]);
