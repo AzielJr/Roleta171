@@ -124,7 +124,8 @@ export const HistoricoSaldos: React.FC<HistoricoSaldosProps> = ({ onClose, varia
         }, {})
       ) as R171Saldo[];
 
-      porDataMaisRecente.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+      // Ordenar por data DECRESCENTE (mais recente primeiro)
+      porDataMaisRecente.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
       setSaldos(porDataMaisRecente);
       setFiltroAplicado(true);
     } catch (error) {

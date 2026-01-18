@@ -246,9 +246,27 @@ app.delete('/api/saldo/:id', async (req, res) => {
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ status: 'OK', database: 'Connected' });
+    res.json({ 
+      status: 'OK', 
+      database: 'Connected',
+      env: {
+        hasDbHost: !!process.env.DB_HOST,
+        hasDbUser: !!process.env.DB_USER,
+        hasDbName: !!process.env.DB_NAME,
+        dbName: process.env.DB_NAME
+      }
+    });
   } catch (error) {
-    res.status(500).json({ status: 'ERROR', database: 'Disconnected' });
+    res.status(500).json({ 
+      status: 'ERROR', 
+      database: 'Disconnected',
+      error: error.message,
+      env: {
+        hasDbHost: !!process.env.DB_HOST,
+        hasDbUser: !!process.env.DB_USER,
+        hasDbName: !!process.env.DB_NAME
+      }
+    });
   }
 });
 
