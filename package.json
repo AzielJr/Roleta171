@@ -1,0 +1,8 @@
+{
+  "name": "roleta171",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "mysql2": "^3.6.5"
+  }
+}
