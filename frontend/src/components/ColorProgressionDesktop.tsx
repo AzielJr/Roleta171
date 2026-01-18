@@ -33,6 +33,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   const [showLossAlert, setShowLossAlert] = useState<boolean>(false);
   const [alertRepetitionAverage, setAlertRepetitionAverage] = useState<number>(0);
   const [shouldResetOnUnpause, setShouldResetOnUnpause] = useState<boolean>(false);
+  const [manualBorderColors, setManualBorderColors] = useState<{[key: number]: 'green' | 'red' | 'black'}>({});
 
   const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
   const blackNumbers = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
@@ -57,6 +58,27 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
 
   const progression = calculateProgression();
 
+  // Função para alternar a cor da borda ao clicar no card
+  const toggleBorderColor = (position: number) => {
+    if (!isPaused) return; // Só permite alternar quando pausado
+    
+    const currentColor = manualBorderColors[position];
+    let nextColor: 'green' | 'red' | 'black';
+    
+    if (!currentColor || currentColor === 'green') {
+      nextColor = 'red';
+    } else if (currentColor === 'red') {
+      nextColor = 'black';
+    } else {
+      nextColor = 'green';
+    }
+    
+    setManualBorderColors(prev => ({
+      ...prev,
+      [position]: nextColor
+    }));
+  };
+
   useEffect(() => {
     if (!isOpen) {
       setSelectedNumbers([]);
@@ -67,6 +89,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
       setBetHistory([]);
       setCurrentBetColor(null);
       setLastWasZero(false);
+      setManualBorderColors({});
       return;
     }
   }, [isOpen]);
@@ -157,8 +180,16 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
             setLastWasZero(false);
           }
           
+          // Verificar se há cor manual definida para a posição atual
+          const manualColor = manualBorderColors[currentPosition];
+          
+          // Se a cor manual é verde, não conta win nem loss - apenas adiciona o número
+          if (manualColor === 'green') {
+            // Não faz nada, apenas adiciona o número (já foi adicionado acima)
+            console.log('[ColorProgressionDesktop] Cor manual verde - não conta win/loss');
+          }
           // Se o número atual é zero, computar LOSS, avançar posição e marcar que saiu zero
-          if (lastNumber === 0) {
+          else if (lastNumber === 0) {
             const betValue = progression[currentPosition];
             setCurrentBalance(cb => cb - betValue);
             setLosses(l => l + 1);
@@ -195,10 +226,16 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
               setCurrentPosition(newPosition);
             }
           } else if (prevNumber !== null) {
-            const lastColor = getNumberColor(prevNumber);
-
-            if (lastColor && lastColor !== 'green' && currentColor !== 'green') {
-              if (lastColor === currentColor) {
+            // Se a cor manual é verde, não conta win nem loss
+            if (manualColor === 'green') {
+              console.log('[ColorProgressionDesktop] Cor da aposta é verde - não conta win/loss');
+            } else {
+              // Usar cor manual se definida, senão usar cor automática
+              const betColorToUse = manualColor || currentBetColor;
+              
+              if (betColorToUse && currentColor !== 'green') {
+                // Verificar se ganhou (cor atual = cor da aposta)
+                if (betColorToUse === currentColor) {
                 const betValue = progression[currentPosition];
                 setCurrentBalance(cb => cb + betValue);
                 setWins(w => w + 1);
@@ -215,6 +252,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                   setCurrentPosition(newPosition);
                 }
               } else {
+                // Perdeu
                 const betValue = progression[currentPosition];
                 setCurrentBalance(cb => cb - betValue);
                 setLosses(l => l + 1);
@@ -250,6 +288,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
                   setCurrentPosition(newPosition);
                 }
               }
+            }
             }
           }
         }
@@ -517,7 +556,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   if (!isOpen) return null;
 
   const currentRepetitionAverage = calculateColorRepetitionAverage();
-  const containerBgColor = currentRepetitionAverage < 2 ? 'bg-red-100' : 'bg-white';
+  const containerBgColor = currentRepetitionAverage < 1.90 ? 'bg-red-100' : 'bg-white';
 
   return (
     <div className={`${containerBgColor} rounded-lg shadow-lg p-4`} style={{marginTop: '-15px', marginBottom: '20px'}}>
@@ -913,35 +952,52 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
               </div>
             </div>
             <div className="grid grid-cols-4 gap-2">
-              {progression.map((value, idx) => (
-                <div key={idx} className="relative">
-                  <div className={`p-2 rounded text-center font-bold ${
-                    currentPosition === idx 
-                      ? lastWasZero
-                        ? 'bg-yellow-200 text-gray-800 border-4 border-green-600'
-                        : currentBetColor === 'red' 
-                        ? 'bg-yellow-200 text-gray-800 border-4 border-red-600' 
-                        : currentBetColor === 'black'
-                        ? 'bg-yellow-200 text-gray-800 border-4 border-gray-800'
-                        : 'bg-yellow-200 text-gray-800 border-4 border-yellow-400'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    <div className="text-xs">#{idx + 1}</div>
-                    <div className="text-sm">{value.toFixed(2)}</div>
+              {progression.map((value, idx) => {
+                // Determinar a cor da borda: usar cor manual se definida, senão usar a cor automática
+                const manualColor = manualBorderColors[idx];
+                const borderColor = manualColor 
+                  ? manualColor === 'green' ? 'border-green-600'
+                    : manualColor === 'red' ? 'border-red-600'
+                    : 'border-gray-800'
+                  : lastWasZero
+                    ? 'border-green-600'
+                    : currentBetColor === 'red' 
+                    ? 'border-red-600' 
+                    : currentBetColor === 'black'
+                    ? 'border-gray-800'
+                    : 'border-yellow-400';
+                
+                const arrowColor = manualColor 
+                  ? manualColor === 'green' ? 'border-t-green-600'
+                    : manualColor === 'red' ? 'border-t-red-600'
+                    : 'border-t-gray-800'
+                  : lastWasZero
+                    ? 'border-t-green-600'
+                    : currentBetColor === 'red' 
+                    ? 'border-t-red-600' 
+                    : currentBetColor === 'black'
+                    ? 'border-t-gray-800'
+                    : 'border-t-yellow-400';
+                
+                return (
+                  <div key={idx} className="relative">
+                    <div 
+                      onClick={() => toggleBorderColor(idx)}
+                      className={`p-2 rounded text-center font-bold ${
+                        currentPosition === idx 
+                          ? `bg-yellow-200 text-gray-800 border-4 ${borderColor} ${isPaused ? 'cursor-pointer hover:opacity-80' : ''}`
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      <div className="text-xs">#{idx + 1}</div>
+                      <div className="text-sm">{value.toFixed(2)}</div>
+                    </div>
+                    {currentPosition === idx && (
+                      <div className={`absolute -bottom-1.5 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent ${arrowColor}`}></div>
+                    )}
                   </div>
-                  {currentPosition === idx && (
-                    <div className={`absolute -bottom-1.5 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent ${
-                      lastWasZero
-                        ? 'border-t-green-600'
-                        : currentBetColor === 'red' 
-                        ? 'border-t-red-600' 
-                        : currentBetColor === 'black'
-                        ? 'border-t-gray-800'
-                        : 'border-t-yellow-400'
-                    }`}></div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
