@@ -33,7 +33,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
   const [showLossAlert, setShowLossAlert] = useState<boolean>(false);
   const [alertRepetitionAverage, setAlertRepetitionAverage] = useState<number>(0);
   const [shouldResetOnUnpause, setShouldResetOnUnpause] = useState<boolean>(false);
-  const [manualBorderColors, setManualBorderColors] = useState<{[key: number]: 'green' | 'red' | 'black'}>({});
+  const [manualBorderColors, setManualBorderColors] = useState<{[key: number]: 'green' | 'red' | 'black' | null}>({});
 
   const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
   const blackNumbers = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
@@ -181,7 +181,7 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
           }
           
           // Verificar se há cor manual definida para a posição atual
-          const manualColor = manualBorderColors[currentPosition];
+          const manualColor = manualBorderColors[currentPosition] as 'green' | 'red' | 'black' | undefined;
           
           // Se a cor manual é verde, não conta win nem loss - apenas adiciona o número
           if (manualColor === 'green') {
@@ -230,8 +230,8 @@ export const ColorProgressionDesktop: React.FC<ColorProgressionDesktopProps> = (
             if (manualColor === 'green') {
               console.log('[ColorProgressionDesktop] Cor da aposta é verde - não conta win/loss');
             } else {
-              // Usar cor manual se definida, senão usar cor automática
-              const betColorToUse = manualColor || currentBetColor;
+              // Usar cor manual se definida (red ou black), senão usar cor automática
+              const betColorToUse: 'red' | 'black' | null = manualColor === 'red' || manualColor === 'black' ? manualColor : currentBetColor;
               
               if (betColorToUse && currentColor !== 'green') {
                 // Verificar se ganhou (cor atual = cor da aposta)
