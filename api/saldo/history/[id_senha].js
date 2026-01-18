@@ -1,15 +1,4 @@
-import mysql from 'mysql2/promise';
-
-const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT || 3306,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+import { getPool } from '../../_db.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -57,6 +46,7 @@ export default async function handler(req, res) {
 
     query += ' ORDER BY data DESC';
 
+    const pool = getPool();
     const [rows] = await pool.query(query, params);
 
     return res.status(200).json({ saldos: rows });
